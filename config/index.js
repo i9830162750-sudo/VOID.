@@ -3,7 +3,6 @@
  * Central configuration — reads from environment variables.
  * All runtime config flows through here; never read process.env directly in routes.
  */
-
 'use strict';
 
 module.exports = {
@@ -16,15 +15,29 @@ module.exports = {
   youtube: {
     // Server-side API key — never exposed to the client
     apiKey: process.env.VOID_YT_API_KEY || '',
-    searchEndpoint: 'https://www.googleapis.com/youtube/v3/search',
-    videosEndpoint: 'https://www.googleapis.com/youtube/v3/videos',
+    searchEndpoint:   'https://www.googleapis.com/youtube/v3/search',
+    videosEndpoint:   'https://www.googleapis.com/youtube/v3/videos',
     playlistEndpoint: 'https://www.googleapis.com/youtube/v3/playlistItems',
-    // Invidious fallback instances (used when no API key is configured)
-    invidiousInstances: [
-      'https://invidious.snopyta.org',
-      'https://invidious.kavin.rocks',
-      'https://vid.puffyan.us',
-    ],
+
+    // Invidious fallback instances — override via VOID_INVIDIOUS_INSTANCES env var
+    // (comma-separated) so you can swap instances without redeploying
+    invidiousInstances: (process.env.VOID_INVIDIOUS_INSTANCES || '')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
+      .length
+        ? (process.env.VOID_INVIDIOUS_INSTANCES || '')
+            .split(',')
+            .map(s => s.trim())
+            .filter(Boolean)
+        : [
+            'https://invidious.io.lol',
+            'https://invidious.fdn.fr',
+            'https://invidious.nerdvpn.de',
+            'https://inv.tux.pizza',
+            'https://yewtu.be',
+            'https://invidious.privacydev.net',
+          ],
   },
 
   // ── CORS ──────────────────────────────────────────────────────────────────
