@@ -189,13 +189,13 @@ exports.streamProxy = async (req, res, next) => {
   if (!videoId) return res.status(400).json({ error: 'Missing query parameter: id' });
 
   const pipedInstances = [
-    'https://pipedapi.kavin.rocks',
-    'https://piped-api.garudalinux.org',
-    'https://api.piped.projectsegfau.lt',
-    'https://pipedapi.in.projectsegfau.lt',
-    'https://pipedapi.drgns.space',
+    'https://pipedapi.reallyaweso.me',
+    'https://piped-api.privacy.com.de',
+    'https://piped.video/api',
+    'https://api.piped.yt',
+    'https://pipedapi.adminforge.de',
   ];
-
+  
   const errors = [];
 
   for (const instance of pipedInstances) {
