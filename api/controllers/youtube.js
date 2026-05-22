@@ -183,3 +183,48 @@ exports.playlistItems = async (req, res, next) => {
     next(err);
   }
 };
+
+// ── Stream proxy — fetches audio from Invidious server-side ──────────────────
+exports.streamProxy = async (req, res, next) => {
+  const videoId = String(req.query.id || '').trim();
+  if (!videoId) return res.status(400).json({ error: 'Missing query parameter: id' });
+
+  const instances = config.youtube.invidiousInstances;
+  const itags = [251, 140, 250, 18];
+  const errors = [];
+
+  for (const inst of instances) {
+    for (const itag of itags) {
+      const url = `${inst}/latest_version?id=${encodeURIComponent(videoId)}&itag=${itag}&local=true`;
+      try {
+        const upstream = await fetch(url, { signal: AbortSignal.timeout(30000) });
+        if (!upstream.ok) {
+          errors.push(`${inst} itag=${itag}: HTTP ${upstream.status}`);
+          continue;
+        }
+
+        const mimeType = (itag === 251 || itag === 250) ? 'audio/webm' : 'audio/mp4';
+        res.setHeader('Content-Type', mimeType);
+
+        const cl = upstream.headers.get('Content-Length');
+        if (cl) res.setHeader('Content-Length', cl);
+
+        res.setHeader('Cache-Control', 'no-store');
+
+        // Pipe the stream straight through — no buffering
+        upstream.body.pipeTo(
+          new WritableStream({
+            write(chunk) { res.write(chunk); },
+            close()      { res.end(); },
+            abort(err)   { next(err); }
+          })
+        );
+        return; // success — response is streaming
+      } catch (e) {
+        errors.push(`${inst} itag=${itag}: ${e.message}`);
+      }
+    }
+  }
+
+  res.status(502).json({ error: 'All Invidious instances failed', details: errors.slice(0, 5) });
+};
