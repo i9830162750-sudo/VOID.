@@ -229,3 +229,17 @@ exports.streamProxy = async (req, res, next) => {
     next(e);
   }
 };
+
+router.get('/ytdlp-test', async (req, res) => {
+  try {
+    const youtubedl = require('youtube-dl-exec');
+    const info = await youtubedl('https://www.youtube.com/watch?v=dQw4w9WgXcQ', {
+      dumpSingleJson: true,
+      noWarnings: true,
+      format: 'bestaudio',
+    });
+    res.json({ success: true, title: info.title, ext: info.ext, url: info.url?.slice(0, 80) });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
