@@ -2986,9 +2986,14 @@ function renderYTResults(data, query) {
             :`<button class="yt-result-btn" onclick="ytOpenMatchPicker(${vi},'${esc(query)}')" title="Match to library track">
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               </button>`}
-          <button class="yt-result-btn" id="${dlId}" onclick="ytDownloadTrack(${vi},'${dlId}')" title="Download &amp; play">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0018 9h-1.26A8 8 0 103 16.29"/></svg>
-            <div class="yt-dl-progress" style="width:0%"></div>
+          <button class="yt-result-btn"
+            onclick="ytPlayDirect(${vi})"
+            title="Play instantly">
+
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <polygon points="5,3 19,12 5,21"/>
+            </svg>
+
           </button>
         </div>
       </div>`;
@@ -3071,6 +3076,68 @@ function _playBlob(trackIdx) {
   isPlaying = true;
   updateUI(); renderTrackList(); renderQueueList();
   addToRecent(t.id); lrcActive = -1; saveSettings();
+}
+
+async function ytPlayDirect(vi) {
+
+  const v = ytResults[vi];
+
+  if (!v) {
+    showToast('Video not found');
+    return;
+  }
+
+  showToast('Streaming audio...');
+
+  updateBufferingUI(true);
+
+  try {
+
+    const { blobUrl, mimeType } =
+      await ytFetchBlob(v.id);
+
+    updateBufferingUI(false);
+
+    audioEl.src = blobUrl;
+
+    initAudioContext();
+
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+
+    audioEl.playbackRate = playbackSpeed;
+
+    await audioEl.play();
+
+    isPlaying = true;
+
+    npTitle.textContent = v.title || 'YouTube Track';
+    npArtist.textContent = v.artist || 'YouTube';
+
+    miniTitle.textContent = v.title || 'YouTube Track';
+    miniArtist.textContent = v.artist || 'YouTube';
+
+    if (v.thumb) {
+      npCover.innerHTML =
+        `<img src="${v.thumb}" alt="">`;
+
+      miniCover.innerHTML =
+        `<img src="${v.thumb}" alt="">`;
+    }
+
+    showToast('Now Playing');
+
+    updateUI();
+
+  } catch (e) {
+
+    console.error(e);
+
+    updateBufferingUI(false);
+
+    showToast('Streaming failed');
+  }
 }
 
 // Fetches audio via Invidious proxy, returns {blobUrl, blobId, mimeType}
