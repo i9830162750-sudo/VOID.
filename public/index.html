@@ -3141,108 +3141,40 @@ async function ytPlayDirect(videoId, title, artist, thumb) {
 
 // Fetches audio via Invidious proxy, returns {blobUrl, blobId, mimeType}
 async function ytFetchBlob(videoId, onProgress) {
-  const errors = [];
+  // ── Now calls our own backend — no more direct browser→Invidious fetches ──
+  const url = `${VOID_API_BASE}/youtube/stream?id=${encodeURIComponent(videoId)}`;
 
-  // Use only currently working-ish instances
-  const workingInstances = [
-    'https://yewtu.be',
-    'https://inv.tux.pizza',
-    'https://invidious.privacydev.net'
-  ];
+  const resp = await fetch(url, { signal: AbortSignal.timeout(60000) });
 
-  for (const inst of workingInstances) {
-
-    // Try audio-only first, then fallback
-    // 251 = opus
-    // 140 = m4a
-    // 250 = low opus
-    // 18  = mp4 fallback
-    for (const itag of [251, 140, 250, 18]) {
-
-      const url =
-        `${inst}/latest_version?id=${encodeURIComponent(videoId)}&itag=${itag}&local=true`;
-
-      try {
-
-        const resp = await fetch(url, {
-          signal: AbortSignal.timeout(30000)
-        });
-
-        if (!resp.ok) {
-          console.warn('YT source HTTP fail:', inst, itag, resp.status);
-          errors.push(`${inst} ${itag}: HTTP ${resp.status}`);
-          continue;
-        }
-
-        // Stream with progress
-        const total = parseInt(resp.headers.get('Content-Length') || '0');
-
-        const reader = resp.body.getReader();
-
-        const chunks = [];
-
-        let received = 0;
-
-        while (true) {
-
-          const { done, value } = await reader.read();
-
-          if (done) break;
-
-          chunks.push(value);
-
-          received += value.length;
-
-          if (total && onProgress) {
-            onProgress(Math.round((received / total) * 100));
-          }
-        }
-
-        const mimeType =
-          (itag === 251 || itag === 250)
-            ? 'audio/webm'
-            : 'audio/mp4';
-
-        const blob = new Blob(chunks, {
-          type: mimeType
-        });
-
-        const blobId =
-          'blob_yt_' + videoId + '_' + Date.now();
-
-        await dbPut('blobs', {
-          id: blobId,
-          blob
-        });
-
-        console.log('YT fetch success:', inst, itag);
-
-        return {
-          blobUrl: URL.createObjectURL(blob),
-          blobId,
-          mimeType
-        };
-
-      } catch (e) {
-
-        console.warn(
-          'YT source failed:',
-          inst,
-          itag,
-          e.message
-        );
-
-        errors.push(
-          `${inst} ${itag}: ${e.message}`
-        );
-      }
-    }
+  if (!resp.ok) {
+    const body = await resp.text().catch(() => '');
+    throw new Error(`Stream proxy failed ${resp.status}: ${body}`);
   }
 
-  throw new Error(
-    'All sources failed: ' +
-    errors.slice(0, 3).join('; ')
-  );
+  const total    = parseInt(resp.headers.get('Content-Length') || '0');
+  const reader   = resp.body.getReader();
+  const chunks   = [];
+  let   received = 0;
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    received += value.length;
+    if (total && onProgress) onProgress(Math.round((received / total) * 100));
+  }
+
+  // Determine mime from Content-Type header; default to webm
+  const ct       = resp.headers.get('Content-Type') || 'audio/webm';
+  const mimeType = ct.split(';')[0].trim();
+
+  const blob   = new Blob(chunks, { type: mimeType });
+  const blobId = 'blob_yt_' + videoId + '_' + Date.now();
+
+  await dbPut('blobs', { id: blobId, blob });
+
+  console.log('YT fetch success via backend proxy');
+  return { blobUrl: URL.createObjectURL(blob), blobId, mimeType };
 }
    
 // ==============================
