@@ -1236,7 +1236,7 @@ const VOID_YT_API_KEY = 'AIzaSyAyIzgLddMuiNayJcKWIlSYD5l3FL4BR1o';
 //
 // Set to true once the Express backend is deployed on Render.
 // When false (default), all existing client-side fetch behaviour is unchanged.
-const VOID_USE_BACKEND_PROXY = false;
+const VOID_USE_BACKEND_PROXY = true;
 
 // Relative URL of the backend API — works on both localhost and Render
 // because both serve the app and the API from the same origin.
@@ -1396,14 +1396,16 @@ async function ytCheckApiStatus() {
 
   try {
     const resp = await fetch(
-      `https://www.googleapis.com/youtube/v3/videos?part=id&id=dQw4w9WgXcQ&key=${encodeURIComponent(ytApiKey)}`,
+      VOID_USE_BACKEND_PROXY
+        ? `${VOID_API_BASE}/youtube/videos?ids=dQw4w9WgXcQ`
+        : `https://www.googleapis.com/youtube/v3/videos?part=id&id=dQw4w9WgXcQ&key=${encodeURIComponent(ytApiKey)}`,
       { signal: AbortSignal.timeout(5000) }
     );
     if (resp.ok) {
       if (dot)     dot.classList.remove('offline');
       if (apiDot)  apiDot.classList.remove('offline');
-      if (apiText) apiText.textContent = 'YouTube API connected';
-      if (apiVis)  apiVis.textContent  = 'LIVE';
+      if (apiText) apiText.textContent = VOID_USE_BACKEND_PROXY ? 'Backend proxy connected' : 'YouTube API connected';
+      if (apiVis)  apiVis.textContent  = VOID_USE_BACKEND_PROXY ? 'PROXY' : 'LIVE';
     } else {
       throw new Error('HTTP ' + resp.status);
     }
@@ -2806,43 +2808,58 @@ async function ytFetchResults(query) {
   const isPlaylistFilter=ytActiveFilter==='playlist';
   let ytResults=[], ytPlaylistResults=[];
 
-  if (ytApiKey) {
+  if (VOID_USE_BACKEND_PROXY || ytApiKey) {
     try {
       const videoType=isPlaylistFilter?'playlist':'video';
-      const resp=await fetch(
-        `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(effectiveQ)}&type=${videoType}&maxResults=15&key=${encodeURIComponent(ytApiKey)}`,
-        {signal:AbortSignal.timeout(8000)}
-      );
+      let resp;
+      if (VOID_USE_BACKEND_PROXY) {
+        const params=new URLSearchParams({q:effectiveQ,type:videoType,max:15});
+        resp=await fetch(`${VOID_API_BASE}/youtube/search?${params}`,{signal:AbortSignal.timeout(8000)});
+      } else {
+        resp=await fetch(
+          `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(effectiveQ)}&type=${videoType}&maxResults=15&key=${encodeURIComponent(ytApiKey)}`,
+          {signal:AbortSignal.timeout(8000)}
+        );
+      }
       if (resp.ok) {
-        const data=await resp.json();
-        const items=data.items||[];
+        const raw=await resp.json();
+        // Backend proxy returns YT API shape; normalise playlist/video items either way
+        const items=raw.items||raw||[];
         if (isPlaylistFilter) {
           ytPlaylistResults=items.map(item=>({
-            playlistId:item.id.playlistId,
-            title:item.snippet.title||'Unknown',
-            artist:item.snippet.channelTitle||'',
-            thumbnail:item.snippet.thumbnails?.medium?.url||item.snippet.thumbnails?.default?.url||null,
-            videoCount:null,
+            playlistId:item.id?.playlistId||item.playlistId,
+            title:item.snippet?.title||item.title||'Unknown',
+            artist:item.snippet?.channelTitle||item.author||'',
+            thumbnail:item.snippet?.thumbnails?.medium?.url||item.snippet?.thumbnails?.default?.url||item.playlistThumbnail||null,
+            videoCount:item.videoCount||null,
           }));
         } else {
-          const videoIds=items.map(i=>i.id.videoId).filter(Boolean).join(',');
+          const videoIds=items.map(i=>i.id?.videoId||i.videoId).filter(Boolean).join(',');
           let durMap={};
           if (videoIds) {
             try {
-              const dr=await fetch(`https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${videoIds}&key=${encodeURIComponent(ytApiKey)}`,{signal:AbortSignal.timeout(5000)});
+              let dr;
+              if (VOID_USE_BACKEND_PROXY) {
+                dr=await fetch(`${VOID_API_BASE}/youtube/videos?ids=${encodeURIComponent(videoIds)}`,{signal:AbortSignal.timeout(5000)});
+              } else {
+                dr=await fetch(`https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${videoIds}&key=${encodeURIComponent(ytApiKey)}`,{signal:AbortSignal.timeout(5000)});
+              }
               if (dr.ok) { const dd=await dr.json(); (dd.items||[]).forEach(v=>{durMap[v.id]=ytIso8601ToDur(v.contentDetails?.duration||'');}); }
             } catch(e) {}
           }
-          ytResults=items.filter(i=>i.id.videoId).map(item=>({
-            videoId:item.id.videoId,
-            title:item.snippet.title||'Unknown',
-            artist:item.snippet.channelTitle||'',
-            duration:durMap[item.id.videoId]||0,
-            thumbnail:item.snippet.thumbnails?.medium?.url||item.snippet.thumbnails?.default?.url||null,
-            localMatch:ytFindExactLocalMatch(item.snippet.title,item.snippet.channelTitle),
-          }));
+          ytResults=items.filter(i=>i.id?.videoId||i.videoId).map(item=>{
+            const vid=item.id?.videoId||item.videoId;
+            return {
+              videoId:vid,
+              title:item.snippet?.title||item.title||'Unknown',
+              artist:item.snippet?.channelTitle||item.author||'',
+              duration:durMap[vid]||item.lengthSeconds||0,
+              thumbnail:item.snippet?.thumbnails?.medium?.url||item.snippet?.thumbnails?.default?.url||null,
+              localMatch:ytFindExactLocalMatch(item.snippet?.title||item.title,item.snippet?.channelTitle||item.author),
+            };
+          });
         }
-        return {ytResults,ytPlaylistResults,localMatches,source:'yt_api'};
+        return {ytResults,ytPlaylistResults,localMatches,source:VOID_USE_BACKEND_PROXY?'backend_proxy':'yt_api'};
       }
     } catch(e) {}
   }
@@ -3442,20 +3459,36 @@ async function ytImportPlaylistById(plId, knownTitle, inputEl) {
   try {
     let pl_title=knownTitle||'YouTube Import', videos=[];
 
-    if (ytApiKey) {
+    if (VOID_USE_BACKEND_PROXY || ytApiKey) {
       try {
-        const resp=await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${encodeURIComponent(plId)}&maxResults=50&key=${encodeURIComponent(ytApiKey)}`,{signal:AbortSignal.timeout(12000)});
+        let resp;
+        if (VOID_USE_BACKEND_PROXY) {
+          resp=await fetch(`${VOID_API_BASE}/youtube/playlist?id=${encodeURIComponent(plId)}`,{signal:AbortSignal.timeout(12000)});
+        } else {
+          resp=await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${encodeURIComponent(plId)}&maxResults=50&key=${encodeURIComponent(ytApiKey)}`,{signal:AbortSignal.timeout(12000)});
+        }
         if (resp.ok) {
           const data=await resp.json();
-          const pResp=await fetch(`https://www.googleapis.com/youtube/v3/playlists?part=snippet&id=${encodeURIComponent(plId)}&key=${encodeURIComponent(ytApiKey)}`,{signal:AbortSignal.timeout(5000)});
-          if (pResp.ok) { const pData=await pResp.json(); if (pData.items&&pData.items[0]) pl_title=pData.items[0].snippet.title; }
-          videos=(data.items||[]).map(item=>({
-            videoId:item.snippet.resourceId?.videoId,
-            title:item.snippet.title||'',
-            artist:item.snippet.videoOwnerChannelTitle||'',
-            thumbnail:item.snippet.thumbnails?.medium?.url||item.snippet.thumbnails?.default?.url||null,
-            duration:0,
-          })).filter(v=>v.videoId&&v.videoId!=='Deleted video');
+          if (VOID_USE_BACKEND_PROXY) {
+            // Backend /api/youtube/playlist returns YT API playlistItems shape
+            videos=(data.items||[]).map(item=>({
+              videoId:item.snippet?.resourceId?.videoId||item.videoId,
+              title:item.snippet?.title||item.title||'',
+              artist:item.snippet?.videoOwnerChannelTitle||item.author||'',
+              thumbnail:item.snippet?.thumbnails?.medium?.url||item.snippet?.thumbnails?.default?.url||item.thumbnail||null,
+              duration:item.lengthSeconds||0,
+            })).filter(v=>v.videoId&&v.videoId!=='Deleted video');
+          } else {
+            const pResp=await fetch(`https://www.googleapis.com/youtube/v3/playlists?part=snippet&id=${encodeURIComponent(plId)}&key=${encodeURIComponent(ytApiKey)}`,{signal:AbortSignal.timeout(5000)});
+            if (pResp.ok) { const pData=await pResp.json(); if (pData.items&&pData.items[0]) pl_title=pData.items[0].snippet.title; }
+            videos=(data.items||[]).map(item=>({
+              videoId:item.snippet.resourceId?.videoId,
+              title:item.snippet.title||'',
+              artist:item.snippet.videoOwnerChannelTitle||'',
+              thumbnail:item.snippet.thumbnails?.medium?.url||item.snippet.thumbnails?.default?.url||null,
+              duration:0,
+            })).filter(v=>v.videoId&&v.videoId!=='Deleted video');
+          }
         }
       } catch(e) {}
     }
