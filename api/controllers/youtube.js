@@ -184,7 +184,7 @@ exports.playlistItems = async (req, res, next) => {
   }
 };
 
-const youtubedl = require('youtube-dl-exec');
+const youtubedl = require('@distube/ytdl-core');
 
 exports.streamProxy = async (req, res, next) => {
   const videoId = String(req.query.id || '').trim();
