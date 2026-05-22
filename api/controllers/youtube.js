@@ -6,7 +6,8 @@
  *   search(q, type, maxResults)  → /api/youtube/search
  *   videoDetails(ids)             → /api/youtube/videos
  *   playlistItems(playlistId)     → /api/youtube/playlist
- *   streamProxy(id)               → /api/youtube/stream  (JioSaavn audio)
+ *   streamProxy(id, title)        → /api/youtube/stream  (JioSaavn audio)
+ *   saavnSearch(q)                → /api/youtube/saavn/search
  */
 
 'use strict';
@@ -208,8 +209,8 @@ exports.playlistItems = async (req, res, next) => {
 };
 
 // ── Stream proxy — searches JioSaavn by YouTube title, streams audio ──────────
-// ?id=       YouTube video ID (used for cache key)
-// ?title=    YouTube video title (used to search Saavn)
+// ?id=       YouTube video ID
+// ?title=    YouTube video title (used to match on Saavn)
 exports.streamProxy = async (req, res, next) => {
   const videoId = String(req.query.id    || '').trim();
   const title   = String(req.query.title || '').trim();
@@ -218,17 +219,14 @@ exports.streamProxy = async (req, res, next) => {
   if (!title)   return res.status(400).json({ error: 'Missing query parameter: title' });
 
   try {
-    // Search Saavn for the track by title
     const results = await saavnSearchByTitle(title);
     if (!results.length) {
       return res.status(404).json({ error: `No Saavn match found for: ${title}` });
     }
 
-    // Use the top result
     const songId = results[0].id;
     const streamUrl = await saavnGetStreamUrl(songId);
 
-    // Fetch and proxy the audio
     const audioResp = await fetch(streamUrl, {
       signal: AbortSignal.timeout(60000),
       headers: { 'User-Agent': 'Mozilla/5.0' },
@@ -247,6 +245,18 @@ exports.streamProxy = async (req, res, next) => {
 
   } catch (e) {
     console.error('[VOID stream] Saavn error:', e.message);
+    next(e);
+  }
+};
+
+// ── Saavn search endpoint ─────────────────────────────────────────────────────
+exports.saavnSearch = async (req, res, next) => {
+  const q = String(req.query.q || '').trim();
+  if (!q) return res.status(400).json({ error: 'Missing query parameter: q' });
+  try {
+    const results = await saavnSearchByTitle(q);
+    res.json({ data: { results } });
+  } catch (e) {
     next(e);
   }
 };
