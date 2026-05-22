@@ -193,27 +193,43 @@ exports.streamProxy = async (req, res, next) => {
   try {
     const ytdl = require('@distube/ytdl-core');
 
-    if (!ytdl.validateID(videoId)) {
-      return res.status(400).json({ error: 'Invalid video ID' });
-    }
+    const agent = process.env.VOID_YT_COOKIE
+      ? ytdl.createAgent(undefined, {
+          jar: { toJSON: () => ({ cookies: [] }) }, // placeholder
+        })
+      : undefined;
 
-    const info = await ytdl.getInfo(videoId);
+    const cookieHeader = process.env.VOID_YT_COOKIE || '';
+
+    const info = await ytdl.getInfo(videoId, {
+      requestOptions: {
+        headers: {
+          Cookie: cookieHeader,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+      },
+    });
 
     const format = ytdl.chooseFormat(info.formats, {
       quality: 'highestaudio',
       filter: 'audioonly',
     });
 
-    if (!format) {
-      return res.status(502).json({ error: 'No audio format found' });
-    }
+    if (!format) return res.status(502).json({ error: 'No audio format found' });
 
     const mimeType = format.mimeType?.split(';')[0] || 'audio/webm';
-
     res.setHeader('Content-Type', mimeType);
     res.setHeader('Cache-Control', 'no-store');
 
-    ytdl(videoId, { format }).pipe(res);
+    ytdl(videoId, {
+      format,
+      requestOptions: {
+        headers: {
+          Cookie: cookieHeader,
+          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+      },
+    }).pipe(res);
 
   } catch (e) {
     console.error('[VOID stream] ytdl error:', e.message);
