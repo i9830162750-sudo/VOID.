@@ -1,0 +1,35 @@
+# render.yaml
+# VOID Player — Render deployment configuration
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: void-player
+    runtime: node
+    plan: free               # upgrade to starter/standard for production
+    region: oregon           # change to match your user base
+
+    # Build step — install production deps only
+    buildCommand: npm install --omit=dev
+
+    # Start command
+    startCommand: node server.js
+
+    # Health check — Render uses this to verify the service is up
+    healthCheckPath: /api/health
+
+    # Auto-deploy on push to main
+    autoDeploy: true
+
+    # Environment variables
+    # Set VOID_YT_API_KEY in the Render dashboard (not here — keep it secret)
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      # Add these in the Render dashboard → Environment tab:
+      # VOID_YT_API_KEY      your YouTube Data API v3 key
+      # (future) DATABASE_URL     your Postgres connection string
+      # (future) SESSION_SECRET   random string for session signing
+      # (future) JWT_SECRET       random string for JWT signing
