@@ -193,22 +193,28 @@ exports.streamProxy = async (req, res, next) => {
   try {
     const ytdl = require('@distube/ytdl-core');
 
-    const agent = process.env.VOID_YT_COOKIE
-      ? ytdl.createAgent(undefined, {
-          jar: { toJSON: () => ({ cookies: [] }) }, // placeholder
-        })
-      : undefined;
+    // Parse Netscape cookie file format into "name=value; name2=value2"
+    const rawCookie = process.env.VOID_YT_COOKIE || '';
+    const cookieHeader = rawCookie
+      .split('\n')
+      .filter(line => line && !line.startsWith('#'))
+      .map(line => {
+        const parts = line.split('\t');
+        // Netscape format: domain, flag, path, secure, expiry, name, value
+        if (parts.length >= 7) return `${parts[5]}=${parts[6]}`;
+        return null;
+      })
+      .filter(Boolean)
+      .join('; ');
 
-    const cookieHeader = process.env.VOID_YT_COOKIE || '';
-
-    const info = await ytdl.getInfo(videoId, {
-      requestOptions: {
-        headers: {
-          Cookie: cookieHeader,
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        },
+    const requestOptions = {
+      headers: {
+        Cookie: cookieHeader,
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
       },
-    });
+    };
+
+    const info = await ytdl.getInfo(videoId, { requestOptions });
 
     const format = ytdl.chooseFormat(info.formats, {
       quality: 'highestaudio',
@@ -221,18 +227,11 @@ exports.streamProxy = async (req, res, next) => {
     res.setHeader('Content-Type', mimeType);
     res.setHeader('Cache-Control', 'no-store');
 
-    ytdl(videoId, {
-      format,
-      requestOptions: {
-        headers: {
-          Cookie: cookieHeader,
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        },
-      },
-    }).pipe(res);
+    ytdl(videoId, { format, requestOptions }).pipe(res);
 
   } catch (e) {
     console.error('[VOID stream] ytdl error:', e.message);
     next(e);
   }
+};
 };
