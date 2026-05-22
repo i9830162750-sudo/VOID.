@@ -184,58 +184,48 @@ exports.playlistItems = async (req, res, next) => {
   }
 };
 
+const youtubedl = require('youtube-dl-exec');
+
 exports.streamProxy = async (req, res, next) => {
   const videoId = String(req.query.id || '').trim();
   if (!videoId) return res.status(400).json({ error: 'Missing query parameter: id' });
 
-  const instances = config.youtube.invidiousInstances;
-  const itags = [251, 140, 250, 18];
-  const errors = [];
+  try {
+    // Get the direct audio URL from yt-dlp (no downloading, just URL extraction)
+    const info = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
+      dumpSingleJson: true,
+      noWarnings: true,
+      noCheckCertificates: true,
+      preferFreeFormats: true,
+      format: 'bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio',
+      addHeader: ['referer:youtube.com', 'user-agent:Mozilla/5.0'],
+    });
 
-  for (const inst of instances) {
-    for (const itag of itags) {
-      const url = `${inst}/latest_version?id=${encodeURIComponent(videoId)}&itag=${itag}&local=true`;
-      try {
-        const upstream = await fetch(url, { signal: AbortSignal.timeout(30000) });
+    const audioUrl = info.url;
+    const mimeType = info.ext === 'webm' ? 'audio/webm' : 'audio/mp4';
 
-        const contentType = upstream.headers.get('Content-Type') || '';
-        const contentLength = upstream.headers.get('Content-Length') || '0';
-
-        console.log(`[VOID stream] ${inst} itag=${itag} status=${upstream.status} type=${contentType} length=${contentLength}`);
-
-        if (!upstream.ok) {
-          errors.push(`${inst} itag=${itag}: HTTP ${upstream.status}`);
-          continue;
-        }
-
-        // Reject if Invidious returned HTML/JSON error instead of audio
-        if (!contentType.includes('audio') && !contentType.includes('video') && !contentType.includes('octet-stream')) {
-          const preview = await upstream.text();
-          console.warn(`[VOID stream] Rejected non-audio response: ${preview.slice(0, 200)}`);
-          errors.push(`${inst} itag=${itag}: wrong content-type ${contentType}`);
-          continue;
-        }
-
-        const mimeType = (itag === 251 || itag === 250) ? 'audio/webm' : 'audio/mp4';
-        const buffer = Buffer.from(await upstream.arrayBuffer());
-
-        if (buffer.length < 10000) {
-          console.warn(`[VOID stream] Suspiciously small buffer: ${buffer.length} bytes`);
-          errors.push(`${inst} itag=${itag}: response too small (${buffer.length} bytes)`);
-          continue;
-        }
-
-        res.setHeader('Content-Type', mimeType);
-        res.setHeader('Content-Length', buffer.length);
-        res.setHeader('Cache-Control', 'no-store');
-        res.send(buffer);
-        return;
-
-      } catch (e) {
-        errors.push(`${inst} itag=${itag}: ${e.message}`);
+    // Fetch and proxy the audio
+    const upstream = await fetch(audioUrl, {
+      signal: AbortSignal.timeout(60000),
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+        'Referer': 'https://www.youtube.com/',
       }
-    }
-  }
+    });
 
-  res.status(502).json({ error: 'All Invidious instances failed', details: errors });
+    if (!upstream.ok) {
+      return res.status(502).json({ error: `Upstream fetch failed: ${upstream.status}` });
+    }
+
+    const buffer = Buffer.from(await upstream.arrayBuffer());
+
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Length', buffer.length);
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(buffer);
+
+  } catch (e) {
+    console.error('[VOID stream] yt-dlp error:', e.message);
+    next(e);
+  }
 };
