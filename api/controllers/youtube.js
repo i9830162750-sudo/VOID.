@@ -239,5 +239,3 @@ exports.streamProxy = async (req, res, next) => {
 
   res.status(502).json({ error: 'All Invidious instances failed', details: errors });
 };
-  res.status(502).json({ error: 'All Invidious instances failed', details: errors.slice(0, 5) });
-};
