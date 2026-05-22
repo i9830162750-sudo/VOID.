@@ -234,4 +234,3 @@ exports.streamProxy = async (req, res, next) => {
     next(e);
   }
 };
-};
