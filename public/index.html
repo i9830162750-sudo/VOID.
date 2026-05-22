@@ -2987,7 +2987,7 @@ function renderYTResults(data, query) {
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               </button>`}
           <button class="yt-result-btn"
-            onclick="ytPlayDirect(${vi})"
+            onclick='ytPlayDirect(${JSON.stringify(v)})'
             title="Play instantly">
 
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -3078,9 +3078,7 @@ function _playBlob(trackIdx) {
   addToRecent(t.id); lrcActive = -1; saveSettings();
 }
 
-async function ytPlayDirect(vi) {
-
-  const v = ytResults[vi];
+async function ytPlayDirect(v) {
 
   if (!v) {
     showToast('Video not found');
@@ -3119,6 +3117,7 @@ async function ytPlayDirect(vi) {
     miniArtist.textContent = v.artist || 'YouTube';
 
     if (v.thumb) {
+
       npCover.innerHTML =
         `<img src="${v.thumb}" alt="">`;
 
