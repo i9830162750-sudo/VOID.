@@ -184,53 +184,71 @@ exports.playlistItems = async (req, res, next) => {
   }
 };
 
-const youtubedl = require('@distube/ytdl-core');
-
 exports.streamProxy = async (req, res, next) => {
   const videoId = String(req.query.id || '').trim();
   if (!videoId) return res.status(400).json({ error: 'Missing query parameter: id' });
 
-  try {
-    const ytdl = require('@distube/ytdl-core');
+  const pipedInstances = [
+    'https://pipedapi.kavin.rocks',
+    'https://piped-api.garudalinux.org',
+    'https://api.piped.projectsegfau.lt',
+    'https://pipedapi.in.projectsegfau.lt',
+    'https://pipedapi.drgns.space',
+  ];
 
-    // Parse Netscape cookie file format into "name=value; name2=value2"
-    const rawCookie = process.env.VOID_YT_COOKIE || '';
-    const cookieHeader = rawCookie
-      .split('\n')
-      .filter(line => line && !line.startsWith('#'))
-      .map(line => {
-        const parts = line.split('\t');
-        // Netscape format: domain, flag, path, secure, expiry, name, value
-        if (parts.length >= 7) return `${parts[5]}=${parts[6]}`;
-        return null;
-      })
-      .filter(Boolean)
-      .join('; ');
+  const errors = [];
 
-    const requestOptions = {
-      headers: {
-        Cookie: cookieHeader,
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      },
-    };
+  for (const instance of pipedInstances) {
+    try {
+      const infoResp = await fetch(`${instance}/streams/${videoId}`, {
+        signal: AbortSignal.timeout(10000),
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+      });
 
-    const info = await ytdl.getInfo(videoId, { requestOptions });
+      if (!infoResp.ok) {
+        errors.push(`${instance}: HTTP ${infoResp.status}`);
+        continue;
+      }
 
-    const format = ytdl.chooseFormat(info.formats, {
-      quality: 'highestaudio',
-      filter: 'audioonly',
-    });
+      const info = await infoResp.json();
 
-    if (!format) return res.status(502).json({ error: 'No audio format found' });
+      // Pick best audio stream
+      const audioStreams = info.audioStreams || [];
+      const stream =
+        audioStreams.find(s => s.mimeType?.includes('audio/webm')) ||
+        audioStreams.find(s => s.mimeType?.includes('audio/mp4')) ||
+        audioStreams[0];
 
-    const mimeType = format.mimeType?.split(';')[0] || 'audio/webm';
-    res.setHeader('Content-Type', mimeType);
-    res.setHeader('Cache-Control', 'no-store');
+      if (!stream?.url) {
+        errors.push(`${instance}: no audio stream found`);
+        continue;
+      }
 
-    ytdl(videoId, { format, requestOptions }).pipe(res);
+      // Fetch the actual audio and pipe it
+      const audioResp = await fetch(stream.url, {
+        signal: AbortSignal.timeout(60000),
+        headers: { 'User-Agent': 'Mozilla/5.0' },
+      });
 
-  } catch (e) {
-    console.error('[VOID stream] ytdl error:', e.message);
-    next(e);
+      if (!audioResp.ok) {
+        errors.push(`${instance} audio fetch: HTTP ${audioResp.status}`);
+        continue;
+      }
+
+      const mimeType = stream.mimeType?.split(';')[0] || 'audio/webm';
+      const buffer = Buffer.from(await audioResp.arrayBuffer());
+
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Length', buffer.length);
+      res.setHeader('Cache-Control', 'no-store');
+      res.send(buffer);
+      return;
+
+    } catch (e) {
+      errors.push(`${instance}: ${e.message}`);
+    }
   }
+
+  console.error('[VOID stream] All Piped instances failed:', errors);
+  res.status(502).json({ error: 'All Piped instances failed', details: errors });
 };
