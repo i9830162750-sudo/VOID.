@@ -197,13 +197,33 @@ exports.streamProxy = async (req, res, next) => {
       const url = `${inst}/latest_version?id=${encodeURIComponent(videoId)}&itag=${itag}&local=true`;
       try {
         const upstream = await fetch(url, { signal: AbortSignal.timeout(30000) });
+
+        const contentType = upstream.headers.get('Content-Type') || '';
+        const contentLength = upstream.headers.get('Content-Length') || '0';
+
+        console.log(`[VOID stream] ${inst} itag=${itag} status=${upstream.status} type=${contentType} length=${contentLength}`);
+
         if (!upstream.ok) {
           errors.push(`${inst} itag=${itag}: HTTP ${upstream.status}`);
           continue;
         }
 
+        // Reject if Invidious returned HTML/JSON error instead of audio
+        if (!contentType.includes('audio') && !contentType.includes('video') && !contentType.includes('octet-stream')) {
+          const preview = await upstream.text();
+          console.warn(`[VOID stream] Rejected non-audio response: ${preview.slice(0, 200)}`);
+          errors.push(`${inst} itag=${itag}: wrong content-type ${contentType}`);
+          continue;
+        }
+
         const mimeType = (itag === 251 || itag === 250) ? 'audio/webm' : 'audio/mp4';
         const buffer = Buffer.from(await upstream.arrayBuffer());
+
+        if (buffer.length < 10000) {
+          console.warn(`[VOID stream] Suspiciously small buffer: ${buffer.length} bytes`);
+          errors.push(`${inst} itag=${itag}: response too small (${buffer.length} bytes)`);
+          continue;
+        }
 
         res.setHeader('Content-Type', mimeType);
         res.setHeader('Content-Length', buffer.length);
@@ -217,5 +237,7 @@ exports.streamProxy = async (req, res, next) => {
     }
   }
 
+  res.status(502).json({ error: 'All Invidious instances failed', details: errors });
+};
   res.status(502).json({ error: 'All Invidious instances failed', details: errors.slice(0, 5) });
 };
