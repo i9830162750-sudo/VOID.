@@ -39,20 +39,7 @@ app.use(
         styleSrc:    ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         fontSrc:     ["'self'", 'https://fonts.gstatic.com'],
         imgSrc:      ["'self'", 'data:', 'https://*.ytimg.com', 'https://*.ggpht.com'],
-        connectSrc: [
-                      "'self'",
-                      'https://www.googleapis.com',
-                      'https://*.youtube.com',
-                    
-                      // Invidious instances
-                      'https://*.nerdvpn.de',
-                      'https://inv.tux.pizza',
-                      'https://yewtu.be',
-                      'https://*.privacydev.net',
-                      'https://iv.melmac.space',
-                      'https://*.io.lol',
-                      'https://*.fdn.fr'
-                      ],
+        connectSrc:  ["'self'", 'https://www.googleapis.com', 'https://*.youtube.com', 'blob:'],
         mediaSrc:    ["'self'", 'blob:', 'https://*.googlevideo.com'],
         workerSrc:   ["'self'"],
         manifestSrc: ["'self'"],
