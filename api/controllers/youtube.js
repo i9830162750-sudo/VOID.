@@ -1,28 +1,21 @@
 /**
  * api/controllers/youtube.js
- * Server-side YouTube Data API v3 proxy.
+ * Server-side proxy for YouTube (search/metadata) + JioSaavn (streaming).
  *
- * Why a proxy?
- *   • Keeps the API key off the client (no more hardcoded key in index.html).
- *   • Allows rate-limiting, caching, and key rotation in one place.
- *   • Makes it trivial to swap YouTube API for a different provider later.
- *
- * Current endpoints:
- *   search(q, type, maxResults)        → /api/youtube/search
- *   videoDetails(ids)                   → /api/youtube/videos
- *   playlistItems(playlistId)           → /api/youtube/playlist
- *
- * Fallback: if VOID_YT_API_KEY is not configured, requests are forwarded
- * to the Invidious public API (same behaviour as the current frontend).
+ * Endpoints:
+ *   search(q, type, maxResults)  → /api/youtube/search
+ *   videoDetails(ids)             → /api/youtube/videos
+ *   playlistItems(playlistId)     → /api/youtube/playlist
+ *   streamProxy(id)               → /api/youtube/stream  (JioSaavn audio)
  */
 
 'use strict';
 
 const config = require('../../config');
 
-// ── Tiny in-memory cache (reduces API quota usage) ───────────────────────────
+// ── Tiny in-memory cache ──────────────────────────────────────────────────────
 const cache = new Map();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 5 * 60 * 1000;
 
 function cacheGet(key) {
   const entry = cache.get(key);
@@ -34,7 +27,7 @@ function cacheSet(key, data) {
   cache.set(key, { data, ts: Date.now() });
 }
 
-// ── Shared fetch helper ────────────────────────────────────────────────────
+// ── Shared fetch helper ───────────────────────────────────────────────────────
 async function apiFetch(url) {
   const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
   if (!res.ok) {
@@ -50,7 +43,7 @@ async function apiFetch(url) {
 // ── YouTube Data API v3 helpers ───────────────────────────────────────────────
 async function ytSearch(q, type = 'video', maxResults = 15) {
   const key = config.youtube.apiKey;
-  if (!key) return null; // signal caller to use Invidious
+  if (!key) return null;
 
   const url = new URL(config.youtube.searchEndpoint);
   url.searchParams.set('part', 'snippet');
@@ -87,7 +80,7 @@ async function ytPlaylistItems(playlistId, maxResults = 50) {
   return apiFetch(url.toString());
 }
 
-// ── Invidious fallback helpers ────────────────────────────────────────────────
+// ── Invidious fallback ────────────────────────────────────────────────────────
 async function invidiousSearch(q, type = 'video') {
   const instances = config.youtube.invidiousInstances;
   const fields = type === 'playlist'
@@ -105,6 +98,39 @@ async function invidiousSearch(q, type = 'video') {
   throw new Error('All Invidious instances failed');
 }
 
+// ── JioSaavn helpers ──────────────────────────────────────────────────────────
+const SAAVN_BASE = 'https://saavn.me';
+
+async function saavnSearchByTitle(title) {
+  const resp = await fetch(
+    `${SAAVN_BASE}/api/search/songs?query=${encodeURIComponent(title)}&page=1&limit=5`,
+    { signal: AbortSignal.timeout(10000) }
+  );
+  if (!resp.ok) throw new Error(`Saavn search failed: ${resp.status}`);
+  const data = await resp.json();
+  return data?.data?.results || [];
+}
+
+async function saavnGetStreamUrl(songId) {
+  const resp = await fetch(
+    `${SAAVN_BASE}/api/songs/${songId}`,
+    { signal: AbortSignal.timeout(10000) }
+  );
+  if (!resp.ok) throw new Error(`Saavn song fetch failed: ${resp.status}`);
+  const data = await resp.json();
+  const song = data?.data?.[0];
+  if (!song) throw new Error('Song not found in Saavn response');
+
+  const urls = song.downloadUrl || [];
+  const best =
+    urls.find(u => u.quality === '320kbps') ||
+    urls.find(u => u.quality === '160kbps') ||
+    urls[urls.length - 1];
+
+  if (!best?.url) throw new Error('No download URL in Saavn response');
+  return best.url;
+}
+
 // ── Exported controller functions ─────────────────────────────────────────────
 
 exports.search = async (req, res, next) => {
@@ -119,13 +145,11 @@ exports.search = async (req, res, next) => {
     const cached = cacheGet(cacheKey);
     if (cached) return res.json({ ...cached, _cached: true });
 
-    // Try YouTube API first; fall back to Invidious
     let data;
     try {
       data = await ytSearch(q, type, maxResults);
-      if (!data) data = await invidiousSearch(q, type); // no API key configured
-    } catch (err) {
-      // YouTube API failed — try Invidious
+      if (!data) data = await invidiousSearch(q, type);
+    } catch {
       data = await invidiousSearch(q, type);
     }
 
@@ -168,7 +192,6 @@ exports.playlistItems = async (req, res, next) => {
     try {
       data = await ytPlaylistItems(playlistId);
       if (!data) {
-        // No API key — try Invidious playlist endpoint
         const instance = config.youtube.invidiousInstances[0];
         data = await apiFetch(`${instance}/api/v1/playlists/${encodeURIComponent(playlistId)}?fields=title,videos`);
       }
@@ -184,71 +207,46 @@ exports.playlistItems = async (req, res, next) => {
   }
 };
 
+// ── Stream proxy — searches JioSaavn by YouTube title, streams audio ──────────
+// ?id=       YouTube video ID (used for cache key)
+// ?title=    YouTube video title (used to search Saavn)
 exports.streamProxy = async (req, res, next) => {
-  const videoId = String(req.query.id || '').trim();
+  const videoId = String(req.query.id    || '').trim();
+  const title   = String(req.query.title || '').trim();
+
   if (!videoId) return res.status(400).json({ error: 'Missing query parameter: id' });
+  if (!title)   return res.status(400).json({ error: 'Missing query parameter: title' });
 
-  const pipedInstances = [
-    'https://pipedapi.reallyaweso.me',
-    'https://piped-api.privacy.com.de',
-    'https://piped.video/api',
-    'https://api.piped.yt',
-    'https://pipedapi.adminforge.de',
-  ];
-  
-  const errors = [];
-
-  for (const instance of pipedInstances) {
-    try {
-      const infoResp = await fetch(`${instance}/streams/${videoId}`, {
-        signal: AbortSignal.timeout(10000),
-        headers: { 'User-Agent': 'Mozilla/5.0' },
-      });
-
-      if (!infoResp.ok) {
-        errors.push(`${instance}: HTTP ${infoResp.status}`);
-        continue;
-      }
-
-      const info = await infoResp.json();
-
-      // Pick best audio stream
-      const audioStreams = info.audioStreams || [];
-      const stream =
-        audioStreams.find(s => s.mimeType?.includes('audio/webm')) ||
-        audioStreams.find(s => s.mimeType?.includes('audio/mp4')) ||
-        audioStreams[0];
-
-      if (!stream?.url) {
-        errors.push(`${instance}: no audio stream found`);
-        continue;
-      }
-
-      // Fetch the actual audio and pipe it
-      const audioResp = await fetch(stream.url, {
-        signal: AbortSignal.timeout(60000),
-        headers: { 'User-Agent': 'Mozilla/5.0' },
-      });
-
-      if (!audioResp.ok) {
-        errors.push(`${instance} audio fetch: HTTP ${audioResp.status}`);
-        continue;
-      }
-
-      const mimeType = stream.mimeType?.split(';')[0] || 'audio/webm';
-      const buffer = Buffer.from(await audioResp.arrayBuffer());
-
-      res.setHeader('Content-Type', mimeType);
-      res.setHeader('Content-Length', buffer.length);
-      res.setHeader('Cache-Control', 'no-store');
-      res.send(buffer);
-      return;
-
-    } catch (e) {
-      errors.push(`${instance}: ${e.message}`);
+  try {
+    // Search Saavn for the track by title
+    const results = await saavnSearchByTitle(title);
+    if (!results.length) {
+      return res.status(404).json({ error: `No Saavn match found for: ${title}` });
     }
-  }
 
-  console.error('[VOID stream] All Piped instances failed:', errors);
-  res.status(502).json({ error: 'All Piped instances failed', details: errors });
+    // Use the top result
+    const songId = results[0].id;
+    const streamUrl = await saavnGetStreamUrl(songId);
+
+    // Fetch and proxy the audio
+    const audioResp = await fetch(streamUrl, {
+      signal: AbortSignal.timeout(60000),
+      headers: { 'User-Agent': 'Mozilla/5.0' },
+    });
+
+    if (!audioResp.ok) {
+      return res.status(502).json({ error: `Audio fetch failed: ${audioResp.status}` });
+    }
+
+    const buffer = Buffer.from(await audioResp.arrayBuffer());
+
+    res.setHeader('Content-Type', 'audio/mpeg');
+    res.setHeader('Content-Length', buffer.length);
+    res.setHeader('Cache-Control', 'no-store');
+    res.send(buffer);
+
+  } catch (e) {
+    console.error('[VOID stream] Saavn error:', e.message);
+    next(e);
+  }
 };
