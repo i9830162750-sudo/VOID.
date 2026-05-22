@@ -184,7 +184,6 @@ exports.playlistItems = async (req, res, next) => {
   }
 };
 
-// ── Stream proxy — fetches audio from Invidious server-side ──────────────────
 exports.streamProxy = async (req, res, next) => {
   const videoId = String(req.query.id || '').trim();
   if (!videoId) return res.status(400).json({ error: 'Missing query parameter: id' });
@@ -204,22 +203,14 @@ exports.streamProxy = async (req, res, next) => {
         }
 
         const mimeType = (itag === 251 || itag === 250) ? 'audio/webm' : 'audio/mp4';
+        const buffer = Buffer.from(await upstream.arrayBuffer());
+
         res.setHeader('Content-Type', mimeType);
-
-        const cl = upstream.headers.get('Content-Length');
-        if (cl) res.setHeader('Content-Length', cl);
-
+        res.setHeader('Content-Length', buffer.length);
         res.setHeader('Cache-Control', 'no-store');
+        res.send(buffer);
+        return;
 
-        // Pipe the stream straight through — no buffering
-        upstream.body.pipeTo(
-          new WritableStream({
-            write(chunk) { res.write(chunk); },
-            close()      { res.end(); },
-            abort(err)   { next(err); }
-          })
-        );
-        return; // success — response is streaming
       } catch (e) {
         errors.push(`${inst} itag=${itag}: ${e.message}`);
       }
