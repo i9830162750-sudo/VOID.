@@ -191,55 +191,32 @@ exports.streamProxy = async (req, res, next) => {
   if (!videoId) return res.status(400).json({ error: 'Missing query parameter: id' });
 
   try {
-    // Get the direct audio URL from yt-dlp (no downloading, just URL extraction)
-    const info = await youtubedl(`https://www.youtube.com/watch?v=${videoId}`, {
-      dumpSingleJson: true,
-      noWarnings: true,
-      noCheckCertificates: true,
-      preferFreeFormats: true,
-      format: 'bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio',
-      addHeader: ['referer:youtube.com', 'user-agent:Mozilla/5.0'],
-    });
+    const ytdl = require('@distube/ytdl-core');
 
-    const audioUrl = info.url;
-    const mimeType = info.ext === 'webm' ? 'audio/webm' : 'audio/mp4';
-
-    // Fetch and proxy the audio
-    const upstream = await fetch(audioUrl, {
-      signal: AbortSignal.timeout(60000),
-      headers: {
-        'User-Agent': 'Mozilla/5.0',
-        'Referer': 'https://www.youtube.com/',
-      }
-    });
-
-    if (!upstream.ok) {
-      return res.status(502).json({ error: `Upstream fetch failed: ${upstream.status}` });
+    if (!ytdl.validateID(videoId)) {
+      return res.status(400).json({ error: 'Invalid video ID' });
     }
 
-    const buffer = Buffer.from(await upstream.arrayBuffer());
+    const info = await ytdl.getInfo(videoId);
+
+    const format = ytdl.chooseFormat(info.formats, {
+      quality: 'highestaudio',
+      filter: 'audioonly',
+    });
+
+    if (!format) {
+      return res.status(502).json({ error: 'No audio format found' });
+    }
+
+    const mimeType = format.mimeType?.split(';')[0] || 'audio/webm';
 
     res.setHeader('Content-Type', mimeType);
-    res.setHeader('Content-Length', buffer.length);
     res.setHeader('Cache-Control', 'no-store');
-    res.send(buffer);
+
+    ytdl(videoId, { format }).pipe(res);
 
   } catch (e) {
-    console.error('[VOID stream] yt-dlp error:', e.message);
+    console.error('[VOID stream] ytdl error:', e.message);
     next(e);
   }
 };
-
-router.get('/ytdlp-test', async (req, res) => {
-  try {
-    const youtubedl = require('youtube-dl-exec');
-    const info = await youtubedl('https://www.youtube.com/watch?v=dQw4w9WgXcQ', {
-      dumpSingleJson: true,
-      noWarnings: true,
-      format: 'bestaudio',
-    });
-    res.json({ success: true, title: info.title, ext: info.ext, url: info.url?.slice(0, 80) });
-  } catch (e) {
-    res.status(500).json({ error: e.message });
-  }
-});
