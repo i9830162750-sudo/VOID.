@@ -2987,7 +2987,7 @@ function renderYTResults(data, query) {
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               </button>`}
           <button class="yt-result-btn"
-            onclick='ytPlayDirect(${JSON.stringify(v)})'
+            onclick="ytPlayDirect('${v.id}','${esc(v.title)}','${esc(v.artist||'YouTube')}','${v.thumb||''}')"
             title="Play instantly">
 
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -3078,10 +3078,10 @@ function _playBlob(trackIdx) {
   addToRecent(t.id); lrcActive = -1; saveSettings();
 }
 
-async function ytPlayDirect(v) {
+async function ytPlayDirect(videoId, title, artist, thumb) {
 
-  if (!v) {
-    showToast('Video not found');
+  if (!videoId || videoId === 'undefined') {
+    showToast('Invalid video ID');
     return;
   }
 
@@ -3092,7 +3092,7 @@ async function ytPlayDirect(v) {
   try {
 
     const { blobUrl, mimeType } =
-      await ytFetchBlob(v.id);
+      await ytFetchBlob(videoId);
 
     updateBufferingUI(false);
 
@@ -3110,19 +3110,19 @@ async function ytPlayDirect(v) {
 
     isPlaying = true;
 
-    npTitle.textContent = v.title || 'YouTube Track';
-    npArtist.textContent = v.artist || 'YouTube';
+    npTitle.textContent = title || 'YouTube Track';
+    npArtist.textContent = artist || 'YouTube';
 
-    miniTitle.textContent = v.title || 'YouTube Track';
-    miniArtist.textContent = v.artist || 'YouTube';
+    miniTitle.textContent = title || 'YouTube Track';
+    miniArtist.textContent = artist || 'YouTube';
 
-    if (v.thumb) {
+    if (thumb) {
 
       npCover.innerHTML =
-        `<img src="${v.thumb}" alt="">`;
+        `<img src="${thumb}" alt="">`;
 
       miniCover.innerHTML =
-        `<img src="${v.thumb}" alt="">`;
+        `<img src="${thumb}" alt="">`;
     }
 
     showToast('Now Playing');
