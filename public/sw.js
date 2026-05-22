@@ -1,4 +1,4 @@
-const CACHE = 'void-v7';
+const CACHE = 'void-v8';
 const ASSETS = [
   '/',
   '/index.html',
