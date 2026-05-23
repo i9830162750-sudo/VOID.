@@ -319,7 +319,6 @@ exports.streamProxy = async (req, res, next) => {
           .replace(/full\s*song/gi, '')
           .replace(/audio/gi, '')
           .replace(/4k|hd/gi, '')
-          .replace(/[^a-zA-Z0-9\s]/g, ' ')
           .replace(/\s{2,}/g, ' ')
           .trim();
 
