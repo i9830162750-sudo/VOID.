@@ -134,9 +134,8 @@ async function ytdlpGetAudioUrl(videoId) {
  const args = [
   '--no-warnings',
   '--quiet',
-  '-f', 'bestaudio/best',
+  '-f', 'bestaudio',
   '--get-url',
-  '--extractor-args', 'youtube:player_client=android',
   ];
   
   if (cookiesFile) args.push('--cookies', cookiesFile);
