@@ -147,19 +147,34 @@ async function deezerSearch(ytTitle, ytArtist) {
 
 // ── saavn.dev — public JioSaavn API (reliable, no scraping) ──────────────────
 // Docs: https://saavn.dev
-const SAAVN_DEV = 'https://saavn.dev/api';
+// ── saavn — tries multiple public API instances until one responds ─────────────
+const SAAVN_INSTANCES = [
+  'https://saavn.dev/api',
+  'https://jiosaavn-api-privatecvc2.vercel.app',
+  'https://saavn.me',
+];
 
 async function saavnSearch(query) {
   console.log(`[VOID saavn] searching: "${query}"`);
 
-  const resp = await fetch(
-    `${SAAVN_DEV}/search/songs?query=${encodeURIComponent(query)}&page=1&limit=5`,
-    { signal: AbortSignal.timeout(10000) }
-  );
-
-  if (!resp.ok) throw new Error(`Saavn search failed: ${resp.status}`);
-  const data = await resp.json();
-  return data?.data?.results || [];
+  for (const base of SAAVN_INSTANCES) {
+    try {
+      const resp = await fetch(
+        `${base}/search/songs?query=${encodeURIComponent(query)}&page=1&limit=5`,
+        { signal: AbortSignal.timeout(8000) }
+      );
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      const results = data?.data?.results || [];
+      if (results.length) {
+        console.log(`[VOID saavn] got results from ${base}`);
+        return results;
+      }
+    } catch (e) {
+      console.warn(`[VOID saavn] instance ${base} failed:`, e.message);
+    }
+  }
+  return [];
 }
 
 function saavnPickStreamUrl(song) {
