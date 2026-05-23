@@ -116,6 +116,7 @@ async function ytdlpGetAudioUrl(videoId) {
 
   // Write cookies to a temp file from the VOID_YT_COOKIE env var
   
+  let cookiesFile = null;
   const cookieData = process.env.VOID_YT_COOKIE;
   if (cookieData) {
     try {
