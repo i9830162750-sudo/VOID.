@@ -1,13 +1,21 @@
 /**
  * api/controllers/youtube.js
- * Server-side proxy for YouTube (search/metadata) + JioSaavn (streaming).
+ * Server-side proxy for YouTube (search/metadata) + Piped/Invidious (streaming).
  *
  * Endpoints:
  *   search(q, type, maxResults)  → /api/youtube/search
  *   videoDetails(ids)             → /api/youtube/videos
  *   playlistItems(playlistId)     → /api/youtube/playlist
- *   streamProxy(id, title)        → /api/youtube/stream  (JioSaavn audio)
- *   saavnSearch(q)                → /api/youtube/saavn/search
+ *   streamProxy(id)               → /api/youtube/stream  (Piped audio)
+ *
+ * Stream flow:
+ *   1. Try each configured Piped instance in order for /streams/:videoId
+ *   2. Piped returns audioStreams[] — pick the best quality URL
+ *   3. Proxy the audio bytes back to the client with correct headers
+ *   4. If ALL Piped instances fail, fall back to Invidious /api/v1/videos/:id
+ *      which also exposes adaptive_formats[] with audio-only streams
+ *
+ * No Deezer. No JioSaavn. No metadata translation pipeline.
  */
 
 'use strict';
@@ -16,7 +24,7 @@ const config = require('../../config');
 
 // ── Tiny in-memory cache ──────────────────────────────────────────────────────
 const cache = new Map();
-const CACHE_TTL = 5 * 60 * 1000;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 function cacheGet(key) {
   const entry = cache.get(key);
@@ -29,11 +37,14 @@ function cacheSet(key, data) {
 }
 
 // ── Shared fetch helper ───────────────────────────────────────────────────────
-async function apiFetch(url) {
-  const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+async function apiFetch(url, opts = {}) {
+  const res = await fetch(url, {
+    signal: AbortSignal.timeout(opts.timeout || 8000),
+    headers: { 'User-Agent': 'Mozilla/5.0', ...(opts.headers || {}) },
+  });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw Object.assign(new Error(`Upstream error ${res.status}`), {
+    throw Object.assign(new Error(`Upstream ${res.status}: ${url}`), {
       status: res.status,
       upstream: body,
     });
@@ -81,7 +92,7 @@ async function ytPlaylistItems(playlistId, maxResults = 50) {
   return apiFetch(url.toString());
 }
 
-// ── Invidious fallback ────────────────────────────────────────────────────────
+// ── Invidious fallback for search/playlist ────────────────────────────────────
 async function invidiousSearch(q, type = 'video') {
   const instances = config.youtube.invidiousInstances;
   const fields = type === 'playlist'
@@ -96,95 +107,74 @@ async function invidiousSearch(q, type = 'video') {
       // try next instance
     }
   }
-  throw new Error('All Invidious instances failed');
+  throw new Error('All Invidious search instances failed');
 }
 
-// ── Title cleanup — strip YouTube bloat before searching ─────────────────────
-function cleanYouTubeTitle(title) {
-  return title
-    .replace(/\(.*?\)/g, '')
-    .replace(/\[.*?\]/g, '')
-    .replace(/\|.*/g, '')
-    .replace(/[-–—]\s*(full|official|video|audio|song|lyric|hd|4k).*/gi, '')
-    .replace(/official\s*(video|audio|music|lyric[s]?)/gi, '')
-    .replace(/\b(lyrics?|hd|4k|full\s*video|full\s*song|audio|video)\b/gi, '')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
-}
+// ── Piped stream resolver ─────────────────────────────────────────────────────
+// Piped /streams/:id returns { audioStreams: [{ url, quality, mimeType }] }
+// We pick the highest-quality audio-only stream.
+async function pipedGetAudioUrl(videoId) {
+  const instances = config.youtube.pipedInstances;
 
-// ── Deezer — resolve canonical title + artist from a messy YouTube title ──────
-const DEEZER_API = 'https://api.deezer.com';
-
-async function deezerSearch(ytTitle, ytArtist) {
-  const cleaned = cleanYouTubeTitle(ytTitle);
-
-  const skipArtist = !ytArtist
-    || ytArtist === 'Unknown Artist'
-    || ytArtist === 'YouTube';
-
-  const query = skipArtist
-    ? cleaned
-    : `${cleaned} ${ytArtist}`.trim();
-
-  console.log(`[VOID deezer] searching: "${query}"`);
-
-  const resp = await fetch(
-    `${DEEZER_API}/search?q=${encodeURIComponent(query)}&limit=5`,
-    { signal: AbortSignal.timeout(8000) }
-  );
-
-  if (!resp.ok) throw new Error(`Deezer search failed: ${resp.status}`);
-  const data = await resp.json();
-  const results = data?.data || [];
-  if (!results.length) return null;
-
-  const top = results[0];
-  return {
-    title:  top.title,
-    artist: top.artist?.name || '',
-  };
-}
-
-// ── saavn.dev — public JioSaavn API (reliable, no scraping) ──────────────────
-// Docs: https://saavn.dev
-// ── saavn — tries multiple public API instances until one responds ─────────────
-const SAAVN_INSTANCES = [
-  'https://saavn.dev/api',
-  'https://jiosaavn-api-privatecvc2.vercel.app',
-  'https://saavn.me',
-];
-
-async function saavnSearch(query) {
-  console.log(`[VOID saavn] searching: "${query}"`);
-
-  for (const base of SAAVN_INSTANCES) {
+  for (const instance of instances) {
     try {
-      const resp = await fetch(
-        `${base}/search/songs?query=${encodeURIComponent(query)}&page=1&limit=5`,
-        { signal: AbortSignal.timeout(8000) }
-      );
-      if (!resp.ok) continue;
-      const data = await resp.json();
-      const results = data?.data?.results || [];
-      if (results.length) {
-        console.log(`[VOID saavn] got results from ${base}`);
-        return results;
-      }
+      const data = await apiFetch(`${instance}/streams/${videoId}`, { timeout: 10000 });
+
+      const streams = data?.audioStreams;
+      if (!streams || !streams.length) continue;
+
+      // Sort by bitrate descending (quality field is a string like "48kbps")
+      const sorted = [...streams].sort((a, b) => {
+        const bpsA = parseInt(a.quality) || 0;
+        const bpsB = parseInt(b.quality) || 0;
+        return bpsB - bpsA;
+      });
+
+      const best = sorted[0];
+      if (!best?.url) continue;
+
+      console.log(`[VOID piped] ${instance} → ${best.quality} (${best.mimeType || 'audio'})`);
+      return { url: best.url, mimeType: best.mimeType || 'audio/webm' };
     } catch (e) {
-      console.warn(`[VOID saavn] instance ${base} failed:`, e.message);
+      console.warn(`[VOID piped] ${instance} failed:`, e.message);
     }
   }
-  return [];
+  return null; // all Piped instances exhausted
 }
 
-function saavnPickStreamUrl(song) {
-  // downloadUrl is an array of { quality, url } sorted low→high
-  const urls = song?.downloadUrl;
-  if (!urls || !urls.length) throw new Error('No downloadUrl in Saavn result');
-  // Prefer 320kbps, fall back to whatever is highest
-  const best = [...urls].reverse().find(u => u.url) || urls[urls.length - 1];
-  if (!best?.url) throw new Error('No usable stream URL in Saavn result');
-  return best.url;
+// ── Invidious stream resolver (fallback) ──────────────────────────────────────
+// Invidious /api/v1/videos/:id exposes adaptiveFormats[] with audio-only entries.
+async function invidiousGetAudioUrl(videoId) {
+  const instances = config.youtube.invidiousInstances;
+
+  for (const instance of instances) {
+    try {
+      const data = await apiFetch(
+        `${instance}/api/v1/videos/${videoId}?fields=adaptiveFormats`,
+        { timeout: 10000 }
+      );
+
+      const formats = data?.adaptiveFormats;
+      if (!formats || !formats.length) continue;
+
+      // Keep only audio-only formats (no video resolution)
+      const audioOnly = formats.filter(f =>
+        f.type && f.type.startsWith('audio/') && !f.resolution
+      );
+
+      if (!audioOnly.length) continue;
+
+      // Pick highest bitrate
+      const best = audioOnly.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0];
+      if (!best?.url) continue;
+
+      console.log(`[VOID invidious] ${instance} → ${best.bitrate}bps (${best.type})`);
+      return { url: best.url, mimeType: best.type.split(';')[0] || 'audio/webm' };
+    } catch (e) {
+      console.warn(`[VOID invidious-stream] ${instance} failed:`, e.message);
+    }
+  }
+  return null;
 }
 
 // ── Exported controller functions ─────────────────────────────────────────────
@@ -264,99 +254,84 @@ exports.playlistItems = async (req, res, next) => {
 };
 
 // ── Stream proxy ──────────────────────────────────────────────────────────────
-// Flow: YouTube title → Deezer (canonical title+artist) → saavn.dev search → stream
-// ?id=      YouTube video ID (required)
-// ?title=   YouTube video title (required)
-// ?artist=  YouTube channel/artist name (optional, improves matching)
+// GET /api/youtube/stream?id=VIDEO_ID
+//
+// Flow:
+//   1. Try all Piped instances → audioStreams[]
+//   2. Fall back to all Invidious instances → adaptiveFormats[] (audio-only)
+//   3. If both chains fail → 502
+//   4. Proxy the audio bytes to the client (supports Range for seek)
+//
+// The client (ytFetchBlob) downloads the whole buffer and stores it in
+// IndexedDB — so this endpoint is called once per track, not on every seek.
 exports.streamProxy = async (req, res, next) => {
-  const videoId = String(req.query.id     || '').trim();
-  const title   = String(req.query.title  || '').trim();
-  const artist  = String(req.query.artist || '').trim();
-
+  const videoId = String(req.query.id || '').trim();
   if (!videoId) return res.status(400).json({ error: 'Missing query parameter: id' });
-  if (!title)   return res.status(400).json({ error: 'Missing query parameter: title' });
+
+  console.log(`[VOID stream] resolving: ${videoId}`);
 
   try {
-    // Step 1 — Ask Deezer to resolve a canonical title + artist.
-    // If Deezer fails we fall back to the (lightly cleaned) raw YouTube title.
-    let cleanTitle  = cleanYouTubeTitle(title);
-    let cleanArtist = artist;
+    // ── Step 1: Resolve an audio URL ─────────────────────────────────────────
+    let resolved = await pipedGetAudioUrl(videoId);
 
-    try {
-      const deezerResult = await deezerSearch(title, artist);
-      if (deezerResult) {
-        cleanTitle  = deezerResult.title;
-        cleanArtist = deezerResult.artist;
-        console.log(`[VOID deezer] resolved: "${cleanTitle}" by "${cleanArtist}"`);
-      }
-    } catch (e) {
-      console.warn('[VOID deezer] lookup failed, using cleaned raw title:', e.message);
+    if (!resolved) {
+      console.warn(`[VOID stream] Piped exhausted, trying Invidious for ${videoId}`);
+      resolved = await invidiousGetAudioUrl(videoId);
     }
 
-    // Step 2 — Search saavn.dev with progressively looser queries.
-    let song = null;
-
-    const attempts = [
-      // Most specific first
-      cleanArtist ? `${cleanTitle} ${cleanArtist}` : null,
-      cleanTitle,
-      // Raw YouTube title as a last resort (catches non-English titles that
-      // survive Deezer poorly, e.g. "Aaj Ki Raat")
-      cleanYouTubeTitle(title) !== cleanTitle ? cleanYouTubeTitle(title) : null,
-      // First 3 words of the cleaned title
-      cleanTitle.split(' ').slice(0, 3).join(' '),
-    ].filter(Boolean);
-
-    for (const query of attempts) {
-      console.log(`[VOID saavn] trying: "${query}"`);
-      try {
-        const results = await saavnSearch(query);
-        if (results.length) { song = results[0]; break; }
-      } catch (e) {
-        console.warn(`[VOID saavn] attempt failed for "${query}":`, e.message);
-      }
+    if (!resolved) {
+      return res.status(502).json({
+        error: 'All stream sources failed. Try again in a moment.',
+      });
     }
 
-    if (!song) {
-      return res.status(404).json({ error: `No Saavn match found for: ${cleanTitle}` });
-    }
+    const { url: audioUrl, mimeType } = resolved;
 
-    // Step 3 — Extract the best stream URL directly from the search result.
-    // saavn.dev returns downloadUrl[] in the song object — no second API call needed.
-    const streamUrl = saavnPickStreamUrl(song);
-    console.log(`[VOID saavn] streaming: "${song.name}" — ${streamUrl.slice(0, 60)}…`);
+    // ── Step 2: Proxy the audio bytes ─────────────────────────────────────────
+    // Forward any Range header the client sends (rare here since the frontend
+    // does a full download, but correct to forward it).
+    const upstreamHeaders = { 'User-Agent': 'Mozilla/5.0' };
+    if (req.headers.range) upstreamHeaders['Range'] = req.headers.range;
 
-    // Step 4 — Fetch audio and proxy it to the client.
-    const audioResp = await fetch(streamUrl, {
-      signal: AbortSignal.timeout(60000),
-      headers: { 'User-Agent': 'Mozilla/5.0' },
+    const audioResp = await fetch(audioUrl, {
+      signal: AbortSignal.timeout(90000),
+      headers: upstreamHeaders,
     });
 
-    if (!audioResp.ok) {
-      return res.status(502).json({ error: `Audio fetch failed: ${audioResp.status}` });
+    if (!audioResp.ok && audioResp.status !== 206) {
+      return res.status(502).json({
+        error: `Upstream audio fetch failed: ${audioResp.status}`,
+      });
     }
 
-    const buffer = Buffer.from(await audioResp.arrayBuffer());
-
-    res.setHeader('Content-Type', 'audio/mpeg');
-    res.setHeader('Content-Length', buffer.length);
+    // Mirror status + key headers from upstream
+    res.status(audioResp.status);
+    res.setHeader('Content-Type', mimeType);
     res.setHeader('Cache-Control', 'no-store');
-    res.send(buffer);
+    res.setHeader('Accept-Ranges', 'bytes');
+
+    const contentLength = audioResp.headers.get('content-length');
+    if (contentLength) res.setHeader('Content-Length', contentLength);
+
+    const contentRange = audioResp.headers.get('content-range');
+    if (contentRange) res.setHeader('Content-Range', contentRange);
+
+    // Stream the body — don't buffer the whole file in memory
+    const reader = audioResp.body.getReader();
+    const pump = async () => {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) { res.end(); break; }
+        const ok = res.write(value);
+        // Respect backpressure
+        if (!ok) await new Promise(r => res.once('drain', r));
+      }
+    };
+    req.on('close', () => reader.cancel().catch(() => {}));
+    await pump();
 
   } catch (e) {
     console.error('[VOID stream] error:', e.message);
-    next(e);
-  }
-};
-
-// ── Saavn search endpoint (used by frontend scan) ─────────────────────────────
-exports.saavnSearch = async (req, res, next) => {
-  const q = String(req.query.q || '').trim();
-  if (!q) return res.status(400).json({ error: 'Missing query parameter: q' });
-  try {
-    const results = await saavnSearch(q);
-    res.json({ data: { results } });
-  } catch (e) {
-    next(e);
+    if (!res.headersSent) next(e);
   }
 };
