@@ -6,14 +6,18 @@
  *   search(q, type, maxResults)  → /api/youtube/search
  *   videoDetails(ids)             → /api/youtube/videos
  *   playlistItems(playlistId)     → /api/youtube/playlist
- *   streamProxy(id)               → /api/youtube/stream  (Piped audio)
+ *   streamProxy(id)               → /api/youtube/stream
  *
  * Stream flow:
- *   1. Try each configured Piped instance in order for /streams/:videoId
- *   2. Piped returns audioStreams[] — pick the best quality URL
- *   3. Proxy the audio bytes back to the client with correct headers
- *   4. If ALL Piped instances fail, fall back to Invidious /api/v1/videos/:id
- *      which also exposes adaptive_formats[] with audio-only streams
+ *   1. Try each Piped instance → /streams/:videoId → audioStreams[]
+ *   2. Fall back to each Invidious instance → /api/v1/videos/:id → adaptiveFormats[]
+ *   3. Return { url, mimeType } JSON to the client — NO audio bytes proxied
+ *   4. Browser fetches audio directly from the resolved URL
+ *
+ * Why browser-direct?
+ *   Piped/Invidious instances block requests from datacenter IPs (AWS/Render).
+ *   The browser is on a residential IP and is not blocked.
+ *   Server only does the cheap metadata lookup; browser does the heavy fetch.
  *
  * No Deezer. No JioSaavn. No metadata translation pipeline.
  */
@@ -92,7 +96,7 @@ async function ytPlaylistItems(playlistId, maxResults = 50) {
   return apiFetch(url.toString());
 }
 
-// ── Invidious fallback for search/playlist ────────────────────────────────────
+// ── Invidious fallback for search / playlist ──────────────────────────────────
 async function invidiousSearch(q, type = 'video') {
   const instances = config.youtube.invidiousInstances;
   const fields = type === 'playlist'
@@ -111,8 +115,8 @@ async function invidiousSearch(q, type = 'video') {
 }
 
 // ── Piped stream resolver ─────────────────────────────────────────────────────
-// Piped /streams/:id returns { audioStreams: [{ url, quality, mimeType }] }
-// We pick the highest-quality audio-only stream.
+// GET /streams/:videoId → { audioStreams: [{ url, quality, mimeType }] }
+// Returns the best quality audio URL, or null if all instances fail.
 async function pipedGetAudioUrl(videoId) {
   const instances = config.youtube.pipedInstances;
 
@@ -123,7 +127,7 @@ async function pipedGetAudioUrl(videoId) {
       const streams = data?.audioStreams;
       if (!streams || !streams.length) continue;
 
-      // Sort by bitrate descending (quality field is a string like "48kbps")
+      // Sort by bitrate descending — quality field is e.g. "128kbps"
       const sorted = [...streams].sort((a, b) => {
         const bpsA = parseInt(a.quality) || 0;
         const bpsB = parseInt(b.quality) || 0;
@@ -139,11 +143,12 @@ async function pipedGetAudioUrl(videoId) {
       console.warn(`[VOID piped] ${instance} failed:`, e.message);
     }
   }
-  return null; // all Piped instances exhausted
+  return null;
 }
 
 // ── Invidious stream resolver (fallback) ──────────────────────────────────────
-// Invidious /api/v1/videos/:id exposes adaptiveFormats[] with audio-only entries.
+// GET /api/v1/videos/:id?fields=adaptiveFormats → audio-only formats
+// Returns the best quality audio URL, or null if all instances fail.
 async function invidiousGetAudioUrl(videoId) {
   const instances = config.youtube.invidiousInstances;
 
@@ -157,14 +162,12 @@ async function invidiousGetAudioUrl(videoId) {
       const formats = data?.adaptiveFormats;
       if (!formats || !formats.length) continue;
 
-      // Keep only audio-only formats (no video resolution)
+      // Audio-only: has audio mime type and no video resolution
       const audioOnly = formats.filter(f =>
         f.type && f.type.startsWith('audio/') && !f.resolution
       );
-
       if (!audioOnly.length) continue;
 
-      // Pick highest bitrate
       const best = audioOnly.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0];
       if (!best?.url) continue;
 
@@ -256,14 +259,9 @@ exports.playlistItems = async (req, res, next) => {
 // ── Stream proxy ──────────────────────────────────────────────────────────────
 // GET /api/youtube/stream?id=VIDEO_ID
 //
-// Flow:
-//   1. Try all Piped instances → audioStreams[]
-//   2. Fall back to all Invidious instances → adaptiveFormats[] (audio-only)
-//   3. If both chains fail → 502
-//   4. Proxy the audio bytes to the client (supports Range for seek)
-//
-// The client (ytFetchBlob) downloads the whole buffer and stores it in
-// IndexedDB — so this endpoint is called once per track, not on every seek.
+// Returns { url, mimeType } JSON — does NOT proxy audio bytes.
+// The browser fetches audio directly from the resolved URL.
+// This avoids datacenter IP blocks on Piped/Invidious instances.
 exports.streamProxy = async (req, res, next) => {
   const videoId = String(req.query.id || '').trim();
   if (!videoId) return res.status(400).json({ error: 'Missing query parameter: id' });
@@ -271,64 +269,24 @@ exports.streamProxy = async (req, res, next) => {
   console.log(`[VOID stream] resolving: ${videoId}`);
 
   try {
-    // ── Step 1: Resolve an audio URL ─────────────────────────────────────────
+    // Step 1 — try Piped instances
     let resolved = await pipedGetAudioUrl(videoId);
 
+    // Step 2 — fall back to Invidious instances
     if (!resolved) {
       console.warn(`[VOID stream] Piped exhausted, trying Invidious for ${videoId}`);
       resolved = await invidiousGetAudioUrl(videoId);
     }
 
+    // Step 3 — everything failed
     if (!resolved) {
       return res.status(502).json({
         error: 'All stream sources failed. Try again in a moment.',
       });
     }
 
-    const { url: audioUrl, mimeType } = resolved;
-
-    // ── Step 2: Proxy the audio bytes ─────────────────────────────────────────
-    // Forward any Range header the client sends (rare here since the frontend
-    // does a full download, but correct to forward it).
-    const upstreamHeaders = { 'User-Agent': 'Mozilla/5.0' };
-    if (req.headers.range) upstreamHeaders['Range'] = req.headers.range;
-
-    const audioResp = await fetch(audioUrl, {
-      signal: AbortSignal.timeout(90000),
-      headers: upstreamHeaders,
-    });
-
-    if (!audioResp.ok && audioResp.status !== 206) {
-      return res.status(502).json({
-        error: `Upstream audio fetch failed: ${audioResp.status}`,
-      });
-    }
-
-    // Mirror status + key headers from upstream
-    res.status(audioResp.status);
-    res.setHeader('Content-Type', mimeType);
-    res.setHeader('Cache-Control', 'no-store');
-    res.setHeader('Accept-Ranges', 'bytes');
-
-    const contentLength = audioResp.headers.get('content-length');
-    if (contentLength) res.setHeader('Content-Length', contentLength);
-
-    const contentRange = audioResp.headers.get('content-range');
-    if (contentRange) res.setHeader('Content-Range', contentRange);
-
-    // Stream the body — don't buffer the whole file in memory
-    const reader = audioResp.body.getReader();
-    const pump = async () => {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) { res.end(); break; }
-        const ok = res.write(value);
-        // Respect backpressure
-        if (!ok) await new Promise(r => res.once('drain', r));
-      }
-    };
-    req.on('close', () => reader.cancel().catch(() => {}));
-    await pump();
+    // Step 4 — return URL to client; browser fetches audio directly
+    res.json({ url: resolved.url, mimeType: resolved.mimeType });
 
   } catch (e) {
     console.error('[VOID stream] error:', e.message);
