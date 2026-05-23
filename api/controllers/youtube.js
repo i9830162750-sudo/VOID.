@@ -107,55 +107,19 @@ async function invidiousSearch(q, type = 'video') {
   throw new Error('All Invidious search instances failed');
 }
 
-// ── yt-dlp audio URL resolver ─────────────────────────────────────────────────
-// Uses cookies from VOID_YT_COOKIE env var (raw Netscape cookies.txt format).
-// yt-dlp only resolves the URL — it never downloads audio bytes.
 async function ytdlpGetAudioUrl(videoId) {
-  const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
-  const bin   = '/opt/render/project/src/.venv/bin/yt-dlp';
-
-  // Write cookies to a temp file from the VOID_YT_COOKIE env var
-  
-  let cookiesFile = null;
-  const cookieData = process.env.VOID_YT_COOKIE;
-  if (cookieData) {
+  const instances = config.youtube.invidiousInstances;
+  for (const instance of instances) {
     try {
-      cookiesFile = path.join(os.tmpdir(), `yt-cookies-${Date.now()}.txt`);
-      fs.writeFileSync(cookiesFile, cookieData, 'utf8');
-      console.log('[VOID yt-dlp] cookies written to temp file');
-    } catch (e) {
-      console.warn('[VOID yt-dlp] failed to write cookies:', e.message);
-      cookiesFile = null;
-    }
-  } else {
-    console.warn('[VOID yt-dlp] VOID_YT_COOKIE not set — attempting without cookies');
+      const url = `${instance}/latest_version?id=${videoId}&itag=140&local=true`;
+      const res = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(8000) });
+      if (res.ok) {
+        console.log(`[VOID invidious] resolved via ${instance}`);
+        return { url, mimeType: 'audio/mp4' };
+      }
+    } catch { }
   }
-
- const args = [
-  '--no-warnings',
-  '--quiet',
-  '-f', '251/140/249/139',
-  '--get-url',
-  ];
-  
-  if (cookiesFile) args.push('--cookies', cookiesFile);
-  args.push(ytUrl);
-
-  try {
-    const { stdout, stderr } = await execFileAsync(bin, args, { timeout: 25000 });
-    if (stderr) console.warn('[VOID yt-dlp] stderr:', stderr.slice(0, 200));
-
-    const audioUrl = stdout.trim().split('\n')[0];
-    if (!audioUrl || !audioUrl.startsWith('http')) throw new Error('Empty URL returned');
-
-    console.log(`[VOID yt-dlp] resolved: ${audioUrl.slice(0, 80)}…`);
-    return { url: audioUrl, mimeType: 'audio/webm' };
-  } catch (e) {
-    console.error('[VOID yt-dlp] failed:', e.message.slice(0, 300));
-    return null;
-  } finally {
-    if (cookiesFile) try { fs.unlinkSync(cookiesFile); } catch {}
-  }
+  return null;
 }
 
 // ── Exported controller functions ─────────────────────────────────────────────
