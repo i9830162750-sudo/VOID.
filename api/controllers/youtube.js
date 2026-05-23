@@ -116,24 +116,13 @@ async function ytdlpGetAudioUrl(videoId) {
 
   // Write cookies to a temp file from the VOID_YT_COOKIE env var
   let cookiesFile = null;
-  const cookieData = process.env.VOID_YT_COOKIE;
-  if (cookieData) {
-    try {
-      cookiesFile = path.join(os.tmpdir(), `yt-cookies-${Date.now()}.txt`);
-      fs.writeFileSync(cookiesFile, cookieData, 'utf8');
-      console.log('[VOID yt-dlp] cookies written to temp file');
-    } catch (e) {
-      console.warn('[VOID yt-dlp] failed to write cookies:', e.message);
-      cookiesFile = null;
-    }
-  } else {
-    console.warn('[VOID yt-dlp] VOID_YT_COOKIE not set — attempting without cookies');
-  }
+ console.log('[VOID yt-dlp] running without cookies');
+let cookiesFile = null;
 
  const args = [
   '--no-warnings',
   '--quiet',
-  '-f', '140/251/250/249/171/bestaudio/best',
+  '-f', 'bestaudio/best',
   '--get-url',
   '--extractor-args', 'youtube:player_client=android',
   ];
