@@ -221,25 +221,7 @@ exports.streamProxy = async (req, res, next) => {
       });
     }
 
-    // Proxy the audio through the server to avoid CSP issues
-    const audioRes = await fetch(resolved.url, {
-      headers: { 'Range': req.headers['range'] || 'bytes=0-' },
-      signal: AbortSignal.timeout(15000),
-    });
-
-    res.setHeader('Content-Type', resolved.mimeType);
-    res.setHeader('Accept-Ranges', 'bytes');
-    if (audioRes.headers.get('content-length')) {
-      res.setHeader('Content-Length', audioRes.headers.get('content-length'));
-    }
-    if (audioRes.headers.get('content-range')) {
-      res.setHeader('Content-Range', audioRes.headers.get('content-range'));
-    }
-    res.status(audioRes.status);
-    audioRes.body.pipeTo(new WritableStream({
-      write(chunk) { res.write(chunk); },
-      close() { res.end(); },
-    }));
+    res.json({ url: resolved.url, mimeType: resolved.mimeType });
 
   } catch (e) {
     console.error('[VOID stream] error:', e.message);
