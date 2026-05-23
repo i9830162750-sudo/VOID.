@@ -13,44 +13,43 @@ module.exports = {
 
  // ── YouTube ───────────────────────────────────────────────────────────────
   youtube: {
-    // Server-side API key — never exposed to the client
     apiKey: process.env.VOID_YT_API_KEY || '',
     searchEndpoint:   'https://www.googleapis.com/youtube/v3/search',
     videosEndpoint:   'https://www.googleapis.com/youtube/v3/videos',
     playlistEndpoint: 'https://www.googleapis.com/youtube/v3/playlistItems',
 
-    // ── Piped instances (primary stream source) ────────────────────────────
-    // GET /streams/:videoId → { audioStreams: [{ url, quality, mimeType }] }
-    // Override via VOID_PIPED_INSTANCES env var (comma-separated).
+    // Piped instances — server-side only (resolves audio URL, not proxied)
     pipedInstances: (process.env.VOID_PIPED_INSTANCES || '')
       .split(',').map(s => s.trim()).filter(Boolean).length
         ? (process.env.VOID_PIPED_INSTANCES || '')
             .split(',').map(s => s.trim()).filter(Boolean)
         : [
-            'https://pipedapi.kavin.rocks',
-            'https://pipedapi.adminforge.de',
-            'https://piped-api.garudalinux.org',
-            'https://pipedapi.drgns.space',
-            'https://pipedapi.coldacid.net',
-            'https://piped.lunar.icu/api',
+            'https://pipedapi.darkness.services',
+            'https://pipedapi.reallyaweso.me',
+            'https://pipedapi.aeong.one',
+            'https://pipedapi.syncpundit.io',
+            'https://api.piped.yt',
+            'https://pipedapi.tokhmi.xyz',
+            'https://pipedapi.moomoo.me',
+            'https://piped-api.cfe.re',
           ],
 
-    // ── Invidious instances (search fallback + stream double-fallback) ─────
-    // Override via VOID_INVIDIOUS_INSTANCES env var (comma-separated).
+    // Invidious instances — server-side only (stream URL fallback)
     invidiousInstances: (process.env.VOID_INVIDIOUS_INSTANCES || '')
       .split(',').map(s => s.trim()).filter(Boolean).length
         ? (process.env.VOID_INVIDIOUS_INSTANCES || '')
             .split(',').map(s => s.trim()).filter(Boolean)
         : [
-            'https://invidious.io.lol',
-            'https://invidious.fdn.fr',
-            'https://invidious.nerdvpn.de',
-            'https://inv.tux.pizza',
-            'https://yewtu.be',
-            'https://invidious.privacydev.net',
+            'https://invidious.materialio.us',
+            'https://invidious.privacyredirect.com',
+            'https://invidious.dhusch.de',
+            'https://invidious.perennialte.ch',
+            'https://yt.drgnz.club',
+            'https://invidious.asir.dev',
+            'https://iv.nboeck.de',
           ],
   },
-
+  
   // ── CORS ──────────────────────────────────────────────────────────────────
   cors: {
     // In prod, restrict to your actual domain(s)
