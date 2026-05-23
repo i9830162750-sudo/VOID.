@@ -103,29 +103,30 @@ async function invidiousSearch(q, type = 'video') {
 const SAAVN_API = 'https://www.jiosaavn.com/api.php';
 
 async function saavnSearchByTitle(title) {
-  const params = new URLSearchParams({
-    __call: 'search.getResults',
-    _format: 'json',
-    _marker: '0',
-    api_version: '4',
-    ctx: 'web6dot0',
-    query: title,
-    n: '5',
-    p: '1',
-  });
+  const cleaned = title
+    .replace(/\(.*?\)/g, '')
+    .replace(/\[.*?\]/g, '')
+    .replace(/\|.*/g, '')           // strip everything after |
+    .replace(/[-–—].*?(full|video|audio|song|lyric)/gi, '')
+    .replace(/official\s*(video|audio|music|lyric[s]?)/gi, '')
+    .replace(/lyrics?/gi, '')
+    .replace(/hd|4k|full\s*video|full\s*song/gi, '')
+    .replace(/ft\.?.*/gi, '')       // strip featured artists
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+    .split(' ')
+    .slice(0, 4)                    // ← only use first 4 words max
+    .join(' ');
 
-  const resp = await fetch(`${SAAVN_API}?${params}`, {
-    signal: AbortSignal.timeout(10000),
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      'Referer': 'https://www.jiosaavn.com/',
-    },
-  });
+  console.log(`[VOID saavn] searching: "${cleaned}" (original: "${title}")`);
 
+  const resp = await fetch(
+    `${SAAVN_BASE}/api/search/songs?query=${encodeURIComponent(cleaned)}&page=1&limit=5`,
+    { signal: AbortSignal.timeout(10000) }
+  );
   if (!resp.ok) throw new Error(`Saavn search failed: ${resp.status}`);
   const data = await resp.json();
-  const results = data?.results || [];
-  return results.map(s => ({ id: s.id, title: s.title, artist: s.more_info?.singers || '' }));
+  return data?.data?.results || [];
 }
 
 async function saavnGetStreamUrl(songId) {
