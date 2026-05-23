@@ -305,14 +305,46 @@ exports.streamProxy = async (req, res, next) => {
       if (deezerResult) {
         cleanTitle  = deezerResult.title;
         cleanArtist = deezerResult.artist;
-        console.log(`[VOID deezer] resolved: "${cleanTitle}" by "${cleanArtist}"`);
+
+        // Extra aggressive cleanup for Saavn
+        cleanTitle = cleanTitle
+          .replace(/\(from\s+["'].*?["']\)/gi, '')
+          .replace(/\(.*?version.*?\)/gi, '')
+          .replace(/\(.*?\)/g, '')
+          .replace(/\[.*?\]/g, '')
+          .replace(/\|.*/g, '')
+          .replace(/official/gi, '')
+          .replace(/video/gi, '')
+          .replace(/lyrics?/gi, '')
+          .replace(/full\s*song/gi, '')
+          .replace(/audio/gi, '')
+          .replace(/4k|hd/gi, '')
+          .replace(/[^a-zA-Z0-9\s]/g, ' ')
+          .replace(/\s{2,}/g, ' ')
+          .trim();
+
+        console.log(`[VOID deezer] resolved clean: "${cleanTitle}" by "${cleanArtist}"`);
       }
     } catch (e) {
       console.warn('[VOID deezer] lookup failed, falling back to raw title:', e.message);
     }
 
-    // Step 2 — Search Saavn with clean data
-    const results = await saavnSearch(cleanTitle, cleanArtist);
+    // Step 2 — Search Saavn with clean data + fallback logic
+    let results = await saavnSearch(cleanTitle, cleanArtist);
+
+    // Fallback 1 — without artist
+    if (!results.length && cleanArtist) {
+      console.log('[VOID saavn] retrying without artist...');
+      results = await saavnSearch(cleanTitle, '');
+    }
+
+    // Fallback 2 — use first 3 words of title only
+    if (!results.length) {
+      const simpleTitle = cleanTitle.split(' ').slice(0, 3).join(' ');
+      console.log(`[VOID saavn] retrying simple: "${simpleTitle}"`);
+      results = await saavnSearch(simpleTitle, '');
+    }
+
     if (!results.length) {
       return res.status(404).json({ error: `No Saavn match found for: ${cleanTitle}` });
     }
