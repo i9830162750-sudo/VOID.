@@ -103,8 +103,21 @@ async function invidiousSearch(q, type = 'video') {
 const SAAVN_BASE = 'https://saavn.me';
 
 async function saavnSearchByTitle(title) {
+  // Clean the title — strip common YouTube suffixes that confuse Saavn
+  const cleaned = title
+    .replace(/\(.*?\)/g, '')           // remove (Official Video) etc
+    .replace(/\[.*?\]/g, '')           // remove [HD] etc
+    .replace(/\|.*/g, '')              // remove | HD Video | ...
+    .replace(/official\s*(video|audio|music|lyric[s]?)/gi, '')
+    .replace(/lyrics?/gi, '')
+    .replace(/hd|4k|full\s*video/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+  console.log(`[VOID saavn] searching: "${cleaned}" (original: "${title}")`);
+
   const resp = await fetch(
-    `${SAAVN_BASE}/api/search/songs?query=${encodeURIComponent(title)}&page=1&limit=5`,
+    `${SAAVN_BASE}/api/search/songs?query=${encodeURIComponent(cleaned)}&page=1&limit=5`,
     { signal: AbortSignal.timeout(10000) }
   );
   if (!resp.ok) throw new Error(`Saavn search failed: ${resp.status}`);
