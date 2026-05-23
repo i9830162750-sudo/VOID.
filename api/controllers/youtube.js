@@ -261,21 +261,21 @@ exports.playlistItems = async (req, res, next) => {
 // Docs: https://github.com/imputnet/cobalt
 async function cobaltGetAudioUrl(videoId) {
   const endpoints = [
-    'https://co.wuk.sh/api/json',
-    'https://cobalt.tools/api/json',
-    'https://api.cobalt.tools/api/json',
+    'https://api.cobalt.tools',
+    'https://cobalt.tools',
   ];
 
   const body = JSON.stringify({
     url: `https://www.youtube.com/watch?v=${videoId}`,
-    aFormat: 'mp3',
-    isAudioOnly: true,
+    downloadMode: 'audio',
+    audioFormat: 'mp3',
+    audioBitrate: '128',
     disableMetadata: true,
   });
 
   for (const endpoint of endpoints) {
     try {
-      const resp = await fetch(endpoint, {
+      const resp = await fetch(`${endpoint}/`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -293,13 +293,11 @@ async function cobaltGetAudioUrl(videoId) {
       const data = await resp.json();
       console.log(`[VOID cobalt] ${endpoint} → status: ${data.status}`);
 
-      // status: "stream" or "redirect" both give a usable URL
-      if ((data.status === 'stream' || data.status === 'redirect') && data.url) {
+      if ((data.status === 'tunnel' || data.status === 'redirect') && data.url) {
         return { url: data.url, mimeType: 'audio/mpeg' };
       }
 
-      // status: "error" or "rate-limit"
-      console.warn(`[VOID cobalt] ${endpoint} rejected:`, data.text || data.status);
+      console.warn(`[VOID cobalt] ${endpoint} rejected:`, data?.error?.code || data.status);
     } catch (e) {
       console.warn(`[VOID cobalt] ${endpoint} failed:`, e.message);
     }
