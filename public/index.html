@@ -3143,42 +3143,102 @@ async function ytPlayDirect(videoId, title, artist, thumb) {
   }
 }
 
-// Fetches audio from backend stream proxy (Piped → Invidious fallback).
-// Backend resolves the URL, browser fetches audio directly to avoid cloud IP blocks.
-// Downloads the full buffer, stores in IndexedDB, returns a blob URL.
+// ── Piped instances — browser fetches these directly (no datacenter IP block) ─
+const VOID_PIPED_INSTANCES = [
+  'https://pipedapi.kavin.rocks',
+  'https://pipedapi.adminforge.de',
+  'https://piped-api.garudalinux.org',
+  'https://pipedapi.drgns.space',
+  'https://pipedapi.coldacid.net',
+  'https://piped.lunar.icu/api',
+];
+
+// Resolves a YouTube video ID to a direct audio URL using Piped instances.
+// Called from the browser — residential IP, not blocked like datacenter IPs.
+async function resolvePipedAudioUrl(videoId) {
+  for (const instance of VOID_PIPED_INSTANCES) {
+    try {
+      const resp = await fetch(`${instance}/streams/${videoId}`, {
+        signal: AbortSignal.timeout(8000)
+      });
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      const streams = data?.audioStreams;
+      if (!streams || !streams.length) continue;
+
+      // Sort by bitrate descending
+      const sorted = [...streams].sort((a, b) => {
+        return (parseInt(b.quality) || 0) - (parseInt(a.quality) || 0);
+      });
+      const best = sorted[0];
+      if (!best?.url) continue;
+
+      console.log(`[VOID] Piped resolved via ${instance} → ${best.quality}`);
+      return { url: best.url, mimeType: best.mimeType || 'audio/webm' };
+    } catch (e) {
+      console.warn(`[VOID] Piped ${instance} failed:`, e.message);
+    }
+  }
+  return null;
+}
+
+// Resolves via Invidious as a second fallback (also browser-direct).
+async function resolveInvidiousAudioUrl(videoId) {
+  for (const instance of YT_INVIDIOUS) {
+    try {
+      const resp = await fetch(
+        `${instance}/api/v1/videos/${videoId}?fields=adaptiveFormats`,
+        { signal: AbortSignal.timeout(8000) }
+      );
+      if (!resp.ok) continue;
+      const data = await resp.json();
+      const formats = (data?.adaptiveFormats || []).filter(f =>
+        f.type && f.type.startsWith('audio/') && !f.resolution
+      );
+      if (!formats.length) continue;
+
+      const best = formats.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0];
+      if (!best?.url) continue;
+
+      console.log(`[VOID] Invidious resolved via ${instance}`);
+      return { url: best.url, mimeType: best.type?.split(';')[0] || 'audio/webm' };
+    } catch (e) {
+      console.warn(`[VOID] Invidious ${instance} failed:`, e.message);
+    }
+  }
+  return null;
+}
+
+// Fetches audio fully client-side: Piped → Invidious → error.
+// Backend is NOT involved in stream resolution at all.
+// Downloads full buffer, stores in IndexedDB, returns a blob URL.
 async function ytFetchBlob(videoId, onProgress, title, artist) {
 
-  const params = new URLSearchParams({ id: videoId });
-  if (title)  params.set('title', title);
-  if (artist) params.set('artist', artist);
-
-  // Step 1 — Ask backend to resolve the audio URL (no audio bytes returned)
-  const resolveResp = await fetch(`${VOID_API_BASE}/youtube/stream?${params}`, {
-    signal: AbortSignal.timeout(15000)
-  });
-
-  if (!resolveResp.ok) {
-    const err = await resolveResp.json().catch(() => ({}));
-    throw new Error(err.error || `Stream resolve failed: ${resolveResp.status}`);
+  // Step 1 — resolve a direct audio URL from the browser
+  let resolved = await resolvePipedAudioUrl(videoId);
+  if (!resolved) {
+    console.warn('[VOID] Piped exhausted, trying Invidious…');
+    resolved = await resolveInvidiousAudioUrl(videoId);
+  }
+  if (!resolved) {
+    throw new Error('All stream sources failed — try again later');
   }
 
-  const { url: audioUrl, mimeType } = await resolveResp.json();
-  if (!audioUrl) throw new Error('Backend returned no audio URL');
+  const { url: audioUrl, mimeType } = resolved;
 
-  // Step 2 — Browser fetches audio directly (avoids cloud IP blocks on Piped/Invidious)
+  // Step 2 — fetch audio bytes directly (browser → Piped/Invidious CDN)
   const audioResp = await fetch(audioUrl, {
     signal: AbortSignal.timeout(120000)
   });
-
   if (!audioResp.ok) throw new Error(`Audio fetch failed: ${audioResp.status}`);
 
   const arrayBuffer = await audioResp.arrayBuffer();
-  const blob = new Blob([arrayBuffer], { type: mimeType || 'audio/webm' });
+  const blob = new Blob([arrayBuffer], { type: mimeType });
 
   const blobId = 'blob_yt_' + videoId + '_' + Date.now();
   await dbPut('blobs', { id: blobId, blob });
-  console.log('[VOID] YT fetch success — direct browser fetch');
-  return { blobUrl: URL.createObjectURL(blob), blobId, mimeType: mimeType || 'audio/webm' };
+  console.log('[VOID] YT fetch success — fully client-side');
+  return { blobUrl: URL.createObjectURL(blob), blobId, mimeType };
 }
    
 // ==============================
