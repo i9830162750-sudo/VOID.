@@ -112,8 +112,12 @@ async function ytdlpGetAudioUrl(videoId) {
   for (const instance of instances) {
     try {
       const url = `${instance}/latest_version?id=${videoId}&itag=140&local=true`;
-      const res = await fetch(url, { method: 'HEAD', signal: AbortSignal.timeout(8000) });
-      if (res.ok) {
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: { 'Range': 'bytes=0-0' },
+        signal: AbortSignal.timeout(8000),
+      });
+      if (res.ok || res.status === 206 || res.status === 302) {
         console.log(`[VOID invidious] resolved via ${instance}`);
         return { url, mimeType: 'audio/mp4' };
       }
