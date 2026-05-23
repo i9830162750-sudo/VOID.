@@ -230,3 +230,18 @@ exports.streamProxy = async (req, res, next) => {
     if (!res.headersSent) next(e);
   }
 };
+
+exports.audioProxy = async (req, res, next) => {
+  const videoId = String(req.query.id || '').trim();
+  if (!videoId) return res.status(400).json({ error: 'Missing id' });
+  try {
+    const resolved = await ytdlpGetAudioUrl(videoId);
+    if (!resolved) return res.status(502).send('Stream unavailable');
+    const audioRes = await fetch(resolved.url, { signal: AbortSignal.timeout(30000) });
+    if (!audioRes.ok) return res.status(502).send('Upstream failed');
+    res.setHeader('Content-Type', resolved.mimeType);
+    res.setHeader('Accept-Ranges', 'bytes');
+    const buf = await audioRes.arrayBuffer();
+    res.send(Buffer.from(buf));
+  } catch(e) { next(e); }
+};
