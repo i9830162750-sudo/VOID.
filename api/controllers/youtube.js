@@ -130,11 +130,12 @@ async function ytdlpGetAudioUrl(videoId) {
     console.warn('[VOID yt-dlp] VOID_YT_COOKIE not set — attempting without cookies');
   }
 
-  const args = [
-    '--no-warnings',
-    '--quiet',
-    '-f', '140/251/250/249/171/bestaudio/best',
-    '--get-url',
+ const args = [
+  '--no-warnings',
+  '--quiet',
+  '-f', '140/251/250/249/171/bestaudio/best',
+  '--get-url',
+  '--extractor-args', 'youtube:player_client=android',
   ];
   
   if (cookiesFile) args.push('--cookies', cookiesFile);
