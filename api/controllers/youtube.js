@@ -256,58 +256,40 @@ exports.playlistItems = async (req, res, next) => {
   }
 };
 
-// ── Cobalt.tools audio resolver ───────────────────────────────────────────────
-// cobalt is a free, open source media downloader with a public API.
-// Docs: https://github.com/imputnet/cobalt
-async function cobaltGetAudioUrl(videoId) {
-  const endpoints = [
-    'https://api.cobalt.tools',
-    'https://cobalt.tools',
-  ];
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+const execFileAsync = promisify(execFile);
 
-  const body = JSON.stringify({
-    url: `https://www.youtube.com/watch?v=${videoId}`,
-    downloadMode: 'audio',
-    audioFormat: 'mp3',
-    audioBitrate: '128',
-    disableMetadata: true,
-  });
+async function ytdlpGetAudioUrl(videoId) {
+  const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
-  for (const endpoint of endpoints) {
+  // Try to find yt-dlp in common locations
+  const bins = ['yt-dlp', '/usr/local/bin/yt-dlp', '/usr/bin/yt-dlp', `${process.env.HOME}/.local/bin/yt-dlp`];
+
+  for (const bin of bins) {
     try {
-      const resp = await fetch(`${endpoint}/`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body,
-        signal: AbortSignal.timeout(10000),
-      });
+      const { stdout, stderr } = await execFileAsync(bin, [
+        '--no-warnings',
+        '--quiet',
+        '-f', 'bestaudio',
+        '--get-url',
+        ytUrl,
+      ], { timeout: 25000 });
 
-      if (!resp.ok) {
-        console.warn(`[VOID cobalt] ${endpoint} → ${resp.status}`);
-        continue;
-      }
+      if (stderr) console.warn(`[VOID yt-dlp] stderr:`, stderr.slice(0, 200));
 
-      const data = await resp.json();
-      console.log(`[VOID cobalt] ${endpoint} → status: ${data.status}`);
+      const audioUrl = stdout.trim().split('\n')[0];
+      if (!audioUrl || !audioUrl.startsWith('http')) continue;
 
-      if ((data.status === 'tunnel' || data.status === 'redirect') && data.url) {
-        return { url: data.url, mimeType: 'audio/mpeg' };
-      }
-
-      console.warn(`[VOID cobalt] ${endpoint} rejected:`, data?.error?.code || data.status);
+      console.log(`[VOID yt-dlp] resolved via ${bin}: ${audioUrl.slice(0, 80)}…`);
+      return { url: audioUrl, mimeType: 'audio/webm' };
     } catch (e) {
-      console.warn(`[VOID cobalt] ${endpoint} failed:`, e.message);
+      console.warn(`[VOID yt-dlp] ${bin} failed:`, e.message.slice(0, 200));
     }
   }
   return null;
 }
 
-// ── Stream proxy ──────────────────────────────────────────────────────────────
-// GET /api/youtube/stream?id=VIDEO_ID
-// Returns { url, mimeType } — browser fetches audio from the URL directly.
 exports.streamProxy = async (req, res, next) => {
   const videoId = String(req.query.id || '').trim();
   if (!videoId) return res.status(400).json({ error: 'Missing query parameter: id' });
@@ -315,7 +297,7 @@ exports.streamProxy = async (req, res, next) => {
   console.log(`[VOID stream] resolving: ${videoId}`);
 
   try {
-    const resolved = await cobaltGetAudioUrl(videoId);
+    const resolved = await ytdlpGetAudioUrl(videoId);
 
     if (!resolved) {
       return res.status(502).json({
