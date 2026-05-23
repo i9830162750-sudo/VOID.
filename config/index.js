@@ -11,7 +11,7 @@ module.exports = {
   env:  process.env.NODE_ENV || 'development',
   isDev: (process.env.NODE_ENV || 'development') === 'development',
 
-  // ── YouTube ───────────────────────────────────────────────────────────────
+ // ── YouTube ───────────────────────────────────────────────────────────────
   youtube: {
     // Server-side API key — never exposed to the client
     apiKey: process.env.VOID_YT_API_KEY || '',
@@ -19,17 +19,28 @@ module.exports = {
     videosEndpoint:   'https://www.googleapis.com/youtube/v3/videos',
     playlistEndpoint: 'https://www.googleapis.com/youtube/v3/playlistItems',
 
-    // Invidious fallback instances — override via VOID_INVIDIOUS_INSTANCES env var
-    // (comma-separated) so you can swap instances without redeploying
+    // ── Piped instances (primary stream source) ────────────────────────────
+    // GET /streams/:videoId → { audioStreams: [{ url, quality, mimeType }] }
+    // Override via VOID_PIPED_INSTANCES env var (comma-separated).
+    pipedInstances: (process.env.VOID_PIPED_INSTANCES || '')
+      .split(',').map(s => s.trim()).filter(Boolean).length
+        ? (process.env.VOID_PIPED_INSTANCES || '')
+            .split(',').map(s => s.trim()).filter(Boolean)
+        : [
+            'https://pipedapi.kavin.rocks',
+            'https://pipedapi.adminforge.de',
+            'https://piped-api.garudalinux.org',
+            'https://pipedapi.drgns.space',
+            'https://pipedapi.coldacid.net',
+            'https://piped.lunar.icu/api',
+          ],
+
+    // ── Invidious instances (search fallback + stream double-fallback) ─────
+    // Override via VOID_INVIDIOUS_INSTANCES env var (comma-separated).
     invidiousInstances: (process.env.VOID_INVIDIOUS_INSTANCES || '')
-      .split(',')
-      .map(s => s.trim())
-      .filter(Boolean)
-      .length
+      .split(',').map(s => s.trim()).filter(Boolean).length
         ? (process.env.VOID_INVIDIOUS_INSTANCES || '')
-            .split(',')
-            .map(s => s.trim())
-            .filter(Boolean)
+            .split(',').map(s => s.trim()).filter(Boolean)
         : [
             'https://invidious.io.lol',
             'https://invidious.fdn.fr',
