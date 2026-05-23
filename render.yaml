@@ -10,7 +10,7 @@ services:
     region: oregon           # change to match your user base
 
     # Build step — install production deps only
-    buildCommand: npm install --omit=dev && pip install -U yt-dlp --user
+    buildCommand: npm install --omit=dev && python3 -m pip install -U yt-dlp && python3 -m yt_dlp --version && which yt-dlp || find /opt/render -name "yt-dlp" 2>/dev/null || echo "yt-dlp not found in PATH"
 
     # Start command
     startCommand: node server.js
