@@ -115,9 +115,9 @@ async function ytdlpGetAudioUrl(videoId) {
   const bin   = '/opt/render/project/src/.venv/bin/yt-dlp';
 
   // Write cookies to a temp file from the VOID_YT_COOKIE env var
-  let cookiesFile = null;
+  
  console.log('[VOID yt-dlp] running without cookies');
-let cookiesFile = null;
+  let cookiesFile = null;
 
  const args = [
   '--no-warnings',
