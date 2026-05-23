@@ -3040,8 +3040,11 @@ async function ytFetchAndPlay(trackIdx) {
   updateBufferingUI(true);
 
   try {
-    const { blobUrl, blobId, mimeType } = await ytFetchBlob(t.ytMeta.videoId,
-      (pct) => showToast(`Downloading… ${pct}%`));
+    const { blobUrl, blobId, mimeType } = await ytFetchBlob(
+      t.ytMeta.videoId,
+      (pct) => showToast(`Downloading… ${pct}%`),
+      t.title
+    );
 
     // Upgrade track from online→cached
     t.url = blobUrl;
@@ -3092,7 +3095,7 @@ async function ytPlayDirect(videoId, title, artist, thumb) {
   try {
 
     const { blobUrl, mimeType } =
-      await ytFetchBlob(videoId);
+      await ytFetchBlob(videoId, null, title);
 
     updateBufferingUI(false);
 
@@ -3140,10 +3143,11 @@ async function ytPlayDirect(videoId, title, artist, thumb) {
 }
 
 // Fetches audio via Invidious proxy, returns {blobUrl, blobId, mimeType}
-async function ytFetchBlob(videoId, onProgress) {
-  // ── Now calls our own backend — no more direct browser→Invidious fetches ──
-  const url = `${VOID_API_BASE}/youtube/stream?id=${encodeURIComponent(videoId)}`;
+async function ytFetchBlob(videoId, onProgress, title) {
+  const params = new URLSearchParams({ id: videoId });
+  if (title) params.set('title', title);
 
+  const url = `${VOID_API_BASE}/youtube/stream?${params}`;
   const resp = await fetch(url, { signal: AbortSignal.timeout(60000) });
 
   if (!resp.ok) {
@@ -3151,10 +3155,10 @@ async function ytFetchBlob(videoId, onProgress) {
     throw new Error(`Stream proxy failed ${resp.status}: ${body}`);
   }
 
-  const total    = parseInt(resp.headers.get('Content-Length') || '0');
-  const reader   = resp.body.getReader();
-  const chunks   = [];
-  let   received = 0;
+  const total  = parseInt(resp.headers.get('Content-Length') || '0');
+  const reader = resp.body.getReader();
+  const chunks = [];
+  let received = 0;
 
   while (true) {
     const { done, value } = await reader.read();
@@ -3164,15 +3168,12 @@ async function ytFetchBlob(videoId, onProgress) {
     if (total && onProgress) onProgress(Math.round((received / total) * 100));
   }
 
-  // Determine mime from Content-Type header; default to webm
-  const ct       = resp.headers.get('Content-Type') || 'audio/webm';
+  const ct       = resp.headers.get('Content-Type') || 'audio/mpeg';
   const mimeType = ct.split(';')[0].trim();
-
-  const blob   = new Blob(chunks, { type: mimeType });
-  const blobId = 'blob_yt_' + videoId + '_' + Date.now();
+  const blob     = new Blob(chunks, { type: mimeType });
+  const blobId   = 'blob_yt_' + videoId + '_' + Date.now();
 
   await dbPut('blobs', { id: blobId, blob });
-
   console.log('YT fetch success via backend proxy');
   return { blobUrl: URL.createObjectURL(blob), blobId, mimeType };
 }
@@ -3216,7 +3217,7 @@ async function ytDownloadTrack(ytResultIdx, btnId) {
 
     const { blobUrl, blobId } = await ytFetchBlob(v.videoId, (pct) => {
       if (prog) prog.style.width = pct + '%';
-    });
+    }, v.title);
 
     t.url = blobUrl;
     t.blobId = blobId;
