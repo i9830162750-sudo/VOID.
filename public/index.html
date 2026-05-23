@@ -3162,14 +3162,14 @@ async function ytFetchBlob(videoId, onProgress, title, artist) {
   const { url: audioUrl, mimeType } = await resolveResp.json();
   if (!audioUrl) throw new Error('Backend returned no audio URL');
 
-  // Step 2 — browser fetches audio from CDN directly (googlevideo.com, no CORS)
-  const audioResp = await fetch(audioUrl, {
-    signal: AbortSignal.timeout(120000)
-  });
-  if (!audioResp.ok) throw new Error(`Audio fetch failed: ${audioResp.status}`);
-
-  const arrayBuffer = await audioResp.arrayBuffer();
-  const blob = new Blob([arrayBuffer], { type: mimeType || 'audio/webm' });
+  // Step 2 — stream audio through backend to avoid CORS
+   const audioResp = await fetch(`${VOID_API_BASE}/youtube/audio?id=${encodeURIComponent(videoId)}`, {
+     signal: AbortSignal.timeout(120000)
+   });
+   if (!audioResp.ok) throw new Error(`Audio fetch failed: ${audioResp.status}`);
+   
+   const arrayBuffer = await audioResp.arrayBuffer();
+   const blob = new Blob([arrayBuffer], { type: mimeType || 'audio/mp4' });
 
   const blobId = 'blob_yt_' + videoId + '_' + Date.now();
   await dbPut('blobs', { id: blobId, blob });
