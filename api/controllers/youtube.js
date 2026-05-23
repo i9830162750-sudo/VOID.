@@ -1,34 +1,27 @@
 /**
  * api/controllers/youtube.js
- * Server-side proxy for YouTube (search/metadata) + Piped/Invidious (streaming).
- *
- * Endpoints:
- *   search(q, type, maxResults)  → /api/youtube/search
- *   videoDetails(ids)             → /api/youtube/videos
- *   playlistItems(playlistId)     → /api/youtube/playlist
- *   streamProxy(id)               → /api/youtube/stream
+ * Server-side proxy for YouTube (search/metadata) + yt-dlp (streaming).
  *
  * Stream flow:
- *   1. Try each Piped instance → /streams/:videoId → audioStreams[]
- *   2. Fall back to each Invidious instance → /api/v1/videos/:id → adaptiveFormats[]
- *   3. Return { url, mimeType } JSON to the client — NO audio bytes proxied
- *   4. Browser fetches audio directly from the resolved URL
- *
- * Why browser-direct?
- *   Piped/Invidious instances block requests from datacenter IPs (AWS/Render).
- *   The browser is on a residential IP and is not blocked.
- *   Server only does the cheap metadata lookup; browser does the heavy fetch.
- *
- * No Deezer. No JioSaavn. No metadata translation pipeline.
+ *   1. yt-dlp resolves a direct googlevideo.com audio URL using cookies
+ *   2. Return { url, mimeType } JSON to the client
+ *   3. Browser fetches audio directly from googlevideo.com CDN
  */
 
 'use strict';
 
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+const fs   = require('fs');
+const os   = require('os');
+const path = require('path');
+
+const execFileAsync = promisify(execFile);
 const config = require('../../config');
 
 // ── Tiny in-memory cache ──────────────────────────────────────────────────────
 const cache = new Map();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const CACHE_TTL = 5 * 60 * 1000;
 
 function cacheGet(key) {
   const entry = cache.get(key);
@@ -114,70 +107,54 @@ async function invidiousSearch(q, type = 'video') {
   throw new Error('All Invidious search instances failed');
 }
 
-// ── Piped stream resolver ─────────────────────────────────────────────────────
-// GET /streams/:videoId → { audioStreams: [{ url, quality, mimeType }] }
-// Returns the best quality audio URL, or null if all instances fail.
-async function pipedGetAudioUrl(videoId) {
-  const instances = config.youtube.pipedInstances;
+// ── yt-dlp audio URL resolver ─────────────────────────────────────────────────
+// Uses cookies from VOID_YT_COOKIE env var (raw Netscape cookies.txt format).
+// yt-dlp only resolves the URL — it never downloads audio bytes.
+async function ytdlpGetAudioUrl(videoId) {
+  const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
+  const bin   = '/opt/render/project/src/.venv/bin/yt-dlp';
 
-  for (const instance of instances) {
+  // Write cookies to a temp file from the VOID_YT_COOKIE env var
+  let cookiesFile = null;
+  const cookieData = process.env.VOID_YT_COOKIE;
+  if (cookieData) {
     try {
-      const data = await apiFetch(`${instance}/streams/${videoId}`, { timeout: 10000 });
-
-      const streams = data?.audioStreams;
-      if (!streams || !streams.length) continue;
-
-      // Sort by bitrate descending — quality field is e.g. "128kbps"
-      const sorted = [...streams].sort((a, b) => {
-        const bpsA = parseInt(a.quality) || 0;
-        const bpsB = parseInt(b.quality) || 0;
-        return bpsB - bpsA;
-      });
-
-      const best = sorted[0];
-      if (!best?.url) continue;
-
-      console.log(`[VOID piped] ${instance} → ${best.quality} (${best.mimeType || 'audio'})`);
-      return { url: best.url, mimeType: best.mimeType || 'audio/webm' };
+      cookiesFile = path.join(os.tmpdir(), `yt-cookies-${Date.now()}.txt`);
+      fs.writeFileSync(cookiesFile, cookieData, 'utf8');
+      console.log('[VOID yt-dlp] cookies written to temp file');
     } catch (e) {
-      console.warn(`[VOID piped] ${instance} failed:`, e.message);
+      console.warn('[VOID yt-dlp] failed to write cookies:', e.message);
+      cookiesFile = null;
     }
+  } else {
+    console.warn('[VOID yt-dlp] VOID_YT_COOKIE not set — attempting without cookies');
   }
-  return null;
-}
 
-// ── Invidious stream resolver (fallback) ──────────────────────────────────────
-// GET /api/v1/videos/:id?fields=adaptiveFormats → audio-only formats
-// Returns the best quality audio URL, or null if all instances fail.
-async function invidiousGetAudioUrl(videoId) {
-  const instances = config.youtube.invidiousInstances;
+  const args = [
+    '--no-warnings',
+    '--quiet',
+    '-f', 'bestaudio',
+    '--get-url',
+  ];
 
-  for (const instance of instances) {
-    try {
-      const data = await apiFetch(
-        `${instance}/api/v1/videos/${videoId}?fields=adaptiveFormats`,
-        { timeout: 10000 }
-      );
+  if (cookiesFile) args.push('--cookies', cookiesFile);
+  args.push(ytUrl);
 
-      const formats = data?.adaptiveFormats;
-      if (!formats || !formats.length) continue;
+  try {
+    const { stdout, stderr } = await execFileAsync(bin, args, { timeout: 25000 });
+    if (stderr) console.warn('[VOID yt-dlp] stderr:', stderr.slice(0, 200));
 
-      // Audio-only: has audio mime type and no video resolution
-      const audioOnly = formats.filter(f =>
-        f.type && f.type.startsWith('audio/') && !f.resolution
-      );
-      if (!audioOnly.length) continue;
+    const audioUrl = stdout.trim().split('\n')[0];
+    if (!audioUrl || !audioUrl.startsWith('http')) throw new Error('Empty URL returned');
 
-      const best = audioOnly.sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0];
-      if (!best?.url) continue;
-
-      console.log(`[VOID invidious] ${instance} → ${best.bitrate}bps (${best.type})`);
-      return { url: best.url, mimeType: best.type.split(';')[0] || 'audio/webm' };
-    } catch (e) {
-      console.warn(`[VOID invidious-stream] ${instance} failed:`, e.message);
-    }
+    console.log(`[VOID yt-dlp] resolved: ${audioUrl.slice(0, 80)}…`);
+    return { url: audioUrl, mimeType: 'audio/webm' };
+  } catch (e) {
+    console.error('[VOID yt-dlp] failed:', e.message.slice(0, 300));
+    return null;
+  } finally {
+    if (cookiesFile) try { fs.unlinkSync(cookiesFile); } catch {}
   }
-  return null;
 }
 
 // ── Exported controller functions ─────────────────────────────────────────────
@@ -256,46 +233,9 @@ exports.playlistItems = async (req, res, next) => {
   }
 };
 
-const { execFile } = require('child_process');
-const { promisify } = require('util');
-const execFileAsync = promisify(execFile);
-
-async function ytdlpGetAudioUrl(videoId) {
-  const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
-
- const bins = [
-    '/opt/render/project/src/.venv/bin/yt-dlp',
-    '/opt/render/.local/bin/yt-dlp',
-    '${process.env.HOME}/.local/bin/yt-dlp',
-    '/usr/local/bin/yt-dlp',
-    '/usr/bin/yt-dlp',
-    'yt-dlp',
-  ];
-
-  for (const bin of bins) {
-    try {
-      const { stdout, stderr } = await execFileAsync(bin, [
-        '--no-warnings',
-        '--quiet',
-        '-f', 'bestaudio',
-        '--get-url',
-        ytUrl,
-      ], { timeout: 25000 });
-
-      if (stderr) console.warn(`[VOID yt-dlp] stderr:`, stderr.slice(0, 200));
-
-      const audioUrl = stdout.trim().split('\n')[0];
-      if (!audioUrl || !audioUrl.startsWith('http')) continue;
-
-      console.log(`[VOID yt-dlp] resolved via ${bin}: ${audioUrl.slice(0, 80)}…`);
-      return { url: audioUrl, mimeType: 'audio/webm' };
-    } catch (e) {
-      console.warn(`[VOID yt-dlp] ${bin} failed:`, e.message.slice(0, 200));
-    }
-  }
-  return null;
-}
-
+// ── Stream proxy ──────────────────────────────────────────────────────────────
+// GET /api/youtube/stream?id=VIDEO_ID
+// Returns { url, mimeType } — browser fetches audio from CDN directly.
 exports.streamProxy = async (req, res, next) => {
   const videoId = String(req.query.id || '').trim();
   if (!videoId) return res.status(400).json({ error: 'Missing query parameter: id' });
