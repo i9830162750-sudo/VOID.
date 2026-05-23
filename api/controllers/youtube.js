@@ -111,7 +111,7 @@ async function ytdlpGetAudioUrl(videoId) {
   const instances = config.youtube.invidiousInstances;
   for (const instance of instances) {
     try {
-      const url = `${instance}/latest_version?id=${videoId}&itag=140&local=true`;
+      const url = `${instance}/latest_version?id=${videoId}&itag=140`;
       const res = await fetch(url, {
         method: 'GET',
         headers: { 'Range': 'bytes=0-0' },
