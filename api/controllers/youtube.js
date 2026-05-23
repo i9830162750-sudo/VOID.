@@ -113,16 +113,16 @@ async function ytdlpGetAudioUrl(videoId) {
     try {
       const url = `${instance}/latest_version?id=${videoId}&itag=140`;
       const res = await fetch(url, {
-        method: 'GET',
-        headers: { 'Range': 'bytes=0-0' },
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(10000),
       });
-      const ct = res.headers.get('content-type') || '';
-      if ((res.ok || res.status === 206) && !ct.includes('text/html')) {
+      if (res.ok || res.status === 206) {
         console.log(`[VOID invidious] resolved via ${instance}`);
         return { url, mimeType: 'audio/mp4' };
       }
-    } catch { }
+      console.log(`[VOID invidious] ${instance} returned ${res.status}`);
+    } catch(e) {
+      console.log(`[VOID invidious] ${instance} failed: ${e.message}`);
+    }
   }
   return null;
 }
