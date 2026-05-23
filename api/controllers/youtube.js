@@ -99,52 +99,60 @@ async function invidiousSearch(q, type = 'video') {
   throw new Error('All Invidious instances failed');
 }
 
-// ── JioSaavn helpers ──────────────────────────────────────────────────────────
-const SAAVN_BASE = 'https://saavn.me';
+// ── JioSaavn direct integration (no external API needed) ──────────────────────
+const SAAVN_API = 'https://www.jiosaavn.com/api.php';
 
 async function saavnSearchByTitle(title) {
-  // Clean the title — strip common YouTube suffixes that confuse Saavn
-  const cleaned = title
-    .replace(/\(.*?\)/g, '')           // remove (Official Video) etc
-    .replace(/\[.*?\]/g, '')           // remove [HD] etc
-    .replace(/\|.*/g, '')              // remove | HD Video | ...
-    .replace(/official\s*(video|audio|music|lyric[s]?)/gi, '')
-    .replace(/lyrics?/gi, '')
-    .replace(/hd|4k|full\s*video/gi, '')
-    .replace(/\s{2,}/g, ' ')
-    .trim();
+  const params = new URLSearchParams({
+    __call: 'search.getResults',
+    _format: 'json',
+    _marker: '0',
+    api_version: '4',
+    ctx: 'web6dot0',
+    query: title,
+    n: '5',
+    p: '1',
+  });
 
-  console.log(`[VOID saavn] searching: "${cleaned}" (original: "${title}")`);
+  const resp = await fetch(`${SAAVN_API}?${params}`, {
+    signal: AbortSignal.timeout(10000),
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Referer': 'https://www.jiosaavn.com/',
+    },
+  });
 
-  const resp = await fetch(
-    `${SAAVN_BASE}/api/search/songs?query=${encodeURIComponent(cleaned)}&page=1&limit=5`,
-    { signal: AbortSignal.timeout(10000) }
-  );
   if (!resp.ok) throw new Error(`Saavn search failed: ${resp.status}`);
   const data = await resp.json();
-  return data?.data?.results || [];
+  const results = data?.results || [];
+  return results.map(s => ({ id: s.id, title: s.title, artist: s.more_info?.singers || '' }));
 }
 
 async function saavnGetStreamUrl(songId) {
-  const resp = await fetch(
-    `${SAAVN_BASE}/api/songs/${songId}`,
-    { signal: AbortSignal.timeout(10000) }
-  );
-  if (!resp.ok) throw new Error(`Saavn song fetch failed: ${resp.status}`);
+  const params = new URLSearchParams({
+    __call: 'song.generateAuthToken',
+    _format: 'json',
+    _marker: '0',
+    api_version: '4',
+    ctx: 'web6dot0',
+    bitrate: '320',
+    url: `https://www.jiosaavn.com/song/x/${songId}`,
+  });
+
+  const resp = await fetch(`${SAAVN_API}?${params}`, {
+    signal: AbortSignal.timeout(10000),
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Referer': 'https://www.jiosaavn.com/',
+    },
+  });
+
+  if (!resp.ok) throw new Error(`Saavn token failed: ${resp.status}`);
   const data = await resp.json();
-  const song = data?.data?.[0];
-  if (!song) throw new Error('Song not found in Saavn response');
-
-  const urls = song.downloadUrl || [];
-  const best =
-    urls.find(u => u.quality === '320kbps') ||
-    urls.find(u => u.quality === '160kbps') ||
-    urls[urls.length - 1];
-
-  if (!best?.url) throw new Error('No download URL in Saavn response');
-  return best.url;
+  const url = data?.auth_url;
+  if (!url) throw new Error('No auth_url in Saavn response');
+  return url;
 }
-
 // ── Exported controller functions ─────────────────────────────────────────────
 
 exports.search = async (req, res, next) => {
