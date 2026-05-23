@@ -264,7 +264,13 @@ async function ytdlpGetAudioUrl(videoId) {
   const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
   // Try to find yt-dlp in common locations
-  const bins = ['yt-dlp', '/usr/local/bin/yt-dlp', '/usr/bin/yt-dlp', `${process.env.HOME}/.local/bin/yt-dlp`];
+  const bins = [
+    '/opt/render/.local/bin/yt-dlp',
+    `${process.env.HOME}/.local/bin/yt-dlp`,
+    '/usr/local/bin/yt-dlp',
+    '/usr/bin/yt-dlp',
+    'yt-dlp',
+  ];
 
   for (const bin of bins) {
     try {
