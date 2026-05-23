@@ -134,7 +134,7 @@ async function ytdlpGetAudioUrl(videoId) {
  const args = [
   '--no-warnings',
   '--quiet',
-  '-f', 'bestaudio',
+  '-f', '251/140/249/139',
   '--get-url',
   ];
   
