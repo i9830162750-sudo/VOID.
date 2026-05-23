@@ -133,7 +133,7 @@ async function ytdlpGetAudioUrl(videoId) {
   const args = [
     '--no-warnings',
     '--quiet',
-    '-f', 'bestaudio[ext=webm]/bestaudio[ext=m4a]/bestaudio[ext=opus]/bestaudio/best',
+    '-f', '140/251/250/249/171/bestaudio/best',
     '--get-url',
   ];
   
