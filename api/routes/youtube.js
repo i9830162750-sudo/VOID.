@@ -40,4 +40,6 @@ router.get(
   controller.streamProxy
 );
 
+router.get('/audio', controller.audioProxy);
+
 module.exports = router;
