@@ -256,12 +256,60 @@ exports.playlistItems = async (req, res, next) => {
   }
 };
 
+// ── Cobalt.tools audio resolver ───────────────────────────────────────────────
+// cobalt is a free, open source media downloader with a public API.
+// Docs: https://github.com/imputnet/cobalt
+async function cobaltGetAudioUrl(videoId) {
+  const endpoints = [
+    'https://co.wuk.sh/api/json',
+    'https://cobalt.tools/api/json',
+    'https://api.cobalt.tools/api/json',
+  ];
+
+  const body = JSON.stringify({
+    url: `https://www.youtube.com/watch?v=${videoId}`,
+    aFormat: 'mp3',
+    isAudioOnly: true,
+    disableMetadata: true,
+  });
+
+  for (const endpoint of endpoints) {
+    try {
+      const resp = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body,
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (!resp.ok) {
+        console.warn(`[VOID cobalt] ${endpoint} → ${resp.status}`);
+        continue;
+      }
+
+      const data = await resp.json();
+      console.log(`[VOID cobalt] ${endpoint} → status: ${data.status}`);
+
+      // status: "stream" or "redirect" both give a usable URL
+      if ((data.status === 'stream' || data.status === 'redirect') && data.url) {
+        return { url: data.url, mimeType: 'audio/mpeg' };
+      }
+
+      // status: "error" or "rate-limit"
+      console.warn(`[VOID cobalt] ${endpoint} rejected:`, data.text || data.status);
+    } catch (e) {
+      console.warn(`[VOID cobalt] ${endpoint} failed:`, e.message);
+    }
+  }
+  return null;
+}
+
 // ── Stream proxy ──────────────────────────────────────────────────────────────
 // GET /api/youtube/stream?id=VIDEO_ID
-//
-// Returns { url, mimeType } JSON — does NOT proxy audio bytes.
-// The browser fetches audio directly from the resolved URL.
-// This avoids datacenter IP blocks on Piped/Invidious instances.
+// Returns { url, mimeType } — browser fetches audio from the URL directly.
 exports.streamProxy = async (req, res, next) => {
   const videoId = String(req.query.id || '').trim();
   if (!videoId) return res.status(400).json({ error: 'Missing query parameter: id' });
@@ -269,23 +317,14 @@ exports.streamProxy = async (req, res, next) => {
   console.log(`[VOID stream] resolving: ${videoId}`);
 
   try {
-    // Step 1 — try Piped instances
-    let resolved = await pipedGetAudioUrl(videoId);
+    const resolved = await cobaltGetAudioUrl(videoId);
 
-    // Step 2 — fall back to Invidious instances
-    if (!resolved) {
-      console.warn(`[VOID stream] Piped exhausted, trying Invidious for ${videoId}`);
-      resolved = await invidiousGetAudioUrl(videoId);
-    }
-
-    // Step 3 — everything failed
     if (!resolved) {
       return res.status(502).json({
-        error: 'All stream sources failed. Try again in a moment.',
+        error: 'Could not resolve audio stream. Try again in a moment.',
       });
     }
 
-    // Step 4 — return URL to client; browser fetches audio directly
     res.json({ url: resolved.url, mimeType: resolved.mimeType });
 
   } catch (e) {
