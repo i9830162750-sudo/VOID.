@@ -40,13 +40,4 @@ router.get(
   controller.streamProxy
 );
 
-// ─────────────────────────────────────────────
-// Saavn search helper
-// GET /api/youtube/saavn/search?q=
-// ─────────────────────────────────────────────
-router.get(
-  '/saavn/search',
-  controller.saavnSearch
-);
-
 module.exports = router;
