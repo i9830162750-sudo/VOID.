@@ -117,7 +117,8 @@ async function ytdlpGetAudioUrl(videoId) {
         headers: { 'Range': 'bytes=0-0' },
         signal: AbortSignal.timeout(8000),
       });
-      if (res.ok || res.status === 206 || res.status === 302) {
+      const ct = res.headers.get('content-type') || '';
+      if ((res.ok || res.status === 206) && !ct.includes('text/html')) {
         console.log(`[VOID invidious] resolved via ${instance}`);
         return { url, mimeType: 'audio/mp4' };
       }
