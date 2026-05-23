@@ -99,12 +99,9 @@ async function invidiousSearch(q, type = 'video') {
   throw new Error('All Invidious instances failed');
 }
 
-// ── Deezer search — clean title + artist from messy YouTube titles ────────────
-const DEEZER_API = 'https://api.deezer.com';
-
-async function deezerSearch(ytTitle, ytArtist) {
-  // Strip YouTube bloat from title first
-  const cleanTitle = ytTitle
+// ── Title cleanup — strip YouTube bloat before searching ─────────────────────
+function cleanYouTubeTitle(title) {
+  return title
     .replace(/\(.*?\)/g, '')
     .replace(/\[.*?\]/g, '')
     .replace(/\|.*/g, '')
@@ -113,11 +110,21 @@ async function deezerSearch(ytTitle, ytArtist) {
     .replace(/\b(lyrics?|hd|4k|full\s*video|full\s*song|audio|video)\b/gi, '')
     .replace(/\s{2,}/g, ' ')
     .trim();
+}
 
-  // Build query: cleaned title + artist if available and not "Unknown Artist"
-  const artistPart = (ytArtist && ytArtist !== 'Unknown Artist' && ytArtist !== 'YouTube')
-    ? ` ${ytArtist}` : '';
-  const query = `${cleanTitle}${artistPart}`.trim();
+// ── Deezer — resolve canonical title + artist from a messy YouTube title ──────
+const DEEZER_API = 'https://api.deezer.com';
+
+async function deezerSearch(ytTitle, ytArtist) {
+  const cleaned = cleanYouTubeTitle(ytTitle);
+
+  const skipArtist = !ytArtist
+    || ytArtist === 'Unknown Artist'
+    || ytArtist === 'YouTube';
+
+  const query = skipArtist
+    ? cleaned
+    : `${cleaned} ${ytArtist}`.trim();
 
   console.log(`[VOID deezer] searching: "${query}"`);
 
@@ -129,81 +136,40 @@ async function deezerSearch(ytTitle, ytArtist) {
   if (!resp.ok) throw new Error(`Deezer search failed: ${resp.status}`);
   const data = await resp.json();
   const results = data?.data || [];
-
   if (!results.length) return null;
 
-  // Return the top result's clean title and artist
   const top = results[0];
   return {
-    title: top.title,
+    title:  top.title,
     artist: top.artist?.name || '',
   };
 }
 
-// ── JioSaavn direct integration ───────────────────────────────────────────────
-const SAAVN_API = 'https://www.jiosaavn.com/api.php';
+// ── saavn.dev — public JioSaavn API (reliable, no scraping) ──────────────────
+// Docs: https://saavn.dev
+const SAAVN_DEV = 'https://saavn.dev/api';
 
-async function saavnSearch(cleanTitle, cleanArtist) {
-  // Use Deezer-cleaned title + artist for accurate Saavn matching
-  const query = cleanArtist
-    ? `${cleanTitle} ${cleanArtist}`
-    : cleanTitle;
-
+async function saavnSearch(query) {
   console.log(`[VOID saavn] searching: "${query}"`);
 
-  const params = new URLSearchParams({
-    __call: 'search.getResults',
-    _format: 'json',
-    _marker: '0',
-    api_version: '4',
-    ctx: 'web6dot0',
-    query,
-    n: '5',
-    p: '1',
-  });
-
-  const resp = await fetch(`${SAAVN_API}?${params}`, {
-    signal: AbortSignal.timeout(10000),
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      'Referer': 'https://www.jiosaavn.com/',
-    },
-  });
+  const resp = await fetch(
+    `${SAAVN_DEV}/search/songs?query=${encodeURIComponent(query)}&page=1&limit=5`,
+    { signal: AbortSignal.timeout(10000) }
+  );
 
   if (!resp.ok) throw new Error(`Saavn search failed: ${resp.status}`);
   const data = await resp.json();
-  const results = data?.results || [];
-  return results.map(s => ({
-    id: s.id,
-    title: s.title,
-    artist: s.more_info?.singers || '',
-  }));
+  return data?.data?.results || [];
 }
 
-async function saavnGetStreamUrl(songId) {
-  const params = new URLSearchParams({
-    __call: 'song.generateAuthToken',
-    _format: 'json',
-    _marker: '0',
-    api_version: '4',
-    ctx: 'web6dot0',
-    bitrate: '320',
-    url: `https://www.jiosaavn.com/song/x/${songId}`,
-  });
-
-  const resp = await fetch(`${SAAVN_API}?${params}`, {
-    signal: AbortSignal.timeout(10000),
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-      'Referer': 'https://www.jiosaavn.com/',
-    },
-  });
-
-  if (!resp.ok) throw new Error(`Saavn token failed: ${resp.status}`);
-  const data = await resp.json();
-  const url = data?.auth_url;
-  if (!url) throw new Error('No auth_url in Saavn response');
-  return url;
+function saavnPickStreamUrl(song) {
+  // downloadUrl is an array of { quality, url } sorted low→high
+  const urls = song?.downloadUrl;
+  if (!urls || !urls.length) throw new Error('No downloadUrl in Saavn result');
+  // Prefer 320kbps, fall back to whatever is highest
+  const best = [...urls].reverse().find(u => u.url) || urls[urls.length - 1];
+  if (!best?.url) throw new Error('No usable stream URL in Saavn result');
+  return best.url;
 }
 
 // ── Exported controller functions ─────────────────────────────────────────────
@@ -283,10 +249,10 @@ exports.playlistItems = async (req, res, next) => {
 };
 
 // ── Stream proxy ──────────────────────────────────────────────────────────────
-// Flow: YouTube title → Deezer (clean title+artist) → Saavn search → stream
-// ?id=      YouTube video ID
-// ?title=   YouTube video title
-// ?artist=  YouTube channel/artist name (optional but helps)
+// Flow: YouTube title → Deezer (canonical title+artist) → saavn.dev search → stream
+// ?id=      YouTube video ID (required)
+// ?title=   YouTube video title (required)
+// ?artist=  YouTube channel/artist name (optional, improves matching)
 exports.streamProxy = async (req, res, next) => {
   const videoId = String(req.query.id     || '').trim();
   const title   = String(req.query.title  || '').trim();
@@ -296,8 +262,9 @@ exports.streamProxy = async (req, res, next) => {
   if (!title)   return res.status(400).json({ error: 'Missing query parameter: title' });
 
   try {
-    // Step 1 — Use Deezer to get clean title + artist from messy YouTube title
-    let cleanTitle = title;
+    // Step 1 — Ask Deezer to resolve a canonical title + artist.
+    // If Deezer fails we fall back to the (lightly cleaned) raw YouTube title.
+    let cleanTitle  = cleanYouTubeTitle(title);
     let cleanArtist = artist;
 
     try {
@@ -305,54 +272,46 @@ exports.streamProxy = async (req, res, next) => {
       if (deezerResult) {
         cleanTitle  = deezerResult.title;
         cleanArtist = deezerResult.artist;
-
-        // Extra aggressive cleanup for Saavn
-        cleanTitle = cleanTitle
-          .replace(/\(from\s+["'].*?["']\)/gi, '')
-          .replace(/\(.*?version.*?\)/gi, '')
-          .replace(/\(.*?\)/g, '')
-          .replace(/\[.*?\]/g, '')
-          .replace(/\|.*/g, '')
-          .replace(/official/gi, '')
-          .replace(/video/gi, '')
-          .replace(/lyrics?/gi, '')
-          .replace(/full\s*song/gi, '')
-          .replace(/audio/gi, '')
-          .replace(/4k|hd/gi, '')
-          .replace(/\s{2,}/g, ' ')
-          .trim();
-
-        console.log(`[VOID deezer] resolved clean: "${cleanTitle}" by "${cleanArtist}"`);
+        console.log(`[VOID deezer] resolved: "${cleanTitle}" by "${cleanArtist}"`);
       }
     } catch (e) {
-      console.warn('[VOID deezer] lookup failed, falling back to raw title:', e.message);
+      console.warn('[VOID deezer] lookup failed, using cleaned raw title:', e.message);
     }
 
-    // Step 2 — Search Saavn with clean data + fallback logic
-    let results = await saavnSearch(cleanTitle, cleanArtist);
+    // Step 2 — Search saavn.dev with progressively looser queries.
+    let song = null;
 
-    // Fallback 1 — without artist
-    if (!results.length && cleanArtist) {
-      console.log('[VOID saavn] retrying without artist...');
-      results = await saavnSearch(cleanTitle, '');
+    const attempts = [
+      // Most specific first
+      cleanArtist ? `${cleanTitle} ${cleanArtist}` : null,
+      cleanTitle,
+      // Raw YouTube title as a last resort (catches non-English titles that
+      // survive Deezer poorly, e.g. "Aaj Ki Raat")
+      cleanYouTubeTitle(title) !== cleanTitle ? cleanYouTubeTitle(title) : null,
+      // First 3 words of the cleaned title
+      cleanTitle.split(' ').slice(0, 3).join(' '),
+    ].filter(Boolean);
+
+    for (const query of attempts) {
+      console.log(`[VOID saavn] trying: "${query}"`);
+      try {
+        const results = await saavnSearch(query);
+        if (results.length) { song = results[0]; break; }
+      } catch (e) {
+        console.warn(`[VOID saavn] attempt failed for "${query}":`, e.message);
+      }
     }
 
-    // Fallback 2 — use first 3 words of title only
-    if (!results.length) {
-      const simpleTitle = cleanTitle.split(' ').slice(0, 3).join(' ');
-      console.log(`[VOID saavn] retrying simple: "${simpleTitle}"`);
-      results = await saavnSearch(simpleTitle, '');
-    }
-
-    if (!results.length) {
+    if (!song) {
       return res.status(404).json({ error: `No Saavn match found for: ${cleanTitle}` });
     }
 
-    // Step 3 — Get stream URL
-    const songId = results[0].id;
-    const streamUrl = await saavnGetStreamUrl(songId);
+    // Step 3 — Extract the best stream URL directly from the search result.
+    // saavn.dev returns downloadUrl[] in the song object — no second API call needed.
+    const streamUrl = saavnPickStreamUrl(song);
+    console.log(`[VOID saavn] streaming: "${song.name}" — ${streamUrl.slice(0, 60)}…`);
 
-    // Step 4 — Fetch and proxy audio
+    // Step 4 — Fetch audio and proxy it to the client.
     const audioResp = await fetch(streamUrl, {
       signal: AbortSignal.timeout(60000),
       headers: { 'User-Agent': 'Mozilla/5.0' },
@@ -370,17 +329,17 @@ exports.streamProxy = async (req, res, next) => {
     res.send(buffer);
 
   } catch (e) {
-    console.error('[VOID stream] Saavn error:', e.message);
+    console.error('[VOID stream] error:', e.message);
     next(e);
   }
 };
 
-// ── Saavn search endpoint ─────────────────────────────────────────────────────
+// ── Saavn search endpoint (used by frontend scan) ─────────────────────────────
 exports.saavnSearch = async (req, res, next) => {
   const q = String(req.query.q || '').trim();
   if (!q) return res.status(400).json({ error: 'Missing query parameter: q' });
   try {
-    const results = await saavnSearch(q, '');
+    const results = await saavnSearch(q);
     res.json({ data: { results } });
   } catch (e) {
     next(e);
