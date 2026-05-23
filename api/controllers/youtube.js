@@ -113,11 +113,13 @@ async function ytdlpGetAudioUrl(videoId) {
     try {
       const url = `${instance}/latest_version?id=${videoId}&itag=140`;
       const res = await fetch(url, {
+        redirect: 'follow',
         signal: AbortSignal.timeout(10000),
       });
       if (res.ok || res.status === 206) {
-        console.log(`[VOID invidious] resolved via ${instance}`);
-        return { url, mimeType: 'audio/mp4' };
+        const finalUrl = res.url; // follow redirect to googlevideo.com
+        console.log(`[VOID invidious] resolved via ${instance}: ${finalUrl.slice(0, 60)}`);
+        return { url: finalUrl, mimeType: 'audio/mp4' };
       }
       console.log(`[VOID invidious] ${instance} returned ${res.status}`);
     } catch(e) {
