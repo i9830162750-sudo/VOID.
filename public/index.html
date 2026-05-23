@@ -3144,27 +3144,32 @@ async function ytPlayDirect(videoId, title, artist, thumb) {
 }
 
 // Fetches audio via backend stream proxy
+// Fetches audio via backend stream proxy
 async function ytFetchBlob(videoId, onProgress, title, artist) {
 
-  const params = new URLSearchParams({
-    id: videoId
-  });
-
+  const params = new URLSearchParams({ id: videoId });
   if (title)  params.set('title', title);
   if (artist) params.set('artist', artist);
 
-  const url =
-    `${VOID_API_BASE}/youtube/stream?${params}`;
+  const url = `${VOID_API_BASE}/youtube/stream?${params}`;
 
   const resp = await fetch(url, {
     signal: AbortSignal.timeout(60000)
   });
 
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.error || `Stream failed: ${resp.status}`);
+  }
+
   const ct       = resp.headers.get('Content-Type') || 'audio/mpeg';
   const mimeType = ct.split(';')[0].trim();
-  const blob     = new Blob(chunks, { type: mimeType });
-  const blobId   = 'blob_yt_' + videoId + '_' + Date.now();
 
+  // ✅ Actually read the response body
+  const arrayBuffer = await resp.arrayBuffer();
+  const blob = new Blob([arrayBuffer], { type: mimeType });
+
+  const blobId = 'blob_yt_' + videoId + '_' + Date.now();
   await dbPut('blobs', { id: blobId, blob });
   console.log('YT fetch success via backend proxy');
   return { blobUrl: URL.createObjectURL(blob), blobId, mimeType };
