@@ -263,10 +263,10 @@ const execFileAsync = promisify(execFile);
 async function ytdlpGetAudioUrl(videoId) {
   const ytUrl = `https://www.youtube.com/watch?v=${videoId}`;
 
-  // Try to find yt-dlp in common locations
-  const bins = [
+ const bins = [
+    '/opt/render/project/src/.venv/bin/yt-dlp',
     '/opt/render/.local/bin/yt-dlp',
-    `${process.env.HOME}/.local/bin/yt-dlp`,
+    '${process.env.HOME}/.local/bin/yt-dlp',
     '/usr/local/bin/yt-dlp',
     '/usr/bin/yt-dlp',
     'yt-dlp',
