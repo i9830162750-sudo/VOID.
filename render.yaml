@@ -10,7 +10,7 @@ services:
     region: oregon           # change to match your user base
 
     # Build step — install production deps only
-    buildCommand: npm install --omit=dev
+    buildCommand: npm install --omit=dev && pip install -U yt-dlp
 
     # Start command
     startCommand: node server.js
