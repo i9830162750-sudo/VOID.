@@ -133,10 +133,10 @@ async function ytdlpGetAudioUrl(videoId) {
   const args = [
     '--no-warnings',
     '--quiet',
-    '-f', 'bestaudio',
+    '-f', 'bestaudio/best',
     '--get-url',
   ];
-
+  
   if (cookiesFile) args.push('--cookies', cookiesFile);
   args.push(ytUrl);
 
