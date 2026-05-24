@@ -1,10 +1,17 @@
 /**
  * server.js
  * VOID Player — Express server entry point.
+ *
+ * Responsibilities:
+ *   • Serve the static PWA shell (public/)
+ *   • Mount the /api/* routes
+ *   • SPA fallback so browser refreshes never 404
+ *   • Production-ready middleware (helmet, compression, rate-limiting)
  */
 
 'use strict';
 
+// Load .env in development (Render injects env vars directly in production)
 if (process.env.NODE_ENV !== 'production') {
   require('dotenv').config();
 }
@@ -16,51 +23,34 @@ const compression = require('compression');
 const cors        = require('cors');
 const rateLimit   = require('express-rate-limit');
 
-const config    = require('./config');
+const config  = require('./config');
 const apiRouter = require('./api');
 
 const app = express();
 
-// ── Trust proxy (required on Render / behind a load balancer) ────────────────
-// Fixes ERR_ERL_UNEXPECTED_X_FORWARDED_FOR from express-rate-limit.
-app.set('trust proxy', 1);
-
-// ── Security headers ──────────────────────────────────────────────────────────
+// ── Security headers ────────────────────────────────────────────────────────
 app.use(
   helmet({
-   contentSecurityPolicy: {
+    contentSecurityPolicy: {
       directives: {
-        defaultSrc:    ["'self'"],
-        scriptSrc:     ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://fonts.googleapis.com'],
-        scriptSrcAttr: ["'unsafe-inline'", "'unsafe-hashes'"],
-        styleSrc:      ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-        fontSrc:       ["'self'", 'https://fonts.gstatic.com'],
-        imgSrc:        ["'self'", 'data:', 'https://*.ytimg.com', 'https://*.ggpht.com'],
-        connectSrc: [ "'self'",
-                      'https://www.googleapis.com',
-                      'https://*.youtube.com',
-                      'https://co.wuk.sh',
-                      'https://cobalt.tools',
-                      'https://api.cobalt.tools',
-                      'https://*.googlevideo.com',
-                      'https://inv.nadeko.net',
-                      'https://invidious.nerdvpn.de',
-                      'https://invidious.privacydev.net',
-                      'https://iv.melmac.space',
-                      'https://invidious.io.lol',
-                      'blob:',],
-        mediaSrc: ["'self'", 'blob:', 'https://*.googlevideo.com', 'https://inv.nadeko.net', 'https://invidious.nerdvpn.de', 'https://invidious.privacydev.net', 'https://iv.melmac.space', 'https://invidious.io.lol'],
-        workerSrc:     ["'self'"],
-        manifestSrc:   ["'self'"],
+        defaultSrc:  ["'self'"],
+        scriptSrc:   ["'self'", "'unsafe-inline'"],   // inline JS in index.html
+        styleSrc:    ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        fontSrc:     ["'self'", 'https://fonts.gstatic.com'],
+        imgSrc:      ["'self'", 'data:', 'https://*.ytimg.com', 'https://*.ggpht.com'],
+        connectSrc:  ["'self'", 'https://www.googleapis.com', 'https://*.youtube.com'],
+        mediaSrc:    ["'self'", 'blob:', 'https://*.googlevideo.com'],
+        workerSrc:   ["'self'"],
+        manifestSrc: ["'self'"],
       },
     },
   })
 );
 
-// ── Compression ───────────────────────────────────────────────────────────────
+// ── Compression ─────────────────────────────────────────────────────────────
 app.use(compression());
 
-// ── CORS ──────────────────────────────────────────────────────────────────────
+// ── CORS ─────────────────────────────────────────────────────────────────────
 app.use(
   cors({
     origin: config.cors.allowedOrigins.includes('*')
@@ -71,11 +61,11 @@ app.use(
   })
 );
 
-// ── Body parsing ──────────────────────────────────────────────────────────────
+// ── Body parsing ─────────────────────────────────────────────────────────────
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: true, limit: '1mb' }));
 
-// ── Rate limiting (API only) ──────────────────────────────────────────────────
+// ── Rate limiting (API only) ─────────────────────────────────────────────────
 const limiter = rateLimit({
   windowMs: config.rateLimit.windowMs,
   max:      config.rateLimit.max,
@@ -85,14 +75,15 @@ const limiter = rateLimit({
 });
 app.use('/api', limiter);
 
-// ── API routes ────────────────────────────────────────────────────────────────
+// ── API routes ───────────────────────────────────────────────────────────────
 app.use('/api', apiRouter);
 
-// ── Static files (PWA shell) ──────────────────────────────────────────────────
+// ── Static files (PWA shell) ─────────────────────────────────────────────────
 app.use(
   express.static(path.join(__dirname, 'public'), {
-    maxAge: config.isDev ? '0' : '1d',
-    etag:   true,
+    maxAge:  config.isDev ? '0' : '1d',
+    etag:    true,
+    // Explicitly do NOT cache service worker so updates propagate
     setHeaders(res, filePath) {
       if (filePath.endsWith('sw.js')) {
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
@@ -102,7 +93,8 @@ app.use(
   })
 );
 
-// ── SPA fallback ──────────────────────────────────────────────────────────────
+// ── SPA fallback — send index.html for any unmatched GET ─────────────────────
+// This ensures browser refreshes on deep paths never 404 on Render.
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
@@ -110,7 +102,7 @@ app.get('*', (req, res) => {
 // ── Error handler ─────────────────────────────────────────────────────────────
 // eslint-disable-next-line no-unused-vars
 app.use((err, req, res, _next) => {
-  const status  = err.status || err.statusCode || 500;
+  const status = err.status || err.statusCode || 500;
   const message = config.isDev ? err.message : 'Internal server error';
   if (status >= 500) console.error('[VOID] Server error:', err);
   res.status(status).json({ error: message });
@@ -119,10 +111,12 @@ app.use((err, req, res, _next) => {
 // ── Start ─────────────────────────────────────────────────────────────────────
 app.listen(config.port, () => {
   console.log(`[VOID] Server running on port ${config.port} (${config.env})`);
-  if (config.isDev) console.log(`[VOID] http://localhost:${config.port}`);
+  if (config.isDev) {
+    console.log(`[VOID] http://localhost:${config.port}`);
+  }
   if (!config.youtube.apiKey) {
-    console.warn('[VOID] Warning: VOID_YT_API_KEY not set — using Invidious fallback');
+    console.warn('[VOID] Warning: VOID_YT_API_KEY not set — YouTube API proxy will use Invidious fallback');
   }
 });
 
-module.exports = app;
+module.exports = app; // exported for future testing
