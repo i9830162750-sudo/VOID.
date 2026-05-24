@@ -13,6 +13,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/music-metadata-browser@2.5.8/dist/music-metadata-browser.js"></script>
 <style>
 /* ============================================================
    VOID PLAYER V5
@@ -925,8 +926,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/></svg>
         Upload Music Files
       </label>
-      <input type="file" id="file-input" multiple accept="audio/*">
-      <div class="lib-section">
+<input type="file" id="file-input" multiple accept="audio/*,.flac,.wav,.aiff,.aif,.ogg,.opus,.m4a,.wma,.mp3,.mp4,.webm,.mkv,.ape,.wv,.mka">      <div class="lib-section">
         <div class="lib-section-row">
           <div class="lib-label" id="lib-label">All Tracks</div>
         </div>
@@ -1236,7 +1236,7 @@ const VOID_YT_API_KEY = 'AIzaSyAyIzgLddMuiNayJcKWIlSYD5l3FL4BR1o';
 //
 // Set to true once the Express backend is deployed on Render.
 // When false (default), all existing client-side fetch behaviour is unchanged.
-const VOID_USE_BACKEND_PROXY = false;
+const VOID_USE_BACKEND_PROXY = true;
 
 // Relative URL of the backend API — works on both localhost and Render
 // because both serve the app and the API from the same origin.
@@ -1380,43 +1380,89 @@ async function removeTrackFromDB(t) {
   await dbDelete('tracks', t.id).catch(()=>{});
 }
 
-async function loadAll() {
-  await openDB();
-  const storedTracks = await dbGetAll('tracks');
-  for (const t of storedTracks) {
-    try {
-      if (t.isOnline) {
-        // Online-only tracks (YouTube streams) — restore metadata but no local audio
-        tracks.push(t);
-      } else {
-        const blobRec = await dbGet('blobs', t.blobId).catch(()=>null);
-        if (blobRec) { t.url = URL.createObjectURL(blobRec.blob); tracks.push(t); }
-      }
-    } catch(e) {}
+async function ytCheckApiStatus() {
+  const dot     = document.getElementById('yt-status-dot');
+  const apiDot  = document.getElementById('yt-api-dot');
+  const apiText = document.getElementById('yt-api-status-text');
+  const apiVis  = document.getElementById('yt-api-status-vis');
+
+  if (!ytApiKey) {
+    if (dot)     dot.classList.add('offline');
+    if (apiDot)  apiDot.classList.add('offline');
+    if (apiText) apiText.textContent = 'No API key — using Invidious fallback';
+    if (apiVis)  apiVis.textContent  = 'PROXY';
+    return;
   }
-  playlists = await dbGetAll('playlists');
-  const s = await dbGet('settings','state').catch(()=>null);
-  if (s) {
-    favorites      = new Set(s.favorites||[]);
-    repeatMode     = s.repeatMode||0;
-    isShuffle      = s.isShuffle||false;
-    currentPreset  = s.currentPreset||'VOID';
-    eqValues       = s.eqValues||[...EQ_PRESETS['VOID']];
-    eqEnabled      = s.eqEnabled!==undefined ? s.eqEnabled : true;
-    recentlyPlayed = s.recentlyPlayed||[];
-    playbackSpeed  = s.playbackSpeed||1.0;
-    if (s.appSettings) Object.assign(appSettings, s.appSettings);
-    const vol = s.volume||80;
-    document.getElementById('vol-slider').value = vol;
-    if (s.queueHistory) queue.history = s.queueHistory.filter(i=>i>=0&&i<tracks.length);
-    if (s.queueFuture)  queue.future  = s.queueFuture.filter(i=>i>=0&&i<tracks.length);
-    if (s.queueManual)  queue.manual  = s.queueManual.filter(i=>i>=0&&i<tracks.length);
-    if (s.currentIndex>=0 && s.currentIndex<tracks.length) {
-      currentIndex = s.currentIndex;
-      const t = tracks[currentIndex];
-      if (t && !t.isOnline && t.url) { audioEl.src = t.url; isPlaying = false; updateUI(); }
+
+  try {
+    const resp = await fetch(
+      VOID_USE_BACKEND_PROXY
+        ? `${VOID_API_BASE}/youtube/videos?ids=dQw4w9WgXcQ`
+        : `https://www.googleapis.com/youtube/v3/videos?part=id&id=dQw4w9WgXcQ&key=${encodeURIComponent(ytApiKey)}`,
+      { signal: AbortSignal.timeout(5000) }
+    );
+    if (resp.ok) {
+      if (dot)     dot.classList.remove('offline');
+      if (apiDot)  apiDot.classList.remove('offline');
+      if (apiText) apiText.textContent = VOID_USE_BACKEND_PROXY ? 'Backend proxy connected' : 'YouTube API connected';
+      if (apiVis)  apiVis.textContent  = VOID_USE_BACKEND_PROXY ? 'PROXY' : 'LIVE';
+    } else {
+      throw new Error('HTTP ' + resp.status);
     }
+  } catch(e) {
+    if (dot)     dot.classList.add('offline');
+    if (apiDot)  apiDot.classList.add('offline');
+    if (apiText) apiText.textContent = 'API key invalid or quota exceeded';
+    if (apiVis)  apiVis.textContent  = 'ERROR';
   }
+}
+
+async function loadAll() {
+  // ── DB init (non-fatal — runs in memory-only if IndexedDB unavailable) ──
+  try {
+    await openDB();
+
+    const storedTracks = await dbGetAll('tracks');
+    for (const t of storedTracks) {
+      try {
+        if (t.isOnline) {
+          tracks.push(t);
+        } else {
+          const blobRec = await dbGet('blobs', t.blobId).catch(()=>null);
+          if (blobRec) { t.url = URL.createObjectURL(blobRec.blob); tracks.push(t); }
+        }
+      } catch(e) {}
+    }
+
+    playlists = await dbGetAll('playlists');
+
+    const s = await dbGet('settings','state').catch(()=>null);
+    if (s) {
+      favorites      = new Set(s.favorites||[]);
+      repeatMode     = s.repeatMode||0;
+      isShuffle      = s.isShuffle||false;
+      currentPreset  = s.currentPreset||'VOID';
+      eqValues       = s.eqValues||[...EQ_PRESETS['VOID']];
+      eqEnabled      = s.eqEnabled!==undefined ? s.eqEnabled : true;
+      recentlyPlayed = s.recentlyPlayed||[];
+      playbackSpeed  = s.playbackSpeed||1.0;
+      if (s.appSettings) Object.assign(appSettings, s.appSettings);
+      const vol = s.volume||80;
+      document.getElementById('vol-slider').value = vol;
+      if (s.queueHistory) queue.history = s.queueHistory.filter(i=>i>=0&&i<tracks.length);
+      if (s.queueFuture)  queue.future  = s.queueFuture.filter(i=>i>=0&&i<tracks.length);
+      if (s.queueManual)  queue.manual  = s.queueManual.filter(i=>i>=0&&i<tracks.length);
+      if (s.currentIndex>=0 && s.currentIndex<tracks.length) {
+        currentIndex = s.currentIndex;
+        const t = tracks[currentIndex];
+        if (t && !t.isOnline && t.url) { audioEl.src = t.url; isPlaying = false; updateUI(); }
+      }
+    }
+  } catch(e) {
+    console.warn('[VOID] IndexedDB unavailable — running in memory-only mode:', e);
+  }
+
+  // ── UI bootstrap (always runs regardless of DB outcome) ──────────────────
   buildEQ();
   buildSpeedRow();
   buildSettingsPage();
@@ -1427,13 +1473,11 @@ async function loadAll() {
   audioEl.playbackRate = playbackSpeed;
   renderAll();
   initPWA();
-  // Show scan button if there are unmatched local tracks
   const unmatched = tracks.filter(t => !t.isOnline && !t.ytMeta);
   if (unmatched.length) {
     const scanWrap = document.getElementById('ytscan-btn-wrap');
     if (scanWrap) scanWrap.style.display = 'block';
   }
-  // Init YT status
   setTimeout(() => ytCheckApiStatus(), 500);
 }
 
@@ -1874,12 +1918,6 @@ document.getElementById('file-input').addEventListener('change', async function(
 
   showToast('Loading ' + files.length + ' track' + (files.length !== 1 ? 's' : '') + '…');
 
-  let jsmediatags = null;
-
-  try {
-    jsmediatags = await loadJsmediatags();
-  } catch(e) {}
-
   for (const file of files) {
 
     const url = URL.createObjectURL(file);
@@ -1897,46 +1935,19 @@ document.getElementById('file-input').addEventListener('change', async function(
     }
 
     // METADATA READING
-    if (jsmediatags) {
-      try {
-
-        const tags = await new Promise((resolve, reject) => {
-          jsmediatags.read(file, {
-            onSuccess: resolve,
-            onError: reject
-          });
-        });
-
-        if (tags?.tags) {
-
-          // TITLE
-          if (tags.tags.title?.trim()) {
-            title = tags.tags.title.trim();
-          }
-
-          // ARTIST
-          if (tags.tags.artist?.trim()) {
-            artist = tags.tags.artist.trim();
-          }
-
-          // COVER
-          if (tags.tags.picture) {
-            const pic = tags.tags.picture;
-
-            let base64 = '';
-
-            for (let i = 0; i < pic.data.length; i++) {
-              base64 += String.fromCharCode(pic.data[i]);
-            }
-
-            cover = `data:${pic.format};base64,${btoa(base64)}`;
-          }
+    try {
+        const mmData = await musicMetadata.parseBlob(file, { native: true });
+        if (mmData?.common?.title) title = mmData.common.title;
+        if (mmData?.common?.artist) artist = mmData.common.artist;
+        if (mmData?.common?.picture?.length) {
+          const pic = mmData.common.picture[0];
+          const data = pic.data instanceof Uint8Array ? pic.data : new Uint8Array(pic.data);
+          const blob = new Blob([data], { type: pic.format || 'image/jpeg' });
+          cover = URL.createObjectURL(blob);
         }
-
       } catch(e) {
         console.warn('Metadata read failed:', e);
       }
-    }
 
     let duration = 0;
 
@@ -2764,43 +2775,58 @@ async function ytFetchResults(query) {
   const isPlaylistFilter=ytActiveFilter==='playlist';
   let ytResults=[], ytPlaylistResults=[];
 
-  if (ytApiKey) {
+  if (VOID_USE_BACKEND_PROXY || ytApiKey) {
     try {
       const videoType=isPlaylistFilter?'playlist':'video';
-      const resp=await fetch(
-        `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(effectiveQ)}&type=${videoType}&maxResults=15&key=${encodeURIComponent(ytApiKey)}`,
-        {signal:AbortSignal.timeout(8000)}
-      );
+      let resp;
+      if (VOID_USE_BACKEND_PROXY) {
+        const params=new URLSearchParams({q:effectiveQ,type:videoType,max:15});
+        resp=await fetch(`${VOID_API_BASE}/youtube/search?${params}`,{signal:AbortSignal.timeout(8000)});
+      } else {
+        resp=await fetch(
+          `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(effectiveQ)}&type=${videoType}&maxResults=15&key=${encodeURIComponent(ytApiKey)}`,
+          {signal:AbortSignal.timeout(8000)}
+        );
+      }
       if (resp.ok) {
-        const data=await resp.json();
-        const items=data.items||[];
+        const raw=await resp.json();
+        // Backend proxy returns YT API shape; normalise playlist/video items either way
+        const items=raw.items||raw||[];
         if (isPlaylistFilter) {
           ytPlaylistResults=items.map(item=>({
-            playlistId:item.id.playlistId,
-            title:item.snippet.title||'Unknown',
-            artist:item.snippet.channelTitle||'',
-            thumbnail:item.snippet.thumbnails?.medium?.url||item.snippet.thumbnails?.default?.url||null,
-            videoCount:null,
+            playlistId:item.id?.playlistId||item.playlistId,
+            title:item.snippet?.title||item.title||'Unknown',
+            artist:item.snippet?.channelTitle||item.author||'',
+            thumbnail:item.snippet?.thumbnails?.medium?.url||item.snippet?.thumbnails?.default?.url||item.playlistThumbnail||null,
+            videoCount:item.videoCount||null,
           }));
         } else {
-          const videoIds=items.map(i=>i.id.videoId).filter(Boolean).join(',');
+          const videoIds=items.map(i=>i.id?.videoId||i.videoId).filter(Boolean).join(',');
           let durMap={};
           if (videoIds) {
             try {
-              const dr=await fetch(`https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${videoIds}&key=${encodeURIComponent(ytApiKey)}`,{signal:AbortSignal.timeout(5000)});
+              let dr;
+              if (VOID_USE_BACKEND_PROXY) {
+                dr=await fetch(`${VOID_API_BASE}/youtube/videos?ids=${encodeURIComponent(videoIds)}`,{signal:AbortSignal.timeout(5000)});
+              } else {
+                dr=await fetch(`https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${videoIds}&key=${encodeURIComponent(ytApiKey)}`,{signal:AbortSignal.timeout(5000)});
+              }
               if (dr.ok) { const dd=await dr.json(); (dd.items||[]).forEach(v=>{durMap[v.id]=ytIso8601ToDur(v.contentDetails?.duration||'');}); }
             } catch(e) {}
           }
-          ytResults=items.filter(i=>i.id.videoId).map(item=>({
-            videoId:item.id.videoId,
-            title:item.snippet.title||'Unknown',
-            artist:item.snippet.channelTitle||'',
-            duration:durMap[item.id.videoId]||0,
-            thumbnail:item.snippet.thumbnails?.medium?.url||item.snippet.thumbnails?.default?.url||null,
-            localMatch:ytFindExactLocalMatch(item.snippet.title,item.snippet.channelTitle),
-          }));
+          ytResults=items.filter(i=>i.id?.videoId||i.videoId).map(item=>{
+            const vid=item.id?.videoId||item.videoId;
+            return {
+              videoId:vid,
+              title:item.snippet?.title||item.title||'Unknown',
+              artist:item.snippet?.channelTitle||item.author||'',
+              duration:durMap[vid]||item.lengthSeconds||0,
+              thumbnail:item.snippet?.thumbnails?.medium?.url||item.snippet?.thumbnails?.default?.url||null,
+              localMatch:ytFindExactLocalMatch(item.snippet?.title||item.title,item.snippet?.channelTitle||item.author),
+            };
+          });
         }
-        return {ytResults,ytPlaylistResults,localMatches,source:'yt_api'};
+        return {ytResults,ytPlaylistResults,localMatches,source:VOID_USE_BACKEND_PROXY?'backend_proxy':'yt_api'};
       }
     } catch(e) {}
   }
@@ -2927,9 +2953,14 @@ function renderYTResults(data, query) {
             :`<button class="yt-result-btn" onclick="ytOpenMatchPicker(${vi},'${esc(query)}')" title="Match to library track">
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               </button>`}
-          <button class="yt-result-btn" id="${dlId}" onclick="ytDownloadTrack(${vi},'${dlId}')" title="Download &amp; play">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0018 9h-1.26A8 8 0 103 16.29"/></svg>
-            <div class="yt-dl-progress" style="width:0%"></div>
+          <button class="yt-result-btn"
+            onclick="ytPlayDirect('${v.videoId || v.id}','${esc(v.title)}','${esc(v.artist||'YouTube')}','${v.thumb||''}')"
+            title="Play instantly">
+
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <polygon points="5,3 19,12 5,21"/>
+            </svg>
+
           </button>
         </div>
       </div>`;
@@ -2976,8 +3007,12 @@ async function ytFetchAndPlay(trackIdx) {
   updateBufferingUI(true);
 
   try {
-    const { blobUrl, blobId, mimeType } = await ytFetchBlob(t.ytMeta.videoId,
-      (pct) => showToast(`Downloading… ${pct}%`));
+    const { blobUrl, blobId, mimeType } = await ytFetchBlob(
+      t.ytMeta.videoId,
+      (pct) => showToast(`Downloading… ${pct}%`),
+      t.title, 
+      t.artist
+    );
 
     // Upgrade track from online→cached
     t.url = blobUrl;
@@ -3014,43 +3049,101 @@ function _playBlob(trackIdx) {
   addToRecent(t.id); lrcActive = -1; saveSettings();
 }
 
-// Fetches audio via Invidious proxy, returns {blobUrl, blobId, mimeType}
-async function ytFetchBlob(videoId, onProgress) {
-  const errors = [];
+async function ytPlayDirect(videoId, title, artist, thumb) {
 
-  for (const inst of YT_INVIDIOUS) {
-    // Try audio-only itags: 251=opus, 140=m4a, 250=opus-low, 18=mp4-360p
-    for (const itag of [251, 140, 250, 18]) {
-      const url = `${inst}/latest_version?id=${encodeURIComponent(videoId)}&itag=${itag}&local=true`;
-      try {
-        const resp = await fetch(url, { signal: AbortSignal.timeout(30000) });
-        if (!resp.ok) { errors.push(`${inst} ${itag}: HTTP ${resp.status}`); continue; }
-
-        // Stream with progress
-        const total = parseInt(resp.headers.get('Content-Length') || '0');
-        const reader = resp.body.getReader();
-        const chunks = [];
-        let received = 0;
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          chunks.push(value);
-          received += value.length;
-          if (total && onProgress) onProgress(Math.round((received / total) * 100));
-        }
-
-        const mimeType = itag === 251 || itag === 250 ? 'audio/webm' : 'audio/mp4';
-        const blob = new Blob(chunks, { type: mimeType });
-        const blobId = 'blob_yt_' + videoId + '_' + Date.now();
-        await dbPut('blobs', { id: blobId, blob });
-        return { blobUrl: URL.createObjectURL(blob), blobId, mimeType };
-      } catch(e) { errors.push(`${inst} ${itag}: ${e.message}`); }
-    }
+  if (!videoId || videoId === 'undefined') {
+    showToast('Invalid video ID');
+    return;
   }
 
-  throw new Error('All sources failed: ' + errors.slice(0,3).join('; '));
+  showToast('Streaming audio...');
+
+  updateBufferingUI(true);
+
+  try {
+
+    const { blobUrl, mimeType } =
+      await ytFetchBlob(videoId, null, title, artist);
+
+    updateBufferingUI(false);
+
+    audioEl.src = blobUrl;
+
+    initAudioContext();
+
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+
+    audioEl.playbackRate = playbackSpeed;
+
+    await audioEl.play();
+
+    isPlaying = true;
+
+    npTitle.textContent = title || 'YouTube Track';
+    npArtist.textContent = artist || 'YouTube';
+
+    miniTitle.textContent = title || 'YouTube Track';
+    miniArtist.textContent = artist || 'YouTube';
+
+    if (thumb) {
+
+      npCover.innerHTML =
+        `<img src="${thumb}" alt="">`;
+
+      miniCover.innerHTML =
+        `<img src="${thumb}" alt="">`;
+    }
+
+    showToast('Now Playing');
+
+    updateUI();
+
+  } catch (e) {
+
+    console.error(e);
+
+    updateBufferingUI(false);
+
+    showToast('Streaming failed');
+  }
 }
 
+// Fetches audio via backend URL resolution, then browser fetches CDN directly.
+// Backend resolves Piped/Invidious (no CORS issue server-side).
+// Browser fetches the returned googlevideo.com CDN URL (no CORS on CDN).
+async function ytFetchBlob(videoId, onProgress, title, artist) {
+
+  // Step 1 — backend resolves the audio URL (server-to-server, no CORS)
+  const params = new URLSearchParams({ id: videoId });
+  const resolveResp = await fetch(`${VOID_API_BASE}/youtube/stream?${params}`, {
+    signal: AbortSignal.timeout(30000)
+  });
+
+  if (!resolveResp.ok) {
+    const err = await resolveResp.json().catch(() => ({}));
+    throw new Error(err.error || `Stream resolve failed: ${resolveResp.status}`);
+  }
+
+  const { url: audioUrl, mimeType } = await resolveResp.json();
+  if (!audioUrl) throw new Error('Backend returned no audio URL');
+
+  // Step 2 — stream audio through backend to avoid CORS
+   const audioResp = await fetch(`${VOID_API_BASE}/youtube/audio?id=${encodeURIComponent(videoId)}`, {
+     signal: AbortSignal.timeout(120000)
+   });
+   if (!audioResp.ok) throw new Error(`Audio fetch failed: ${audioResp.status}`);
+   
+   const arrayBuffer = await audioResp.arrayBuffer();
+   const blob = new Blob([arrayBuffer], { type: mimeType || 'audio/mp4' });
+
+  const blobId = 'blob_yt_' + videoId + '_' + Date.now();
+  await dbPut('blobs', { id: blobId, blob });
+  console.log('[VOID] YT fetch success');
+  return { blobUrl: URL.createObjectURL(blob), blobId, mimeType: mimeType || 'audio/webm' };
+}
+   
 // ==============================
 // YOUTUBE — DOWNLOAD button (same as play but explicit)
 // ==============================
@@ -3090,7 +3183,7 @@ async function ytDownloadTrack(ytResultIdx, btnId) {
 
     const { blobUrl, blobId } = await ytFetchBlob(v.videoId, (pct) => {
       if (prog) prog.style.width = pct + '%';
-    });
+    }, v.title, v.artist);
 
     t.url = blobUrl;
     t.blobId = blobId;
@@ -3400,20 +3493,36 @@ async function ytImportPlaylistById(plId, knownTitle, inputEl) {
   try {
     let pl_title=knownTitle||'YouTube Import', videos=[];
 
-    if (ytApiKey) {
+    if (VOID_USE_BACKEND_PROXY || ytApiKey) {
       try {
-        const resp=await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${encodeURIComponent(plId)}&maxResults=50&key=${encodeURIComponent(ytApiKey)}`,{signal:AbortSignal.timeout(12000)});
+        let resp;
+        if (VOID_USE_BACKEND_PROXY) {
+          resp=await fetch(`${VOID_API_BASE}/youtube/playlist?id=${encodeURIComponent(plId)}`,{signal:AbortSignal.timeout(12000)});
+        } else {
+          resp=await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${encodeURIComponent(plId)}&maxResults=50&key=${encodeURIComponent(ytApiKey)}`,{signal:AbortSignal.timeout(12000)});
+        }
         if (resp.ok) {
           const data=await resp.json();
-          const pResp=await fetch(`https://www.googleapis.com/youtube/v3/playlists?part=snippet&id=${encodeURIComponent(plId)}&key=${encodeURIComponent(ytApiKey)}`,{signal:AbortSignal.timeout(5000)});
-          if (pResp.ok) { const pData=await pResp.json(); if (pData.items&&pData.items[0]) pl_title=pData.items[0].snippet.title; }
-          videos=(data.items||[]).map(item=>({
-            videoId:item.snippet.resourceId?.videoId,
-            title:item.snippet.title||'',
-            artist:item.snippet.videoOwnerChannelTitle||'',
-            thumbnail:item.snippet.thumbnails?.medium?.url||item.snippet.thumbnails?.default?.url||null,
-            duration:0,
-          })).filter(v=>v.videoId&&v.videoId!=='Deleted video');
+          if (VOID_USE_BACKEND_PROXY) {
+            // Backend /api/youtube/playlist returns YT API playlistItems shape
+            videos=(data.items||[]).map(item=>({
+              videoId:item.snippet?.resourceId?.videoId||item.videoId,
+              title:item.snippet?.title||item.title||'',
+              artist:item.snippet?.videoOwnerChannelTitle||item.author||'',
+              thumbnail:item.snippet?.thumbnails?.medium?.url||item.snippet?.thumbnails?.default?.url||item.thumbnail||null,
+              duration:item.lengthSeconds||0,
+            })).filter(v=>v.videoId&&v.videoId!=='Deleted video');
+          } else {
+            const pResp=await fetch(`https://www.googleapis.com/youtube/v3/playlists?part=snippet&id=${encodeURIComponent(plId)}&key=${encodeURIComponent(ytApiKey)}`,{signal:AbortSignal.timeout(5000)});
+            if (pResp.ok) { const pData=await pResp.json(); if (pData.items&&pData.items[0]) pl_title=pData.items[0].snippet.title; }
+            videos=(data.items||[]).map(item=>({
+              videoId:item.snippet.resourceId?.videoId,
+              title:item.snippet.title||'',
+              artist:item.snippet.videoOwnerChannelTitle||'',
+              thumbnail:item.snippet.thumbnails?.medium?.url||item.snippet.thumbnails?.default?.url||null,
+              duration:0,
+            })).filter(v=>v.videoId&&v.videoId!=='Deleted video');
+          }
         }
       } catch(e) {}
     }
@@ -3732,7 +3841,15 @@ document.addEventListener('keydown',e=>{
 // ==============================
 // INIT
 // ==============================
-loadAll();
+loadAll().catch(err => {
+  console.error('[VOID] Fatal init error:', err);
+  // Attempt to recover without DB
+  buildEQ();
+  buildSpeedRow();
+  buildSettingsPage();
+  renderAll();
+  initPWA();
+});
 </script>
 </body>
 </html>
