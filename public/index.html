@@ -3729,6 +3729,23 @@ document.addEventListener('keydown',e=>{
   if (e.code==='Escape')     closeNowPlaying();
 });
 
+async function ytCheckApiStatus() {
+  const dot = document.getElementById('yt-status-dot');
+  const apiDot = document.getElementById('yt-api-dot');
+  const apiText = document.getElementById('yt-api-status-text');
+  if (dot) dot.classList.remove('offline');
+  if (apiDot) apiDot.classList.remove('offline');
+  if (apiText) apiText.textContent = 'Ready';
+}
+
+function ytSaveApiKey() {
+  const input = document.getElementById('yt-api-key-input');
+  if (!input) return;
+  ytApiKey = input.value.trim() || VOID_YT_API_KEY;
+  localStorage.setItem('void_yt_api_key', ytApiKey);
+  showToast('API key saved');
+}
+
 // ==============================
 // INIT
 // ==============================
