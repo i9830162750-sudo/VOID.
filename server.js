@@ -28,10 +28,10 @@ app.set('trust proxy', 1);
 // ── Security headers ──────────────────────────────────────────────────────────
 app.use(
   helmet({
-    contentSecurityPolicy: {
+   contentSecurityPolicy: {
       directives: {
         defaultSrc:    ["'self'"],
-        scriptSrc:     ["'self'", "'unsafe-inline'"],
+        scriptSrc:     ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://fonts.googleapis.com'],
         scriptSrcAttr: ["'unsafe-inline'", "'unsafe-hashes'"],
         styleSrc:      ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         fontSrc:       ["'self'", 'https://fonts.gstatic.com'],
