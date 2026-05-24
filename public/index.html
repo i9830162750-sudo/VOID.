@@ -13,6 +13,7 @@
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/music-metadata-browser@2.5.8/dist/music-metadata-browser.js"></script>
 <style>
 /* ============================================================
    VOID PLAYER V5
@@ -1940,46 +1941,18 @@ document.getElementById('file-input').addEventListener('change', async function(
     }
 
     // METADATA READING
-    if (jsmediatags) {
-      try {
-
-        const tags = await new Promise((resolve, reject) => {
-          jsmediatags.read(file, {
-            onSuccess: resolve,
-            onError: reject
-          });
-        });
-
-        if (tags?.tags) {
-
-          // TITLE
-          if (tags.tags.title?.trim()) {
-            title = tags.tags.title.trim();
-          }
-
-          // ARTIST
-          if (tags.tags.artist?.trim()) {
-            artist = tags.tags.artist.trim();
-          }
-
-          // COVER
-          if (tags.tags.picture) {
-            const pic = tags.tags.picture;
-
-            let base64 = '';
-
-            for (let i = 0; i < pic.data.length; i++) {
-              base64 += String.fromCharCode(pic.data[i]);
-            }
-
-            cover = `data:${pic.format};base64,${btoa(base64)}`;
-          }
-        }
-
-      } catch(e) {
-        console.warn('Metadata read failed:', e);
-      }
-    }
+    try {
+  const mmData = await musicMetadata.parseBlob(file, { native: true });
+  if (mmData?.common?.title) title = mmData.common.title;
+  if (mmData?.common?.artist) artist = mmData.common.artist;
+  if (mmData?.common?.picture?.length) {
+    const pic = mmData.common.picture[0];
+    const b64 = btoa(String.fromCharCode(...new Uint8Array(pic.data)));
+    cover = `data:${pic.format};base64,${b64}`;
+  }
+} catch(e) {
+  console.warn('Metadata read failed:', e);
+}
 
     let duration = 0;
 
