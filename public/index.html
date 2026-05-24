@@ -1918,12 +1918,6 @@ document.getElementById('file-input').addEventListener('change', async function(
 
   showToast('Loading ' + files.length + ' track' + (files.length !== 1 ? 's' : '') + '…');
 
-  let jsmediatags = null;
-
-  try {
-    jsmediatags = await loadJsmediatags();
-  } catch(e) {}
-
   for (const file of files) {
 
     const url = URL.createObjectURL(file);
@@ -1942,17 +1936,18 @@ document.getElementById('file-input').addEventListener('change', async function(
 
     // METADATA READING
     try {
-  const mmData = await musicMetadata.parseBlob(file, { native: true });
-  if (mmData?.common?.title) title = mmData.common.title;
-  if (mmData?.common?.artist) artist = mmData.common.artist;
-  if (mmData?.common?.picture?.length) {
-    const pic = mmData.common.picture[0];
-    const b64 = btoa(String.fromCharCode(...new Uint8Array(pic.data)));
-    cover = `data:${pic.format};base64,${b64}`;
-  }
-} catch(e) {
-  console.warn('Metadata read failed:', e);
-}
+        const mmData = await musicMetadata.parseBlob(file, { native: true });
+        if (mmData?.common?.title) title = mmData.common.title;
+        if (mmData?.common?.artist) artist = mmData.common.artist;
+        if (mmData?.common?.picture?.length) {
+          const pic = mmData.common.picture[0];
+          const data = pic.data instanceof Uint8Array ? pic.data : new Uint8Array(pic.data);
+          const blob = new Blob([data], { type: pic.format || 'image/jpeg' });
+          cover = URL.createObjectURL(blob);
+        }
+      } catch(e) {
+        console.warn('Metadata read failed:', e);
+      }
 
     let duration = 0;
 
