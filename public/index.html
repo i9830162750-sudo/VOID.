@@ -4232,7 +4232,23 @@ async function playTrack(idx, pushHistory=true) {
   }
 
   if (t.url) {
-    audioEl.src = t.url;
+    // Drive-hosted audio: fetch as blob so the audio element can seek/play it
+    if (t.url.startsWith('/api/drive/audio/')) {
+      showToast('Loading from Google Drive…');
+      try {
+        const resp = await fetch(t.url, { credentials: 'include' });
+        if (!resp.ok) throw new Error('Drive fetch failed');
+        const blob = await resp.blob();
+        const blobUrl = URL.createObjectURL(blob);
+        t.url = blobUrl; // cache it so next play is instant
+        audioEl.src = blobUrl;
+      } catch(e) {
+        showToast('Could not load track from Drive');
+        return;
+      }
+    } else {
+      audioEl.src = t.url;
+    }
   } else {
     showToast('No audio source for this track');
     return;
@@ -5209,6 +5225,16 @@ document.getElementById('file-input').addEventListener('change', async function(
   }
   // Fire-and-forget batch persist (don't block UI)
   Promise.all(validResults.map(({ track, file }) => persistTrack(track, file).catch(() => {})));
+
+  // Upload to Google Drive in background if user is signed in
+  if (typeof voidDriveUploadTrack === 'function' && typeof voidDriveGetUser === 'function' && voidDriveGetUser()) {
+    (async () => {
+      for (const { track, file } of validResults) {
+        await voidDriveUploadTrack(track, file).catch(() => {});
+      }
+      if (typeof voidDriveSaveNow === 'function') voidDriveSaveNow();
+    })();
+  }
 
   if (isShuffle) buildShuffleQueue();
   renderAll();
