@@ -34,20 +34,62 @@ app.use(
   helmet({
     contentSecurityPolicy: {
       directives: {
-        defaultSrc:  ["'self'"],
-        scriptSrc:     ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net', 'https://cdnjs.cloudflare.com'],
+        defaultSrc: ["'self'"],
+    
+        scriptSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          'https://cdn.jsdelivr.net',
+          'https://cdnjs.cloudflare.com'
+        ],
+    
         scriptSrcAttr: ["'unsafe-inline'"],
-        styleSrc:    ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
-        fontSrc:     ["'self'", 'https://fonts.gstatic.com'],
-        imgSrc:      ["'self'", 'data:', 'https://*.ytimg.com', 'https://*.ggpht.com', 'https://*.saavncdn.com', 'https://*.jiosaavn.com', 'https://*.sndcdn.com'],
-        connectSrc:  ["'self'", 'https://cdnjs.cloudflare.com', 'https://*.saavncdn.com'],
-        mediaSrc:    ["'self'", 'blob:', 'https://*.saavncdn.com', 'https://cf-media.sndcdn.com'],
-        workerSrc:   ["'self'"],
+    
+        styleSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          'https://fonts.googleapis.com'
+        ],
+    
+        fontSrc: [
+          "'self'",
+          'https://fonts.gstatic.com'
+        ],
+    
+        imgSrc: [
+          "'self'",
+          'data:',
+          'https://*.ytimg.com',
+          'https://*.ggpht.com',
+          'https://*.saavncdn.com',
+          'https://*.jiosaavn.com',
+          'https://*.sndcdn.com'
+        ],
+    
+        connectSrc: [
+          "'self'",
+          'https://cdnjs.cloudflare.com',
+          'https://*.saavncdn.com',
+          'https://*.sndcdn.com'
+        ],
+    
+        mediaSrc: [
+          "'self'",
+          'blob:',
+          'https://*.saavncdn.com',
+          'https://cf-media.sndcdn.com',
+          'https://cf-preview-media.sndcdn.com'
+        ],
+    
+        workerSrc: ["'self'"],
+    
         manifestSrc: ["'self'"],
       },
     },
-  })
-);
+          },
+        },
+      })
+    );
 
 // ── Compression ─────────────────────────────────────────────────────────────
 app.use(compression());
