@@ -125,6 +125,7 @@ exports.saveLibrary = async (req, res) => {
 // Accepts multipart/form-data with field "audio" (the audio file) + "blobId" + "meta" (JSON)
 exports.uploadAudio = async (req, res) => {
   try {
+    console.log('[Drive] uploadAudio called, file:', req.file ? req.file.originalname : 'MISSING', 'body:', req.body);
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
     const { blobId } = req.body;
