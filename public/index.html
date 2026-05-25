@@ -3038,6 +3038,10 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:var(--yt)"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16" fill="var(--yt)" stroke="none"/></svg>
         Find on YouTube
       </div>
+      <div class="ctx-item" id="ctx-download-item" onclick="ctxDownloadSong()" style="display:none">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0018 9h-1.26A8 8 0 103 16.29"/></svg>
+        Download
+      </div>
       <div class="divider" style="margin:4px 20px"></div>
       <div class="ctx-item danger" onclick="ctxRemove()">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a1 1 0 011-1h4a1 1 0 011 1v2"/></svg> Remove
@@ -4199,9 +4203,8 @@ async function playTrack(idx, pushHistory=true) {
   const t = tracks[idx];
 
   if (t.isOnline) {
-    // No direct streaming — download & cache the audio first, then play.
-    // ytFetchAndPlay handles the whole flow with a progress toast.
-    ytFetchAndPlay(idx);
+    // Direct streaming — resolve the stream URL and play immediately.
+    ytDirectStream(idx);
     return;
   }
 
@@ -5653,6 +5656,9 @@ function openCtxMenu(ri) {
   document.getElementById('ctx-items-standard').style.display='block';
   document.getElementById('ctx-pl-picker').style.display='none';
   document.getElementById('ctx-pl-picker').innerHTML='';
+  // Show download only for online (streaming) tracks that aren't yet downloaded
+  const dlItem = document.getElementById('ctx-download-item');
+  if (dlItem) dlItem.style.display = (t.isOnline && !t.blobId) ? 'flex' : 'none';
   document.getElementById('ctx-overlay').classList.add('open');
 }
 
@@ -5998,7 +6004,7 @@ function renderYTDefault() {
   el.innerHTML=`
     <div class="yt-empty">
       <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:var(--yt);width:44px;height:44px;margin:0 auto 12px;display:block"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16" fill="var(--yt)" stroke="none"/></svg>
-      <p>Search for songs, artists, albums<br><span style="font-size:11px;color:var(--text3)">Tap ▶ to download &amp; play · Tap ↓ to cache</span></p>
+      <p>Search for songs, artists, albums<br><span style="font-size:11px;color:var(--text3)">Tap a result to stream instantly</span></p>
     </div>`;
 }
 
@@ -6132,8 +6138,8 @@ function renderYTResults(data, query) {
       const localT=v.localMatch;
       const isMatched=!!(localT&&localT.ytMeta&&localT.ytMeta.videoId===v.videoId);
       const dlId='dl_'+v.videoId;
-      return `<div class="yt-result-item">
-        <div class="yt-thumb">
+      return `<div class="yt-result-item" onclick="ytAddAndStream(${vi})">
+        <div class="yt-thumb" style="cursor:pointer">
           ${v.thumbnail?`<img src="${v.thumbnail}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">`:`<div class="yt-thumb-placeholder"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:var(--yt);width:22px;height:22px"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16" fill="var(--yt)" stroke="none"/></svg></div>`}
         </div>
         <div class="yt-result-info">
@@ -6143,16 +6149,12 @@ function renderYTResults(data, query) {
         </div>
         <div class="yt-result-actions">
           ${localT
-            ?`<button class="yt-result-btn${isMatched?' matched':''}" onclick="ytMatchToTrack(${tracks.indexOf(localT)},${vi},'${esc(query)}')" title="${isMatched?'Matched — unmatch':'Match to library track'}">
+            ?`<button class="yt-result-btn${isMatched?' matched':''}" onclick="event.stopPropagation();ytMatchToTrack(${tracks.indexOf(localT)},${vi},'${esc(query)}')" title="${isMatched?'Matched — unmatch':'Match to library track'}">
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"${isMatched?' fill="var(--accent)"':''}/></svg>
               </button>`
-            :`<button class="yt-result-btn" onclick="ytOpenMatchPicker(${vi},'${esc(query)}')" title="Match to library track">
+            :`<button class="yt-result-btn" onclick="event.stopPropagation();ytOpenMatchPicker(${vi},'${esc(query)}')" title="Match to library track">
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               </button>`}
-          <button class="yt-result-btn" id="${dlId}" onclick="ytDownloadTrack(${vi},'${dlId}')" title="Download &amp; play">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.88 18.09A5 5 0 0018 9h-1.26A8 8 0 103 16.29"/></svg>
-            <div class="yt-dl-progress" style="width:0%"></div>
-          </button>
         </div>
       </div>`;
     }).join('');
@@ -6170,6 +6172,38 @@ function renderYTResults(data, query) {
   window._ytLastResults=ytResults;
 }
 
+// ==============================
+// YOUTUBE — ADD TRACK & STREAM DIRECTLY ON CLICK
+// ==============================
+async function ytAddAndStream(ytResultIdx) {
+  const v = (window._ytLastResults||[])[ytResultIdx]; if (!v||!v.videoId) return;
+
+  // Reuse existing track if already in library
+  let t = tracks.find(tr => tr.ytMeta && tr.ytMeta.videoId === v.videoId);
+  let tIdx;
+  if (t) {
+    tIdx = tracks.indexOf(t);
+  } else {
+    const id = 'track_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    t = {
+      id, blobId: null, title: v.title, artist: v.artist,
+      duration: v.duration, cover: null, isFav: false, isOnline: true,
+      ytMeta: { videoId: v.videoId, thumbnail: v.thumbnail, channelTitle: v.artist, title: v.title },
+      url: null, streamUrl: null,
+    };
+    tracks.push(t);
+    tIdx = tracks.length - 1;
+    await dbPut('tracks', {
+      id: t.id, blobId: null, title: t.title, artist: t.artist,
+      duration: t.duration, cover: null, isFav: false, isOnline: true, ytMeta: t.ytMeta,
+    });
+    saveSettings();
+    renderAll();
+  }
+
+  playTrack(tIdx);
+}
+
 function ytQuickSearch(term) {
   showPage('library');
   setLibSearchMode('yt');
@@ -6180,47 +6214,51 @@ function ytQuickSearch(term) {
 }
 
 // ==============================
-// YOUTUBE — FETCH & PLAY (download blob, then play)
+// YOUTUBE — DIRECT STREAM (no download/caching)
 // ==============================
-// Single entry point for all YT audio. Fetches via Invidious proxy,
-// caches as blob in IndexedDB, then plays. No raw CDN streaming.
-async function ytFetchAndPlay(trackIdx) {
+// Resolves the stream URL from the backend and plays immediately.
+async function ytDirectStream(trackIdx) {
   const t = tracks[trackIdx];
   if (!t || !t.ytMeta || !t.ytMeta.videoId) { showToast('No video ID'); return; }
 
-  // Already downloaded and cached — just play
-  if (t.url && !t.isOnline) {
-    _playBlob(trackIdx);
+  // If already has a stream url cached in memory, play directly
+  if (t.streamUrl) {
+    _playStreamUrl(trackIdx, t.streamUrl);
     return;
   }
 
-  showToast('Fetching audio…');
+  showToast('▶ Loading…');
   updateBufferingUI(true);
 
   try {
-    const { blobUrl, blobId, mimeType } = await ytFetchBlob(t.ytMeta.videoId,
-      (pct) => showToast(`Downloading… ${pct}%`));
+    const streamResp = await fetch(`${VOID_API_BASE}/youtube/stream?id=${encodeURIComponent(t.ytMeta.videoId)}`, { signal: AbortSignal.timeout(15000) });
+    if (!streamResp.ok) throw new Error(`Stream resolve failed: HTTP ${streamResp.status}`);
+    const { url, mimeType } = await streamResp.json();
+    if (!url) throw new Error('No audio URL returned');
 
-    // Upgrade track from online→cached
-    t.url = blobUrl;
-    t.blobId = blobId;
-    t.isOnline = false;
+    // Cache stream URL in memory (session only)
+    t.streamUrl = url;
 
-    // Persist
-    await dbPut('tracks', {
-      id: t.id, blobId, title: t.title, artist: t.artist,
-      duration: t.duration, cover: null, isFav: t.isFav,
-      isOnline: false, ytMeta: t.ytMeta,
-    });
-    saveSettings();
-
-    showToast('\u25B6 Playing: ' + t.title);
-    _playBlob(trackIdx);
+    showToast('▶ Streaming: ' + t.title);
+    _playStreamUrl(trackIdx, url);
   } catch(e) {
     updateBufferingUI(false);
-    showToast('\u26A0 Could not load audio: ' + (e.message||'Try again'));
-    console.error('ytFetchAndPlay:', e);
+    showToast('⚠ Could not stream: ' + (e.message || 'Try again'));
+    console.error('ytDirectStream:', e);
   }
+}
+
+function _playStreamUrl(trackIdx, url) {
+  const t = tracks[trackIdx];
+  updateBufferingUI(false);
+  audioEl.src = url;
+  initAudioContext();
+  if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+  audioEl.playbackRate = playbackSpeed;
+  audioEl.play().catch(() => showToast('Tap play to start'));
+  isPlaying = true;
+  updateUI(); renderTrackList(); renderQueueList();
+  addToRecent(t.id); saveSettings();
 }
 
 function _playBlob(trackIdx) {
@@ -6236,16 +6274,13 @@ function _playBlob(trackIdx) {
   addToRecent(t.id); saveSettings();
 }
 
-// Fetches audio via Invidious proxy, returns {blobUrl, blobId, mimeType}
+// Fetches audio via backend, returns {blobUrl, blobId, mimeType}
 async function ytFetchBlob(videoId, onProgress) {
-  // videoId is the JioSaavn song ID
-  // First get the direct MP3 URL from backend
   const streamResp = await fetch(`${VOID_API_BASE}/youtube/stream?id=${encodeURIComponent(videoId)}`, { signal: AbortSignal.timeout(15000) });
   if (!streamResp.ok) throw new Error(`Stream resolve failed: HTTP ${streamResp.status}`);
   const { url, mimeType } = await streamResp.json();
   if (!url) throw new Error('No audio URL returned');
 
-  // Fetch the actual audio and store as blob
   const resp = await fetch(url, { signal: AbortSignal.timeout(120000) });
   if (!resp.ok) throw new Error(`Audio fetch failed: HTTP ${resp.status}`);
   const total = parseInt(resp.headers.get('Content-Length') || '0');
@@ -6266,81 +6301,36 @@ async function ytFetchBlob(videoId, onProgress) {
 }
 
 // ==============================
-// YOUTUBE — DOWNLOAD button (same as play but explicit)
+// YOUTUBE — DOWNLOAD (from ctx-menu, saves as blob/offline)
 // ==============================
-async function ytDownloadTrack(ytResultIdx, btnId) {
-  const v = (window._ytLastResults||[])[ytResultIdx]; if (!v||!v.videoId) return;
-  const btn = document.getElementById(btnId); if (!btn) return;
+async function ctxDownloadSong() {
+  closeCtxMenu();
+  const t = tracks[ctxTrackIndex]; if (!t) return;
+  if (!t.isOnline || !t.ytMeta || !t.ytMeta.videoId) { showToast('Only online tracks can be downloaded'); return; }
+  if (t.url && !t.isOnline) { showToast('Already downloaded'); return; }
 
-  // Already cached locally
-  const existing = tracks.find(t => t.ytMeta && t.ytMeta.videoId === v.videoId);
-  if (existing && existing.url && !existing.isOnline) {
-    showToast('Already cached — playing');
-    playTrack(tracks.indexOf(existing));
-    return;
-  }
-
-  btn.classList.add('downloading');
-  const prog = btn.querySelector('.yt-dl-progress');
-  if (prog) prog.style.width = '5%';
-
+  showToast('Downloading…');
+  updateBufferingUI(true);
   try {
-    // Create or reuse track entry
-    let t = existing;
-    let tIdx;
-    if (!t) {
-      const id = 'track_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-      t = {
-        id, blobId: null, title: v.title, artist: v.artist,
-        duration: v.duration, cover: null, isFav: false, isOnline: true,
-        ytMeta: { videoId: v.videoId, thumbnail: v.thumbnail, channelTitle: v.artist, title: v.title },
-        url: null,
-      };
-      tracks.push(t);
-      tIdx = tracks.length - 1;
-    } else {
-      tIdx = tracks.indexOf(t);
-    }
-
-    const { blobUrl, blobId } = await ytFetchBlob(v.videoId, (pct) => {
-      if (prog) prog.style.width = pct + '%';
-    });
-
+    const { blobUrl, blobId } = await ytFetchBlob(t.ytMeta.videoId, (pct) => showToast(`Downloading… ${pct}%`));
     t.url = blobUrl;
     t.blobId = blobId;
     t.isOnline = false;
-
+    t.streamUrl = null;
     await dbPut('tracks', {
       id: t.id, blobId, title: t.title, artist: t.artist,
       duration: t.duration, cover: null, isFav: t.isFav,
       isOnline: false, ytMeta: t.ytMeta,
     });
-
-    if (prog) prog.style.width = '100%';
-    setTimeout(() => {
-      btn.classList.remove('downloading');
-      btn.classList.add('dl-done');
-      btn.title = 'Cached — playing';
-      btn.innerHTML = `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>`;
-    }, 300);
-
-    renderAll(); saveSettings();
-    showToast('\u2713 Cached & playing: ' + t.title);
-    playTrack(tIdx);
+    saveSettings();
+    updateBufferingUI(false);
+    showToast('✓ Downloaded: ' + t.title);
+    renderAll();
   } catch(e) {
-    btn.classList.remove('downloading');
-    if (prog) prog.style.width = '0%';
-    showToast('Failed: ' + (e.message || 'Try again'));
-    console.error(e);
+    updateBufferingUI(false);
+    showToast('Download failed: ' + (e.message || 'Try again'));
+    console.error('ctxDownloadSong:', e);
   }
-}
-
-// ==============================
-// YOUTUBE — STREAM button (now also download-then-play)
-// ==============================
-function ytStreamTrack(ytResultIdx, btnId) {
-  // Just proxy to download — streaming doesn't work reliably in browser
-  ytDownloadTrack(ytResultIdx, btnId);
 }
 // YOUTUBE — MATCH SYSTEM
 // ==============================
