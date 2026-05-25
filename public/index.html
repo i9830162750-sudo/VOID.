@@ -6324,7 +6324,6 @@ function renderYTResults(data, query) {
         </div>
       </div>`;
     }).join('');
-    }).join('');
 
     const relatedTerms=ytResults.slice(0,6).map(v=>v.artist).filter((a,i,arr)=>a&&arr.indexOf(a)===i).slice(0,5);
     if (relatedTerms.length>1) {
