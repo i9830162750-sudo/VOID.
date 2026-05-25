@@ -6350,27 +6350,95 @@ function ytQuickSearch(term) {
 // caches as blob in IndexedDB, then plays. No raw CDN streaming.
 async function ytFetchAndPlay(trackIdx) {
   const t = tracks[trackIdx];
+
   // Route SoundCloud tracks to the SC stream endpoint
   if (t && t.scMeta && t.scMeta.trackId) {
+
+    // Already resolved stream URL
     if (t.streamUrl) {
-        audio.src = t.streamUrl;
-        audio.play();
-        return;
+
+      audioEl.src = t.streamUrl;
+
+      initAudioContext();
+
+      if (audioCtx && audioCtx.state === 'suspended') {
+        await audioCtx.resume();
       }
-    showToast('▶ Loading…'); updateBufferingUI(true);
+
+      audioEl.playbackRate = playbackSpeed;
+
+      await audioEl.play();
+
+      isPlaying = true;
+
+      updateUI();
+      renderTrackList();
+      renderQueueList();
+
+      return;
+    }
+
+    showToast('▶ Loading…');
+    updateBufferingUI(true);
+
     try {
-      const r = await fetch(`${VOID_API_BASE}/soundcloud/stream?id=${encodeURIComponent(t.scMeta.trackId)}`, { signal: AbortSignal.timeout(15000) });
-      if (!r.ok) throw new Error(`SC stream HTTP ${r.status}`);
+
+      const r = await fetch(
+        `${VOID_API_BASE}/soundcloud/stream?id=${encodeURIComponent(t.scMeta.trackId)}`,
+        { signal: AbortSignal.timeout(15000) }
+      );
+
+      if (!r.ok) {
+        throw new Error(`SC stream HTTP ${r.status}`);
+      }
+
       const { url } = await r.json();
-      if (!url) throw new Error('No audio URL returned');
+
+      if (!url) {
+        throw new Error('No audio URL returned');
+      }
+
+      // Cache resolved stream URL
       t.streamUrl = url;
+
       showToast('▶ Streaming: ' + t.title);
-      audio.src = url;
-      await audio.play();
-    } catch(e) { updateBufferingUI(false); showToast('⚠ SC stream failed: ' + e.message); }
+
+      audioEl.src = t.streamUrl;
+
+      initAudioContext();
+
+      if (audioCtx && audioCtx.state === 'suspended') {
+        await audioCtx.resume();
+      }
+
+      audioEl.playbackRate = playbackSpeed;
+
+      await audioEl.play();
+
+      isPlaying = true;
+
+      updateUI();
+      renderTrackList();
+      renderQueueList();
+
+    } catch(e) {
+
+      updateBufferingUI(false);
+
+      showToast('⚠ SC stream failed: ' + (e.message || 'Unknown error'));
+
+      console.error('SoundCloud stream error:', e);
+    }
+
     return;
   }
-  if (!t || !t.ytMeta || !t.ytMeta.videoId) { showToast('No video ID'); return; }
+
+  // ===== YOUTUBE FLOW =====
+
+  if (!t || !t.ytMeta || !t.ytMeta.videoId) {
+    showToast('No video ID');
+    return;
+  }
 
   // Already downloaded and cached — just play
   if (t.url && !t.isOnline) {
@@ -6382,27 +6450,42 @@ async function ytFetchAndPlay(trackIdx) {
   updateBufferingUI(true);
 
   try {
-    const { blobUrl, blobId, mimeType } = await ytFetchBlob(t.ytMeta.videoId,
-      (pct) => showToast(`Downloading… ${pct}%`));
 
-    // Upgrade track from online→cached
+    const { blobUrl, blobId, mimeType } = await ytFetchBlob(
+      t.ytMeta.videoId,
+      (pct) => showToast(`Downloading… ${pct}%`)
+    );
+
+    // Upgrade track from online → cached
     t.url = blobUrl;
     t.blobId = blobId;
     t.isOnline = false;
 
     // Persist
     await dbPut('tracks', {
-      id: t.id, blobId, title: t.title, artist: t.artist,
-      duration: t.duration, cover: null, isFav: t.isFav,
-      isOnline: false, ytMeta: t.ytMeta,
+      id: t.id,
+      blobId,
+      title: t.title,
+      artist: t.artist,
+      duration: t.duration,
+      cover: null,
+      isFav: t.isFav,
+      isOnline: false,
+      ytMeta: t.ytMeta,
     });
+
     saveSettings();
 
-    showToast('\u25B6 Playing: ' + t.title);
+    showToast('▶ Playing: ' + t.title);
+
     _playBlob(trackIdx);
+
   } catch(e) {
+
     updateBufferingUI(false);
-    showToast('\u26A0 Could not load audio: ' + (e.message||'Try again'));
+
+    showToast('⚠ Could not load audio: ' + (e.message || 'Try again'));
+
     console.error('ytFetchAndPlay:', e);
   }
 }
