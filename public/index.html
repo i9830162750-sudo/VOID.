@@ -5228,12 +5228,23 @@ document.getElementById('file-input').addEventListener('change', async function(
 
   // Upload to Google Drive in background if user is signed in
   if (typeof voidDriveUploadTrack === 'function' && typeof voidDriveGetUser === 'function' && voidDriveGetUser()) {
+    showToast('Uploading to Google Drive…');
     (async () => {
+      let uploaded = 0;
       for (const { track, file } of validResults) {
-        await voidDriveUploadTrack(track, file).catch(() => {});
+        console.log('[Drive] uploading track:', track.title, 'file size:', file.size);
+        const fileId = await voidDriveUploadTrack(track, file).catch(e => { console.error('[Drive] upload error:', e); return null; });
+        console.log('[Drive] upload result fileId:', fileId);
+        if (fileId) uploaded++;
       }
-      if (typeof voidDriveSaveNow === 'function') voidDriveSaveNow();
+      console.log('[Drive] uploaded', uploaded, 'of', validResults.length);
+      if (uploaded > 0) {
+        showToast('✓ Uploaded ' + uploaded + ' track' + (uploaded !== 1 ? 's' : '') + ' to Drive');
+        if (typeof voidDriveSaveNow === 'function') voidDriveSaveNow();
+      }
     })();
+  } else {
+    console.log('[Drive] skipping upload — user:', typeof voidDriveGetUser === 'function' ? voidDriveGetUser() : 'fn not found');
   }
 
   if (isShuffle) buildShuffleQueue();
