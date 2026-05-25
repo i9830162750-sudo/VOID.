@@ -64,3 +64,20 @@ router.post('/logout', (req, res, next) => {
 });
 
 module.exports = router;
+
+// ── Proxy Google profile photo (avoids CSP/SW issues with googleusercontent.com) ──
+router.get('/photo', async (req, res) => {
+  if (!req.isAuthenticated() || !req.user.photo) {
+    return res.status(404).end();
+  }
+  try {
+    const response = await fetch(req.user.photo);
+    if (!response.ok) return res.status(502).end();
+    res.setHeader('Content-Type', response.headers.get('content-type') || 'image/jpeg');
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+    const buf = await response.arrayBuffer();
+    res.send(Buffer.from(buf));
+  } catch(e) {
+    res.status(502).end();
+  }
+});
