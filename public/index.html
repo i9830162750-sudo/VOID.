@@ -3787,7 +3787,7 @@ const VOID_YT_API_KEY = 'AIzaSyAyIzgLddMuiNayJcKWIlSYD5l3FL4BR1o';
 //
 // Set to true once the Express backend is deployed on Render.
 // When false (default), all existing client-side fetch behaviour is unchanged.
-const VOID_USE_BACKEND_PROXY = false;
+const VOID_USE_BACKEND_PROXY = true;
 
 // Relative URL of the backend API — works on both localhost and Render
 // because both serve the app and the API from the same origin.
@@ -6047,6 +6047,38 @@ async function ytFetchResults(query) {
   const isPlaylistFilter=ytActiveFilter==='playlist';
   let ytResults=[], ytPlaylistResults=[];
 
+  // Route through backend proxy (required when served via Express — CSP blocks direct fetches)
+  if (VOID_USE_BACKEND_PROXY) {
+    try {
+      const type=isPlaylistFilter?'playlist':'video';
+      const resp=await fetch(`${VOID_API_BASE}/youtube/search?q=${encodeURIComponent(effectiveQ)}&type=${type}&max=15`,{signal:AbortSignal.timeout(12000)});
+      if (resp.ok) {
+        const data=await resp.json();
+        const items=Array.isArray(data)?data:(data.items||[]);
+        if (isPlaylistFilter) {
+          ytPlaylistResults=items.map(item=>({
+            playlistId:item.playlistId||item.id?.playlistId,
+            title:item.title||item.snippet?.title||'Unknown',
+            artist:item.author||item.snippet?.channelTitle||'',
+            thumbnail:item.playlistThumbnail||item.snippet?.thumbnails?.medium?.url||null,
+            videoCount:item.videoCount||null,
+          })).filter(p=>p.playlistId);
+        } else {
+          ytResults=items.map(item=>({
+            videoId:item.videoId||item.id?.videoId,
+            title:item.title||item.snippet?.title||'Unknown',
+            artist:item.author||item.snippet?.channelTitle||'',
+            duration:item.lengthSeconds||0,
+            thumbnail:item.videoThumbnails?(item.videoThumbnails.find(t=>t.quality==='medium')?.url||item.videoThumbnails[0]?.url):item.snippet?.thumbnails?.medium?.url||null,
+            localMatch:ytFindExactLocalMatch(item.title||item.snippet?.title||'',item.author||item.snippet?.channelTitle||''),
+          })).filter(v=>v.videoId);
+        }
+        return {ytResults,ytPlaylistResults,localMatches,source:'proxy'};
+      }
+    } catch(e) { console.warn('[VOID search proxy]',e.message); }
+    return {ytResults,ytPlaylistResults,localMatches,source:'none'};
+  }
+
   if (ytApiKey) {
     try {
       const videoType=isPlaylistFilter?'playlist':'video';
@@ -6300,6 +6332,28 @@ function _playBlob(trackIdx) {
 // Fetches audio via Invidious proxy, returns {blobUrl, blobId, mimeType}
 async function ytFetchBlob(videoId, onProgress) {
   const errors = [];
+
+  // Route through backend audio proxy when running under Express
+  if (VOID_USE_BACKEND_PROXY) {
+    const resp = await fetch(`${VOID_API_BASE}/youtube/audio?id=${encodeURIComponent(videoId)}`, { signal: AbortSignal.timeout(120000) });
+    if (!resp.ok) throw new Error(`Backend audio proxy failed: HTTP ${resp.status}`);
+    const total = parseInt(resp.headers.get('Content-Length') || '0');
+    const reader = resp.body.getReader();
+    const chunks = [];
+    let received = 0;
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      chunks.push(value);
+      received += value.length;
+      if (total && onProgress) onProgress(Math.round((received / total) * 100));
+    }
+    const mimeType = resp.headers.get('Content-Type') || 'audio/mp4';
+    const blob = new Blob(chunks, { type: mimeType });
+    const blobId = 'blob_yt_' + videoId + '_' + Date.now();
+    await dbPut('blobs', { id: blobId, blob });
+    return { blobUrl: URL.createObjectURL(blob), blobId, mimeType };
+  }
 
   for (const inst of YT_INVIDIOUS) {
     // Try audio-only itags: 251=opus, 140=m4a, 250=opus-low, 18=mp4-360p
