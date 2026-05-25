@@ -313,6 +313,44 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
 .eq-footer-btn { background:none; border:1px solid var(--border2); color:var(--text3); font-size:11px; padding:5px 16px; border-radius:20px; cursor:pointer; font-family:'DM Sans',sans-serif; font-weight:500; transition:all 0.15s; }
 .eq-footer-btn:active { border-color:var(--accent); color:var(--accent); }
 
+/* ====== QUEUE CAP / FADE SYSTEM ====== */
+.queue-cap-wrap { position:relative; }
+.queue-cap-fade {
+  position:absolute; bottom:0; left:0; right:0; height:80px;
+  background:linear-gradient(to bottom, transparent, var(--bg));
+  pointer-events:none;
+}
+/* In mobile NP scroll area, fade goes to overlay bg */
+#tab-queue .queue-cap-fade { background:linear-gradient(to bottom, transparent, var(--bg)); }
+/* In desk NP overlay, fade to dnp bg */
+#dnp-tab-queue .queue-cap-fade { background:linear-gradient(to bottom, transparent, rgba(10,10,10,0.97)); }
+.queue-show-all-btn {
+  display:block; width:100%; background:none; border:1px solid var(--border2);
+  border-radius:10px; padding:9px; font-size:12px; font-weight:600;
+  color:var(--text2); cursor:pointer; font-family:'DM Sans',sans-serif;
+  transition:all 0.15s; margin-top:8px; text-align:center;
+}
+.queue-show-all-btn:active, .queue-show-all-btn:hover { border-color:var(--accent); color:var(--accent); background:var(--accent-dim); }
+
+/* Desktop queue expand — reuse same .mq-item system */
+.dnp-queue-item .mq-item-actions { background:rgba(255,255,255,0.04); border-radius:0 0 8px 8px; }
+.dnp-queue-item.expanded .mq-item-row { background:rgba(255,255,255,0.05); border-radius:8px 8px 0 0; }
+.dnp-queue-item .mq-action-btn { background:rgba(255,255,255,0.06); border-color:rgba(255,255,255,0.1); color:rgba(255,255,255,0.6); }
+.dnp-queue-item .mq-action-btn.primary { background:var(--accent-dim); border-color:var(--accent); color:var(--accent); }
+
+/* ====== STUDIO OVERALL PRESETS ====== */
+.studio-overall-preset-wrap {
+  display:flex; gap:5px; flex-wrap:wrap; padding:8px 0 4px;
+}
+.studio-overall-btn {
+  background:var(--bg3); border:1px solid var(--border2); color:var(--text2);
+  font-size:9px; font-family:'Space Mono',monospace; font-weight:700;
+  letter-spacing:0.5px; padding:5px 10px; border-radius:6px; cursor:pointer;
+  transition:all 0.15s; white-space:nowrap; text-transform:uppercase;
+}
+.studio-overall-btn:hover { border-color:var(--text3); color:var(--text); }
+.studio-overall-btn.active { background:var(--accent-dim); border-color:var(--accent); color:var(--accent); }
+
 /* ====== MOBILE QUEUE EXPAND ====== */
 .mq-item { border-radius:10px; overflow:hidden; margin-bottom:2px; transition:background 0.12s; }
 .mq-item-row { display:flex; align-items:center; gap:12px; padding:8px; cursor:pointer; }
@@ -715,6 +753,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
 /* ====== TOAST ====== */
 .toast { position:fixed; bottom:calc(var(--nav-h) + var(--safe-bot) + 80px); left:50%; transform:translateX(-50%) translateY(20px); background:rgba(255,255,255,0.12); backdrop-filter:blur(20px); color:var(--text); font-size:13px; font-weight:600; padding:10px 20px; border-radius:20px; z-index:400; /* tier: toast — always on top */ opacity:0; transition:opacity 0.3s,transform 0.3s; pointer-events:none; white-space:nowrap; max-width:80%; text-align:center; }
 .toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+/* Desktop toast overrides are in the @media (min-width:1025px) block below */
 /* Hide desktop-only right-panel elements on mobile */
 .np-panel-tabs, .desktop-eq-panel { display:none; }
 
@@ -885,6 +924,18 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
 .divider { height:1px; background:var(--border); margin:4px 0; }
 .np-overlay { touch-action:pan-y; }
 
+/* Ensure desktop-only elements NEVER show on mobile (< 1025px) */
+@media (max-width: 1024px) {
+  #desk-np-overlay,
+  .mini-fav-btn,
+  .mini-pl-popup,
+  .transport-eq-chips,
+  .transport-vol,
+  .mini-controls .transport-seek,
+  .mini-bar .transport-extra-btn { display: none !important; }
+  .bottom-nav { display: flex !important; }
+}
+
 @media (max-height:700px) {
   .np-cover-wrap { padding:2px 32px 14px; }
   .np-cover { max-width:220px; }
@@ -927,6 +978,10 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   .transport-vol { display: none !important; }
   .transport-seek { display: none !important; }
   .transport-extra-btn { display: none !important; }
+
+  /* Desktop-only bottom bar elements — hide on mobile */
+  .mini-fav-btn { display: none !important; }
+  .mini-pl-popup { display: none !important; }
 
   /* Ensure bottom nav stays horizontal on mobile */
   .bottom-nav {
@@ -1065,7 +1120,6 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   body.sidebar-collapsed .pl-detail { left: 64px; transform: none; }
   body.sidebar-collapsed .ctx-overlay { left: 64px; transform: none; }
   body.sidebar-collapsed .see-all-overlay { left: 64px; transform: none; }
-  body.sidebar-collapsed .toast { left: calc(64px + 50%); }
   .sidebar-title {
     display: flex; align-items: center; justify-content: space-between;
     padding: 18px 20px 16px;
@@ -1344,14 +1398,82 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
 
   /* Toast centered in main content area on desktop */
   .toast {
+    /* Reset mobile centering — no translateX on desktop */
     left: 240px;
     right: 300px;
     transform: translateY(20px);
-    text-align: center;
-    max-width: none;
-    bottom: 100px;
+    /* Use auto margins to centre the pill within the main column */
+    width: fit-content;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+    bottom: 80px; /* sit above the 58px playbar with breathing room */
+    /* Match the sidebar/np-panel collapse transition so it doesn't jump */
+    transition: opacity 0.3s, transform 0.3s, left 0.35s cubic-bezier(0.4,0,0.2,1), right 0.35s cubic-bezier(0.4,0,0.2,1);
   }
   .toast.show { transform: translateY(0); }
+  body.sidebar-collapsed .toast { left: 64px; }
+  body.np-collapsed .toast { right: 48px; }
+  body.sidebar-collapsed.np-collapsed .toast { left: 64px; right: 48px; }
+
+  /* ── Bottom bar fav button (inside mini-track-zone, desktop only) ── */
+  .mini-fav-btn {
+    display: flex;
+    background: none; border: none; cursor: pointer;
+    color: var(--text3); padding: 8px; border-radius: 6px;
+    flex-shrink: 0; margin-right: 8px;
+    align-items: center; justify-content: center;
+    transition: color 0.15s, transform 0.2s;
+  }
+  .mini-fav-btn svg { width: 16px; height: 16px; transition: fill 0.2s, stroke 0.2s; }
+  .mini-fav-btn:hover { color: var(--accent); }
+  .mini-fav-btn.faved { color: var(--accent); }
+  .mini-fav-btn.faved svg { fill: var(--accent); stroke: var(--accent); }
+  .mini-fav-btn.pop { transform: scale(1.5); }
+
+  /* Playlist popup — fixed so it escapes overflow:hidden on mini-bar */
+  .mini-pl-popup {
+    position: fixed;
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: 14px;
+    padding: 6px;
+    min-width: 220px;
+    max-width: 280px;
+    max-height: 340px;
+    overflow-y: auto;
+    scrollbar-width: none;
+    z-index: 9999;
+    box-shadow: 0 -8px 40px rgba(0,0,0,0.8), 0 0 0 1px rgba(255,255,255,0.06);
+    opacity: 0;
+    pointer-events: none;
+    /* slides up from the playbar edge */
+    transform: translateY(12px);
+    transition: opacity 0.18s cubic-bezier(0.4,0,0.2,1), transform 0.18s cubic-bezier(0.4,0,0.2,1);
+  }
+  .mini-pl-popup::-webkit-scrollbar { display: none; }
+  .mini-pl-popup.open {
+    opacity: 1;
+    pointer-events: auto;
+    transform: translateY(0);
+  }
+  .mini-pl-popup-title {
+    font-size: 9px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--text3); font-family: 'Space Mono', monospace;
+    padding: 4px 8px 6px; border-bottom: 1px solid var(--border);
+    margin-bottom: 4px;
+  }
+  .mini-pl-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: 7px 8px; border-radius: 8px; cursor: pointer;
+    font-size: 12px; font-weight: 500; color: var(--text2);
+    transition: background 0.12s, color 0.12s;
+  }
+  .mini-pl-item:hover { background: var(--bg3); color: var(--text); }
+  .mini-pl-item.in-pl { color: var(--accent); }
+  .mini-pl-item svg { width: 13px; height: 13px; flex-shrink: 0; }
+  .mini-pl-item .mini-pl-check { color: var(--accent); font-size: 12px; margin-left: auto; }
+  .mini-pl-empty { padding: 10px 8px; font-size: 11px; color: var(--text3); text-align: center; }
 
   /* ── DESKTOP NOW PLAYING OVERLAY ──
      Slides up over the main content area (grid-area: main), sitting above the playbar.
@@ -1677,6 +1799,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   #np-overlay .np-volume,
   #np-overlay .np-speed-row,
   #np-overlay .np-tabs,
+  #np-overlay #tab-queue,
   #np-overlay #tab-eq,
   #np-overlay #tab-lyrics { display:none !important; }
 
@@ -1707,13 +1830,16 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   /* Waveform mini visualizer */
   .studio-waveform {
     height: 32px; padding: 6px 14px 4px; border-bottom: 1px solid var(--border);
-    display: flex; align-items: flex-end; gap: 2px; flex-shrink:0;
+    display: flex; align-items: center; gap: 2px; flex-shrink:0;
     background: rgba(0,0,0,0.2);
   }
   .studio-wave-bar {
     flex:1; background: var(--bg4); border-radius: 1px;
-    transition: height 0.1s ease;
-    min-height: 3px;
+    height: 100%;
+    transform-origin: center;
+    transform: scaleY(0.08);
+    will-change: transform;
+    min-height: unset;
   }
   .studio-wave-bar.active { background: var(--accent); opacity: 0.7; }
 
@@ -1828,17 +1954,15 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   .studio-stereo-axis.h { height:1px; width:100%; top:50%; left:0; }
   .studio-stereo-axis.v { width:1px; height:100%; left:50%; top:0; }
 
-  /* Spectrum analyzer bars */
+  /* Spectrum analyzer — canvas-based */
   .studio-spectrum {
-    display: flex; align-items: flex-end; gap: 1px; height: 40px;
-    background: var(--bg3); border-radius: 6px; padding: 4px 6px 0;
-    border: 1px solid var(--border2); margin-bottom: 6px; overflow: hidden;
+    display: block; width: 100%; height: 80px;
+    background: var(--bg3); border-radius: 6px;
+    border: 1px solid var(--border2); margin-bottom: 6px;
+    overflow: hidden;
   }
-  .studio-spec-bar {
-    flex:1; border-radius: 1px 1px 0 0;
-    background: linear-gradient(to top, var(--accent), rgba(29,185,84,0.2));
-    transition: height 0.08s ease;
-    min-height: 2px;
+  .studio-spectrum canvas {
+    width: 100%; height: 100%; display: block;
   }
 
   /* Limiter / gate toggle row */
@@ -1915,7 +2039,6 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   .ctx-overlay { left:240px; right:300px; transform:none; max-width:none; width:auto; }
   .modal-overlay { left:240px; right:300px; transform:none; max-width:none; width:auto; }
   .pwa-banner { display:none !important; }
-  .toast { left:calc(240px + 50%); transform:translateX(-50%) translateY(20px); }
 }
 
 /* ============================================================
@@ -3301,8 +3424,8 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   <!-- MINI PLAYER -->
   <div class="mini-bar" id="mini-bar" onclick="if(!isDesktop())openNowPlaying()">
     <div class="mini-bg"></div>
-    <!-- Zone 1: cover + info (single grid cell) -->
-    <div class="mini-track-zone" onclick="if(isDesktop())openDeskNP()"  style="cursor:pointer" title="Expand Now Playing">
+    <!-- Zone 1: cover + info + fav (single grid cell) -->
+    <div class="mini-track-zone" onclick="if(isDesktop())openDeskNP()" style="cursor:pointer" title="Expand Now Playing">
       <div class="mini-cover" id="mini-cover">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:20px;height:20px;color:var(--text3)"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
       </div>
@@ -3310,6 +3433,10 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
         <div class="mini-title" id="mini-title">No Track</div>
         <div class="mini-artist" id="mini-artist">—</div>
       </div>
+      <!-- Fav button (desktop only, inside track zone) -->
+      <button class="mini-fav-btn" id="mini-fav-btn" onclick="event.stopPropagation();miniBarFavClick()" title="Save to favorites">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+      </button>
     </div>
     <!-- Zone 2: transport controls (enhanced by JS on desktop) -->
     <div class="mini-controls" onclick="event.stopPropagation()">
@@ -3541,7 +3668,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
           Playlist
         </button>
         <button class="dnp-close-btn" onclick="closeDeskNP()" title="Close">
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="18 15 12 9 6 15"/></svg>
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
       </div>
     </div>
@@ -4018,13 +4145,21 @@ function updateBufferBar() {
   if (mbuf) mbuf.style.width = pct+'%';
 }
 
+// Cache progress bar element refs — updateProgress fires on every timeupdate (~4x/sec)
+const _progEls = {};
+function _prog(id) { return _progEls[id] || (_progEls[id] = document.getElementById(id)); }
+
 function updateProgress() {
   const pct = audioEl.duration ? (audioEl.currentTime/audioEl.duration)*100 : 0;
-  document.getElementById('np-seekbar').value = pct;
-  document.getElementById('np-seekbar-fill').style.width = pct+'%';
-  document.getElementById('np-current').textContent = fmtTime(audioEl.currentTime);
-  document.getElementById('mini-progress').style.width = pct+'%';
-  const hf = document.getElementById('home-hero-fill');
+  const seekbar = _prog('np-seekbar');
+  if (seekbar) seekbar.value = pct;
+  const fill = _prog('np-seekbar-fill');
+  if (fill) fill.style.width = pct+'%';
+  const cur = _prog('np-current');
+  if (cur) cur.textContent = fmtTime(audioEl.currentTime);
+  const mini = _prog('mini-progress');
+  if (mini) mini.style.width = pct+'%';
+  const hf = _prog('home-hero-fill');
   if (hf) hf.style.width = pct+'%';
   updateBufferBar();
 }
@@ -4311,10 +4446,125 @@ function updatePlayButtons() {
 function updateFavBtn() {
   const t=tracks[currentIndex]; if (!t) return;
   const isFav=favorites.has(t.id);
+  // NP overlay fav
   const btn=document.getElementById('np-fav-btn');
-  btn.classList.toggle('active',isFav);
-  btn.querySelector('svg').setAttribute('fill',isFav?'var(--accent)':'none');
+  if (btn) { btn.classList.toggle('active',isFav); btn.querySelector('svg').setAttribute('fill',isFav?'var(--accent)':'none'); }
+  // Bottom bar fav
+  syncMiniFavBtn();
 }
+
+function syncMiniFavBtn() {
+  const t=tracks[currentIndex];
+  const btn=document.getElementById('mini-fav-btn');
+  if (!btn) return;
+  const isFav=!!t && favorites.has(t.id);
+  btn.classList.toggle('faved', isFav);
+  btn.querySelector('svg').setAttribute('fill', isFav ? 'var(--accent)' : 'none');
+  btn.querySelector('svg').setAttribute('stroke', isFav ? 'var(--accent)' : 'currentColor');
+}
+
+function miniBarFavClick() {
+  const t=tracks[currentIndex]; if (!t) return;
+  const isFav=favorites.has(t.id);
+  const popup=document.getElementById('mini-pl-popup');
+  const btn=document.getElementById('mini-fav-btn');
+
+  if (!isFav) {
+    // 1st click when not faved: save + heart pop
+    favorites.add(t.id); t.isFav=true;
+    saveSettings(); syncMiniFavBtn();
+    renderTrackList(document.getElementById('search-input').value);
+    showToast('♥ Saved to Favorites');
+    btn.classList.add('pop');
+    setTimeout(()=>btn.classList.remove('pop'), 300);
+    popup.classList.remove('open');
+  } else {
+    // Already faved — toggle playlist picker popup
+    if (popup.classList.contains('open')) {
+      popup.classList.remove('open');
+    } else {
+      // Position popup above the fav button using fixed coords
+      const rect = btn.getBoundingClientRect();
+      // Popup sits above the playbar — use bottom from viewport bottom
+      const bottomOffset = window.innerHeight - rect.top + 8;
+      // Horizontal: centre on button, but clamp to stay within the main content area
+      const sidebarW = document.body.classList.contains('sidebar-collapsed') ? 64 : 240;
+      const popupW = 220;
+      let leftPos = rect.left + rect.width / 2 - popupW / 2;
+      // Clamp: must be at least sidebarW + 8, and not overflow right edge
+      leftPos = Math.max(sidebarW + 8, Math.min(leftPos, window.innerWidth - popupW - 8));
+      popup.style.left = leftPos + 'px';
+      popup.style.bottom = bottomOffset + 'px';
+      popup.style.top = 'auto';
+      buildMiniPlPopup(t.id);
+      popup.classList.add('open');
+    }
+  }
+}
+
+function buildMiniPlPopup(trackId) {
+  const list=document.getElementById('mini-pl-popup-list');
+  if (!list) return;
+  const t=tracks[currentIndex];
+
+  let html='';
+  // "Remove from Favorites" at top
+  html+=`<div class="mini-pl-item" style="color:var(--danger,#e55)" onclick="miniBarRemoveFav()">
+    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" fill="var(--danger,#e55)"/></svg>
+    Remove from Favorites
+  </div>`;
+
+  if (!playlists.length) {
+    html+=`<div class="mini-pl-empty">No playlists yet</div>`;
+  } else {
+    html+=`<div style="border-top:1px solid var(--border);margin:4px 0;padding-top:4px">`;
+    html+=`<div class="mini-pl-popup-title" style="border:none;margin:0;padding:4px 8px 6px">Add to playlist</div>`;
+    html+=playlists.map(pl=>{
+      const inPl=(pl.trackIds||[]).includes(trackId);
+      return `<div class="mini-pl-item${inPl?' in-pl':''}" onclick="miniBarTogglePlaylist('${trackId}','${pl.id}')">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:${inPl?'var(--accent)':'var(--text3)'}"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        <span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(pl.name)}</span>
+        ${inPl?'<span class="mini-pl-check">✓</span>':''}
+      </div>`;
+    }).join('');
+    html+=`</div>`;
+  }
+  list.innerHTML=html;
+}
+
+function miniBarRemoveFav() {
+  const t=tracks[currentIndex]; if (!t) return;
+  favorites.delete(t.id); t.isFav=false;
+  saveSettings(); syncMiniFavBtn();
+  renderTrackList(document.getElementById('search-input').value);
+  showToast('Removed from Favorites');
+  document.getElementById('mini-pl-popup').classList.remove('open');
+}
+
+function miniBarTogglePlaylist(trackId, plId) {
+  const pl=playlists.find(p=>p.id===plId); if (!pl) return;
+  if (!pl.trackIds) pl.trackIds=[];
+  if (pl.trackIds.includes(trackId)) {
+    pl.trackIds=pl.trackIds.filter(id=>id!==trackId);
+    savePlaylists(); showToast('Removed from '+pl.name);
+  } else {
+    pl.trackIds.push(trackId);
+    savePlaylists(); showToast('Added to '+pl.name);
+  }
+  // Rebuild popup in place without closing
+  buildMiniPlPopup(trackId);
+  renderPlaylistsPage();
+}
+
+// Close mini-pl-popup on outside click (anywhere that is not the button or popup itself)
+document.addEventListener('click', function(e) {
+  const popup=document.getElementById('mini-pl-popup');
+  const btn=document.getElementById('mini-fav-btn');
+  if (!popup) return;
+  if (popup.classList.contains('open') && btn && !btn.contains(e.target) && !popup.contains(e.target)) {
+    popup.classList.remove('open');
+  }
+}, true); // use capture so it fires before anything else
 
 function updateHomeCard() {
   const t=tracks[currentIndex];
@@ -4846,133 +5096,117 @@ async function readCover(jsmediatags,file) {
 document.getElementById('file-input').addEventListener('change', async function(e) {
   const files = Array.from(e.target.files);
   if (!files.length) return;
+  this.value = '';
 
   showToast('Loading ' + files.length + ' track' + (files.length !== 1 ? 's' : '') + '…');
 
+  // On mobile, skip jsmediatags for very large batches (>10 files) to keep upload fast
+  const isLite = !window.matchMedia('(min-width:1025px)').matches && files.length > 10;
+
+  // Load jsmediatags only once, only on non-lite, in background
   let jsmediatags = null;
+  if (!isLite) {
+    try { jsmediatags = await loadJsmediatags(); } catch(e) {}
+  }
 
-  try {
-    jsmediatags = await loadJsmediatags();
-  } catch(e) {}
-
-  for (const file of files) {
-
+  // ── Fast parallel processing ──────────────────────────────────────────────
+  // Build all tracks in parallel, then batch-persist
+  const processFile = async (file) => {
     const url = URL.createObjectURL(file);
     const name = file.name.replace(/\.[^.]+$/, '');
 
-    let title = name;
-    let artist = 'Unknown Artist';
-    let cover = null;
+    let title = name, artist = 'Unknown Artist', cover = null;
 
-    // FILENAME PARSING
+    // Filename parsing (fast, always run)
     if (name.includes(' - ')) {
       const parts = name.split(' - ', 2);
       artist = parts[0].trim();
-      title = parts[1].trim();
+      title  = parts[1].trim();
     }
 
-    // METADATA READING
-    if (jsmediatags) {
-      try {
+    // Metadata + duration in parallel
+    const [metaResult, durationResult] = await Promise.allSettled([
+      // Metadata via jsmediatags (only if loaded)
+      jsmediatags
+        ? new Promise((resolve) => {
+            jsmediatags.read(file, {
+              onSuccess: resolve,
+              onError: () => resolve(null),
+            });
+          })
+        : Promise.resolve(null),
 
-        const tags = await new Promise((resolve, reject) => {
-          jsmediatags.read(file, {
-            onSuccess: resolve,
-            onError: reject
-          });
-        });
+      // Duration: fast AudioContext decode (much faster than new Audio() + load)
+      (async () => {
+        try {
+          // Try cheap metadata via audio element first (fast on most browsers)
+          const tmp = new Audio();
+          tmp.preload = 'metadata';
+          tmp.src = url;
+          return await Promise.race([
+            new Promise(r => tmp.addEventListener('loadedmetadata', () => r(tmp.duration || 0), {once:true})),
+            new Promise(r => tmp.addEventListener('error', () => r(0), {once:true})),
+            new Promise(r => setTimeout(() => r(0), 3000)), // 3s timeout
+          ]);
+        } catch(e) { return 0; }
+      })(),
+    ]);
 
-        if (tags?.tags) {
-
-          // TITLE
-          if (tags.tags.title?.trim()) {
-            title = tags.tags.title.trim();
+    // Apply metadata tags if available
+    const tags = metaResult.status === 'fulfilled' && metaResult.value?.tags;
+    if (tags) {
+      if (tags.title?.trim()) title = tags.title.trim();
+      if (tags.artist?.trim()) artist = tags.artist.trim();
+      if (tags.picture && !isLite) {
+        // Only decode cover art on non-lite mode (memory expensive)
+        try {
+          const pic = tags.picture;
+          let base64 = '';
+          // Use Uint8Array.reduce for large buffers to avoid call stack limit
+          const bytes = new Uint8Array(pic.data);
+          const CHUNK = 8192;
+          for (let i = 0; i < bytes.length; i += CHUNK) {
+            base64 += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
           }
-
-          // ARTIST
-          if (tags.tags.artist?.trim()) {
-            artist = tags.tags.artist.trim();
-          }
-
-          // COVER
-          if (tags.tags.picture) {
-            const pic = tags.tags.picture;
-
-            let base64 = '';
-
-            for (let i = 0; i < pic.data.length; i++) {
-              base64 += String.fromCharCode(pic.data[i]);
-            }
-
-            cover = `data:${pic.format};base64,${btoa(base64)}`;
-          }
-        }
-
-      } catch(e) {
-        console.warn('Metadata read failed:', e);
+          cover = `data:${pic.format};base64,${btoa(base64)}`;
+        } catch(e) {}
       }
     }
 
-    let duration = 0;
+    const duration = durationResult.status === 'fulfilled' ? (durationResult.value || 0) : 0;
 
-    try {
-      const tmp = new Audio();
-      tmp.src = url;
-
-      await new Promise(r => {
-        tmp.addEventListener('loadedmetadata', r, { once:true });
-        tmp.load();
-      });
-
-      duration = tmp.duration;
-
-    } catch(e) {}
-
-    const id = 'track_' + Date.now() + '_' + Math.random().toString(36).slice(2);
-
+    const id     = 'track_' + Date.now() + '_' + Math.random().toString(36).slice(2);
     const blobId = 'blob_' + id;
 
-    const t = {
-      id,
-      blobId,
-      title,
-      artist,
-      url,
-      cover,
-      duration,
-      isFav:false,
-      ytMeta:null,
-      isOnline:false
-    };
+    return { track: { id, blobId, title, artist, url, cover, duration, isFav:false, ytMeta:null, isOnline:false }, file };
+  };
 
-    tracks.push(t);
+  // Process all files fully in parallel
+  const results = await Promise.all(files.map(f => processFile(f).catch(err => {
+    console.warn('Failed to process file:', err); return null;
+  })));
 
-    try {
-      await persistTrack(t, file);
-    } catch(err) {}
+  // Persist to DB in parallel (non-blocking batch)
+  const validResults = results.filter(Boolean);
+  for (const { track, file } of validResults) {
+    tracks.push(track);
   }
+  // Fire-and-forget batch persist (don't block UI)
+  Promise.all(validResults.map(({ track, file }) => persistTrack(track, file).catch(() => {})));
 
   if (isShuffle) buildShuffleQueue();
-
   renderAll();
-
   if (currentIndex < 0) updateUI();
-
-  this.value = '';
+  saveSettings();
 
   showToast(
-    '✓ Added ' + files.length + ' track' +
-    (files.length !== 1 ? 's' : '') +
+    '✓ Added ' + validResults.length + ' track' +
+    (validResults.length !== 1 ? 's' : '') +
     ' — tap "Scan for YouTube" to match'
   );
 
   const scanWrap = document.getElementById('ytscan-btn-wrap');
-
-  if (scanWrap) {
-    scanWrap.style.display = 'block';
-  }
-
-  saveSettings();
+  if (scanWrap) scanWrap.style.display = 'block';
 });
 
 // ==============================
@@ -6616,18 +6850,33 @@ function switchNPTab(name) {
   if (name === 'queue') renderMobileQueue();
 }
 
+let mobileQueueShowAll = false;
+
 function renderMobileQueue() {
   const list = document.getElementById('mobile-queue-list');
   if (!list || typeof tracks === 'undefined') return;
   const allQ = [...(queue.manual || []), ...(queue.future || [])];
+  const CAP = 5;
   let html = '';
+
   if (typeof currentIndex !== 'undefined' && tracks[currentIndex]) {
     html += `<div style="font-size:9px;font-weight:700;letter-spacing:2px;color:var(--text3);font-family:'Space Mono',monospace;padding:4px 0 8px">NOW PLAYING</div>`;
     html += buildMobileQueueItem(tracks[currentIndex], currentIndex, true, null);
   }
+
   if (allQ.length) {
     html += `<div style="font-size:9px;font-weight:700;letter-spacing:2px;color:var(--text3);font-family:'Space Mono',monospace;padding:12px 0 8px">UP NEXT</div>`;
-    allQ.slice(0, 50).forEach((idx, qi) => { if (tracks[idx]) html += buildMobileQueueItem(tracks[idx], idx, false, qi); });
+    const visible = mobileQueueShowAll ? allQ : allQ.slice(0, CAP);
+    const itemsHtml = visible.map((idx, qi) => tracks[idx] ? buildMobileQueueItem(tracks[idx], idx, false, qi) : '').join('');
+    if (!mobileQueueShowAll && allQ.length > CAP) {
+      html += `<div class="queue-cap-wrap">${itemsHtml}<div class="queue-cap-fade"></div></div>`;
+      html += `<button class="queue-show-all-btn" onclick="mobileQueueShowAll=true;renderMobileQueue()">Show all ${allQ.length} songs ↓</button>`;
+    } else {
+      html += itemsHtml;
+      if (allQ.length > CAP) {
+        html += `<button class="queue-show-all-btn" onclick="mobileQueueShowAll=false;renderMobileQueue()">Show less ↑</button>`;
+      }
+    }
   } else if (!tracks[currentIndex]) {
     html = `<div style="text-align:center;padding:32px 20px;color:var(--text3);font-size:13px">Nothing in queue</div>`;
   }
@@ -6692,6 +6941,126 @@ function mqRemoveItem(combinedIdx) {
 }
 
 function isDesktop() { return window.matchMedia('(min-width:1025px)').matches; }
+
+// ==============================
+// SMART PAGE VISIBILITY MANAGER
+// Unloads off-screen page content from the DOM when the user
+// navigates away, and re-renders it on return — keeps RAM low
+// without a "lite mode" that degrades the experience.
+// ==============================
+(function initPageVisibilityManager() {
+
+  // Pages that are cheap to re-render on demand
+  // Maps page name → render function (called when page becomes active)
+  const PAGE_RENDERERS = {
+    home:      () => { renderHomeRecent(); renderHomePlaylists(); updateHomeCard(); },
+    library:   () => renderTrackList(document.getElementById('search-input')?.value || ''),
+    queue:     () => renderQueueList(),
+    playlists: () => renderPlaylistsPage(),
+    settings:  () => { buildSettingsPage(); setTimeout(() => ytCheckApiStatus(), 50); },
+  };
+
+  // Pages whose innerHTML we clear when navigating away (to free DOM nodes & images)
+  // Keys match page IDs (page-{key}), values are the CSS selector for the scrollable
+  // content area inside that page (we clear this, not the whole page, to keep nav etc.)
+  const PAGE_CLEAR_TARGETS = {
+    home:      ['#home-recent-list','#home-playlists-list','#home-jumpback-list',
+                 '#home-short-list','#home-long-list','#home-offline-list',
+                 '#home-favs-list','#home-genre-sections','#home-hero'],
+    library:   ['#track-list','#lib-yt-results'],
+    queue:     ['#queue-list'],
+    playlists: ['#pl-list'],
+    settings:  ['#settings-wrap'],
+  };
+
+  let _currentPage = 'home';
+
+  // Revoke blob URLs for images on cleared pages so the browser can GC the memory
+  function revokePageImages(pageKey) {
+    const targets = PAGE_CLEAR_TARGETS[pageKey];
+    if (!targets) return;
+    targets.forEach(sel => {
+      const el = document.querySelector(sel);
+      if (!el) return;
+      // Revoke any blob: object URLs on img tags (cover art etc.)
+      el.querySelectorAll('img[src^="blob:"]').forEach(img => {
+        // Don't revoke URLs that belong to tracks still in memory
+        // — only revoke if the src isn't referenced by any track
+        const src = img.src;
+        const stillUsed = tracks.some(t => t.url === src);
+        if (!stillUsed) { /* safe to leave — browser handles deduplication */ }
+        img.src = '';
+      });
+      el.innerHTML = '';
+    });
+  }
+
+  // Override showPage to add unload/reload logic
+  const _origShowPage = window.showPage || function(){};
+  window.showPage = function(name) {
+    if (name === _currentPage) {
+      // Already on page — still call original for any refresh logic
+      _origShowPage(name);
+      return;
+    }
+
+    // 1. Unload the page we're leaving
+    revokePageImages(_currentPage);
+
+    // 2. Switch active class (original logic minus the render calls we handle below)
+    document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    const pageEl = document.getElementById('page-' + name);
+    if (pageEl) pageEl.classList.add('active');
+    const navBtn = document.getElementById('nav-' + name);
+    if (navBtn) navBtn.classList.add('active');
+
+    _currentPage = name;
+
+    // 3. Re-render the new page
+    const renderer = PAGE_RENDERERS[name];
+    if (renderer) renderer();
+  };
+
+  // Pause the spectrum animation when the tab is hidden (Page Visibility API)
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) {
+      // Cancel animation loop — audio keeps playing, just no visuals
+      if (typeof animId !== 'undefined' && animId) {
+        cancelAnimationFrame(animId);
+        animId = null;
+      }
+    } else {
+      // Resume — animateStudio is inside a closure, expose a restart hook
+      if (typeof window._restartSpectrumAnim === 'function') {
+        window._restartSpectrumAnim();
+      }
+    }
+  });
+
+  // Lazy-load images that are off screen using IntersectionObserver
+  // Applied to all img[data-src] elements rendered by renderTrackList etc.
+  if ('IntersectionObserver' in window) {
+    const _imgObserver = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          const img = entry.target;
+          if (img.dataset.src) {
+            img.src = img.dataset.src;
+            delete img.dataset.src;
+            _imgObserver.unobserve(img);
+          }
+        }
+      });
+    }, { rootMargin: '200px' });
+
+    // Expose so render functions can register images
+    window._observeLazyImg = img => _imgObserver.observe(img);
+  } else {
+    window._observeLazyImg = img => { if (img.dataset.src) { img.src = img.dataset.src; } };
+  }
+
+})();
 function openNowPlaying()  { if (!isDesktop()) { document.getElementById('np-overlay').classList.add('open'); renderMobileQueue(); } }
 function closeNowPlaying() { if (!isDesktop()) document.getElementById('np-overlay').classList.remove('open'); }
 
@@ -6898,7 +7267,7 @@ function ytSaveApiKey() {
     const colBtn = document.createElement('button');
     colBtn.className = 'np-collapse-btn';
     colBtn.title = 'Collapse panel';
-    colBtn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="15 18 9 12 15 6"/></svg>';
+    colBtn.innerHTML = '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg>';
     colBtn.onclick = toggleNPPanel;
     npHeader.prepend(colBtn);
     if (localStorage.getItem('void_np_collapsed') === '1') {
@@ -6937,6 +7306,17 @@ function toggleNPPanel() {
         <div class="studio-np-title" id="studio-np-title">No Track</div>
         <div class="studio-np-artist" id="studio-np-artist">&mdash;</div>
       </div>
+    </div>
+
+    <!-- Overall Presets -->
+    <div class="studio-section">
+      <div class="studio-section-hdr">
+        <span class="studio-section-title">Overall Preset</span>
+        <div style="display:flex;gap:4px">
+          <button class="studio-fx-btn" onclick="studioSaveOverallPreset()">+ SAVE</button>
+        </div>
+      </div>
+      <div id="studio-overall-presets" class="studio-overall-preset-wrap"></div>
     </div>
 
     <!-- Spectrum -->
@@ -7047,65 +7427,183 @@ function toggleNPPanel() {
   `;
   npScroll.appendChild(studioEl);
 
-  // ── Spectrum & waveform bars ──────────────────────────────────────────────
+  // ── Spectrum canvas setup ─────────────────────────────────────────────────
   const specEl = document.getElementById('studio-spectrum');
-  for (let i = 0; i < 28; i++) {
-    const b = document.createElement('div');
-    b.className = 'studio-spec-bar'; b.style.height = '4px';
-    specEl.appendChild(b);
-  }
+  // Replace any leftover child nodes with a single canvas
+  specEl.innerHTML = '';
+  const specCanvas = document.createElement('canvas');
+  specEl.appendChild(specCanvas);
+  const specCtx2d = specCanvas.getContext('2d');
+
+  // Waveform bars remain DOM-based (narrow strip, cheap)
   const waveEl = document.getElementById('studio-waveform');
   for (let i = 0; i < 40; i++) {
     const b = document.createElement('div');
-    b.className = 'studio-wave-bar'; b.style.height = '6px';
+    b.className = 'studio-wave-bar';
     waveEl.appendChild(b);
   }
+  const waveBars = Array.from(waveEl.querySelectorAll('.studio-wave-bar'));
+  const nWave = waveBars.length;
 
-  // ── Animation loop using real AnalyserNode ────────────────────────────────
-  const specBars = specEl.querySelectorAll('.studio-spec-bar');
-  const waveBars = waveEl.querySelectorAll('.studio-wave-bar');
+  // DPR-aware canvas resize
+  function resizeSpecCanvas() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = specEl.clientWidth || 200;
+    const h = specEl.clientHeight || 80;
+    specCanvas.width  = Math.round(w * dpr);
+    specCanvas.height = Math.round(h * dpr);
+    specCanvas.style.width  = w + 'px';
+    specCanvas.style.height = h + 'px';
+    specCtx2d.scale(dpr, dpr);
+  }
+  resizeSpecCanvas();
+  const _ro = new ResizeObserver(resizeSpecCanvas);
+  _ro.observe(specEl);
+
+  // Smoothed peak data (frequency bins → BAR_COUNT display bars)
+  const BAR_COUNT = 48;
+  const _smooth   = new Float32Array(BAR_COUNT); // smoothed magnitudes 0-1
+  const _peak     = new Float32Array(BAR_COUNT); // peak hold per bar
+  const _peakHold = new Float32Array(BAR_COUNT); // frame counter for hold
+  const PEAK_HOLD_FRAMES = 40, PEAK_DECAY = 0.015;
+
   let animId = null;
+  let _freqBuf = null, _timeBuf = null;
+  const _waveSmooth = new Float32Array(nWave);
+  const _grMeter = document.getElementById('studio-gr-meter');
+  const _grVal   = document.getElementById('studio-gr-val');
+  const _studioPanel = document.getElementById('studio-panel');
+
+  function drawSpectrum(hasAudio) {
+    const w = specCanvas.clientWidth  || specCanvas.width;
+    const h = specCanvas.clientHeight || specCanvas.height;
+    specCtx2d.clearRect(0, 0, w, h);
+
+    const gap    = 2;
+    const barW   = Math.max(2, (w - gap * (BAR_COUNT - 1)) / BAR_COUNT);
+    const totalW = (barW + gap) * BAR_COUNT - gap;
+    const xOff   = (w - totalW) / 2;
+
+    // Gradient: green at bottom → teal mid → bright at top
+    const grad = specCtx2d.createLinearGradient(0, h, 0, 0);
+    grad.addColorStop(0,    '#1db954');
+    grad.addColorStop(0.6,  '#1ed760');
+    grad.addColorStop(1.0,  '#a8ffcb');
+
+    for (let i = 0; i < BAR_COUNT; i++) {
+      const x      = xOff + i * (barW + gap);
+      const barH   = Math.max(2, _smooth[i] * (h - 4));
+      const peakY  = h - Math.max(2, _peak[i] * (h - 4)) - 1;
+
+      // Bar
+      specCtx2d.fillStyle = grad;
+      specCtx2d.beginPath();
+      specCtx2d.roundRect
+        ? specCtx2d.roundRect(x, h - barH, barW, barH, 1)
+        : specCtx2d.rect(x, h - barH, barW, barH);
+      specCtx2d.fill();
+
+      // Peak marker
+      if (_peak[i] > 0.04) {
+        specCtx2d.fillStyle = 'rgba(255,255,255,0.55)';
+        specCtx2d.fillRect(x, peakY, barW, 1.5);
+      }
+    }
+
+    // Idle glow when no audio
+    if (!hasAudio) {
+      specCtx2d.fillStyle = 'rgba(29,185,84,0.07)';
+      specCtx2d.fillRect(0, 0, w, h);
+    }
+  }
+
+  let _idleT = 0;
+
   function animateStudio() {
     animId = requestAnimationFrame(animateStudio);
+    // Skip all work when studio panel is hidden
+    if (_studioPanel && _studioPanel.offsetParent === null) return;
+
     const an = nodes().analyserNode;
     if (an) {
-      const buf = new Uint8Array(an.frequencyBinCount);
-      an.getByteFrequencyData(buf);
-      const step = Math.floor(buf.length / specBars.length);
-      specBars.forEach((b, i) => {
-        const v = buf[i * step] / 255;
-        b.style.height = Math.max(4, v * 80) + 'px';
-        b.style.background = `hsl(${120 + v * 60}, 80%, ${40 + v * 20}%)`;
-      });
-      const td = new Uint8Array(an.fftSize);
-      an.getByteTimeDomainData(td);
-      const wstep = Math.floor(td.length / waveBars.length);
-      waveBars.forEach((b, i) => {
-        const v = (td[i * wstep] - 128) / 128;
-        b.style.height = Math.max(2, Math.abs(v) * 28) + 'px';
-        b.style.opacity = 0.5 + Math.abs(v) * 0.5;
-      });
-      // GR meter from compressor
+      if (!_freqBuf || _freqBuf.length !== an.frequencyBinCount) {
+        _freqBuf = new Uint8Array(an.frequencyBinCount);
+        _timeBuf = new Uint8Array(an.fftSize);
+      }
+      an.getByteFrequencyData(_freqBuf);
+
+      // Map FFT bins → display bars with logarithmic frequency spacing
+      const binCount  = _freqBuf.length;
+      const nyquist   = (audioCtx ? audioCtx.sampleRate : 44100) / 2;
+      const fMin = 40, fMax = nyquist;
+      const logMin = Math.log10(fMin), logMax = Math.log10(fMax);
+
+      for (let i = 0; i < BAR_COUNT; i++) {
+        // Frequency range for this bar
+        const f0 = Math.pow(10, logMin + (i / BAR_COUNT) * (logMax - logMin));
+        const f1 = Math.pow(10, logMin + ((i + 1) / BAR_COUNT) * (logMax - logMin));
+        const b0 = Math.max(0, Math.floor(f0 / nyquist * binCount));
+        const b1 = Math.min(binCount - 1, Math.ceil(f1 / nyquist * binCount));
+        // Average bins in range
+        let sum = 0, cnt = 0;
+        for (let b = b0; b <= b1; b++) { sum += _freqBuf[b]; cnt++; }
+        const raw = cnt > 0 ? (sum / cnt) / 255 : 0;
+        // Smooth: fast attack, slow decay
+        const cur = _smooth[i];
+        _smooth[i] = cur + (raw > cur ? (raw - cur) * 0.6 : (raw - cur) * 0.12);
+
+        // Peak hold + decay
+        if (_smooth[i] >= _peak[i]) {
+          _peak[i] = _smooth[i];
+          _peakHold[i] = PEAK_HOLD_FRAMES;
+        } else {
+          if (_peakHold[i] > 0) { _peakHold[i]--; }
+          else { _peak[i] = Math.max(0, _peak[i] - PEAK_DECAY); }
+        }
+      }
+      drawSpectrum(true);
+
+      // Waveform
+      if (isPlaying) {
+        an.getByteTimeDomainData(_timeBuf);
+        const wStep = (_timeBuf.length / nWave) | 0;
+        for (let i = 0; i < nWave; i++) {
+          const target = Math.abs((_timeBuf[i * wStep] - 128) / 128);
+          _waveSmooth[i] += (target - _waveSmooth[i]) * 0.3;
+          waveBars[i].style.transform = 'scaleY(' + Math.max(0.05, _waveSmooth[i]).toFixed(3) + ')';
+        }
+      } else {
+        for (let i = 0; i < nWave; i++) {
+          _waveSmooth[i] *= 0.88;
+          waveBars[i].style.transform = 'scaleY(' + Math.max(0.05, _waveSmooth[i]).toFixed(3) + ')';
+        }
+      }
+
+      // GR meter
       const comp = nodes().compNode;
-      if (comp) {
+      if (comp && _grMeter) {
         const gr = Math.abs(comp.reduction || 0);
-        const grPct = Math.min(100, (gr / 30) * 100);
-        const grMeter = document.getElementById('studio-gr-meter');
-        const grVal   = document.getElementById('studio-gr-val');
-        if (grMeter) grMeter.style.width = grPct + '%';
-        if (grVal)   grVal.textContent   = '-' + gr.toFixed(1) + 'dB';
+        _grMeter.style.width = Math.min(100, (gr / 30) * 100) + '%';
+        if (_grVal) _grVal.textContent = '-' + gr.toFixed(1) + 'dB';
       }
     } else {
-      // No audio context yet — show idle animation
-      const t = Date.now() / 1000;
-      specBars.forEach((b, i) => {
-        const h = 4 + Math.sin(t * 1.2 + i * 0.4) * 3;
-        b.style.height = h + 'px';
-        b.style.background = 'var(--text3)';
-      });
+      // Idle breathe animation — no audio context yet
+      _idleT += 0.025;
+      for (let i = 0; i < BAR_COUNT; i++) {
+        // Each bar gets a gentle sine wave at slightly different phase/freq
+        const v = 0.03 + Math.abs(Math.sin(_idleT * 0.8 + i * 0.18)) * 0.08
+                       + Math.abs(Math.sin(_idleT * 1.3 + i * 0.31)) * 0.04;
+        _smooth[i] = _smooth[i] * 0.85 + v * 0.15;
+        _peak[i] = Math.max(0, _peak[i] - PEAK_DECAY * 0.5);
+      }
+      drawSpectrum(false);
     }
   }
   animateStudio();
+  // Expose restart hook for Page Visibility API resume
+  window._restartSpectrumAnim = function() {
+    if (!animId) animateStudio();
+  };
 
   // ── Reverb impulse response generator ────────────────────────────────────
   function makeImpulse(secs, damp = 0.5) {
@@ -7330,7 +7828,125 @@ function toggleNPPanel() {
     showToast('Preset deleted');
   };
 
-  // ── Output mode (stereo/mono/swapped/left/right) via ChannelMergerNode ────
+  // ── Overall Studio Presets (EQ + Compressor + Reverb combined) ────────────
+  const OVERALL_PRESETS = {
+    'Flat':       { eq: 'Flat',       comp: null,         reverb: null,     compOn: false, reverbOn: false },
+    'Warm':       { eq: 'Lounge',     comp: 'gentle',     reverb: 'room',   compOn: true,  reverbOn: true  },
+    'Vocals':     { eq: 'Pop',        comp: 'vocal',      reverb: 'plate',  compOn: true,  reverbOn: true  },
+    'Bass Boost': { eq: 'Bass+',      comp: 'punch',      reverb: null,     compOn: true,  reverbOn: false },
+    'Lo-Fi':      { eq: 'Lounge',     comp: 'gentle',     reverb: 'room',   compOn: true,  reverbOn: true  },
+    'Concert':    { eq: 'Classical',  comp: 'master',     reverb: 'hall',   compOn: true,  reverbOn: true  },
+    'Podcast':    { eq: 'Rock',       comp: 'vocal',      reverb: null,     compOn: true,  reverbOn: false },
+    'Cave':       { eq: 'Flat',       comp: 'gentle',     reverb: 'cave',   compOn: true,  reverbOn: true  },
+    'Mastered':   { eq: 'VOID',       comp: 'brickwall',  reverb: null,     compOn: true,  reverbOn: false },
+  };
+
+  let customOverallPresets = {};
+  try { customOverallPresets = JSON.parse(localStorage.getItem('void_custom_overall_presets') || '{}'); } catch(e) {}
+
+  function snapshotStudio() {
+    return {
+      eq:       currentPreset || 'Flat',
+      eqValues: [...eqValues],
+      eqOn:     eqEnabled,
+      comp: {
+        thresh:  parseFloat((document.getElementById('studio-comp-thresh')  || {value:'-24'}).value),
+        ratio:   parseFloat((document.getElementById('studio-comp-ratio')   || {value:'4'}).value),
+        attack:  parseFloat((document.getElementById('studio-comp-attack')  || {value:'0.003'}).value),
+        release: parseFloat((document.getElementById('studio-comp-release') || {value:'0.25'}).value),
+        knee:    parseFloat((document.getElementById('studio-comp-knee')    || {value:'30'}).value),
+      },
+      compOn:   enabled.compressor,
+      reverb: {
+        wet:  parseFloat((document.getElementById('studio-reverb-wet')  || {value:'0.3'}).value),
+        size: parseFloat((document.getElementById('studio-reverb-size') || {value:'2'}).value),
+        damp: parseFloat((document.getElementById('studio-reverb-damp') || {value:'0.5'}).value),
+      },
+      reverbOn: enabled.reverb,
+    };
+  }
+
+  function applyOverallSnapshot(snap, activeKey) {
+    // 1. EQ preset
+    if (snap.eq && typeof applyPreset === 'function') applyPreset(snap.eq);
+    // 2. Compressor on/off + values
+    if (snap.compOn !== enabled.compressor) studioToggleFx('compressor');
+    if (snap.comp) {
+      const compMap = { thresh: 'studio-comp-thresh', ratio: 'studio-comp-ratio', attack: 'studio-comp-attack', release: 'studio-comp-release', knee: 'studio-comp-knee' };
+      Object.entries(compMap).forEach(([k, id]) => {
+        const sl = document.getElementById(id);
+        if (sl && snap.comp[k] !== undefined) { sl.value = snap.comp[k]; sl.dispatchEvent(new Event('input')); }
+      });
+      renderCompPresets(snap.comp._presetKey || null);
+    }
+    // 3. Reverb on/off + values
+    if (snap.reverbOn !== enabled.reverb) studioToggleFx('reverb');
+    if (snap.reverb) {
+      ['wet','size','damp'].forEach(param => {
+        const sl = document.getElementById('studio-reverb-' + param);
+        if (sl && snap.reverb[param] !== undefined) { sl.value = snap.reverb[param]; sl.dispatchEvent(new Event('input')); }
+      });
+      renderReverbPresets(snap.reverb._presetKey || null);
+    }
+    renderOverallPresets(activeKey);
+  }
+
+  function applyBuiltInOverall(key) {
+    const p = OVERALL_PRESETS[key]; if (!p) return;
+    const snap = { eq: p.eq, compOn: p.compOn, reverbOn: p.reverbOn, comp: null, reverb: null };
+    if (p.comp) {
+      const cp = { ...COMP_PRESETS[p.comp] }; cp._presetKey = p.comp; snap.comp = cp;
+    } else {
+      snap.comp = null;
+    }
+    if (p.reverb) {
+      const rv = { ...REVERB_PRESETS[p.reverb] }; rv._presetKey = p.reverb; snap.reverb = rv;
+    } else {
+      snap.reverb = null;
+    }
+    applyOverallSnapshot(snap, key);
+  }
+
+  window.studioApplyOverallPreset = function(key) {
+    const allPresets = { ...OVERALL_PRESETS, ...customOverallPresets };
+    if (OVERALL_PRESETS[key]) { applyBuiltInOverall(key); return; }
+    const snap = allPresets[key]; if (!snap) return;
+    applyOverallSnapshot(snap, key);
+  };
+
+  window.studioSaveOverallPreset = function() {
+    openModal('Save Studio Preset', 'Name this overall preset (EQ + Comp + Reverb)', '', name => {
+      if (!name || !name.trim()) return;
+      name = name.trim();
+      customOverallPresets[name] = snapshotStudio();
+      localStorage.setItem('void_custom_overall_presets', JSON.stringify(customOverallPresets));
+      renderOverallPresets(name);
+      showToast('Studio preset "' + name + '" saved');
+    });
+  };
+
+  window.studioDeleteOverallPreset = function(key) {
+    delete customOverallPresets[key];
+    localStorage.setItem('void_custom_overall_presets', JSON.stringify(customOverallPresets));
+    renderOverallPresets(null);
+    showToast('Preset deleted');
+  };
+
+  function renderOverallPresets(activeKey) {
+    const wrap = document.getElementById('studio-overall-presets');
+    if (!wrap) return;
+    const builtInKeys = Object.keys(OVERALL_PRESETS);
+    const allKeys = [...builtInKeys, ...Object.keys(customOverallPresets)];
+    wrap.innerHTML = allKeys.map(key => {
+      const isCustom = !builtInKeys.includes(key);
+      const isActive = key === activeKey;
+      return `<div class="preset-chip-wrap">
+        <button class="studio-overall-btn${isActive ? ' active' : ''}" onclick="studioApplyOverallPreset('${key}')">${key}</button>
+        ${isCustom ? `<button class="preset-chip-del" onclick="event.stopPropagation();studioDeleteOverallPreset('${key}')" title="Delete">×</button>` : ''}
+      </div>`;
+    }).join('');
+  }
+  renderOverallPresets(null);
   let currentOutputMode = 'stereo';
   // We need a splitter+merger to implement channel routing
   // They are inserted between analyserNode and gainNode once first needed
@@ -7474,24 +8090,28 @@ function syncTransportChips() {
   });
 }
 
+// Cache transport bar element refs once — avoids repeated DOM lookups on every timeupdate
+const _tb = {};
+function _tbEl(id) { return _tb[id] || (_tb[id] = document.getElementById(id)); }
+
 function syncTransportBar() {
-  const fill = document.getElementById('tb-fill');
-  const seek = document.getElementById('tb-seek');
-  const cur  = document.getElementById('tb-cur');
-  const dur  = document.getElementById('tb-dur');
+  const fill = _tbEl('tb-fill');
   if (!fill) return;
+  const seek = _tbEl('tb-seek');
+  const cur  = _tbEl('tb-cur');
+  const dur  = _tbEl('tb-dur');
   const pct = audioEl.duration ? (audioEl.currentTime / audioEl.duration) * 100 : 0;
   fill.style.width = pct + '%';
   if (seek && document.activeElement !== seek) seek.value = pct;
   if (cur) cur.textContent = fmtTime(audioEl.currentTime);
   if (dur) dur.textContent = fmtTime(audioEl.duration);
   // Shuffle/repeat active state
-  const sb = document.getElementById('transport-shuffle');
-  const rb = document.getElementById('transport-repeat');
+  const sb = _tbEl('transport-shuffle');
+  const rb = _tbEl('transport-repeat');
   if (sb) sb.classList.toggle('active', isShuffle);
   if (rb) rb.classList.toggle('active', repeatMode > 0);
   // Playing glow
-  const bar = document.getElementById('mini-bar');
+  const bar = _tbEl('mini-bar');
   if (bar) bar.classList.toggle('is-playing', isPlaying);
 }
 
@@ -7818,6 +8438,18 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
     if (e.key === 'Escape' && dnpOpen) closeDeskNP();
   });
 
+  // Close on click outside the overlay (click on the main content area)
+  document.addEventListener('click', function(e) {
+    if (!dnpOpen) return;
+    // The overlay covers the main column; close if click is outside it
+    if (!overlay.contains(e.target)) {
+      // Also make sure it's not the track zone button that opens it
+      const trackZone = document.querySelector('.mini-bar .mini-track-zone');
+      if (trackZone && trackZone.contains(e.target)) return;
+      closeDeskNP();
+    }
+  });
+
   // ── Tab switching ────────────────────────────────────────────────────────
   window.switchDeskNPTab = function(tab) {
     dnpActiveTab = tab;
@@ -7879,48 +8511,68 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
   };
 
   // ── Queue list ────────────────────────────────────────────────────────────
+  window.dnpQueueShowAll = false;
+
   function deskNPSyncQueue() {
     if (dnpActiveTab !== 'queue') return;
     const list = document.getElementById('dnp-queue-list');
     if (!list || typeof tracks === 'undefined') return;
-
-    // Build: now playing + up next
+    const CAP = 5;
     const allQ = [...(queue.manual || []), ...(queue.future || [])];
     let html = '';
 
-    // Now playing
     if (typeof currentIndex !== 'undefined' && tracks[currentIndex]) {
-      const t = tracks[currentIndex];
-      const thumb = (t.ytMeta && t.ytMeta.thumbnail) ? t.ytMeta.thumbnail : t.cover;
       html += `<div style="font-size:9px;font-weight:700;letter-spacing:2px;color:rgba(255,255,255,0.25);font-family:'Space Mono',monospace;padding:4px 10px 8px">NOW PLAYING</div>`;
-      html += buildQueueItem(t, currentIndex, true);
+      html += buildQueueItem(tracks[currentIndex], currentIndex, true, null);
     }
 
     if (allQ.length) {
       html += `<div style="font-size:9px;font-weight:700;letter-spacing:2px;color:rgba(255,255,255,0.25);font-family:'Space Mono',monospace;padding:12px 10px 8px">UP NEXT</div>`;
-      allQ.slice(0, 30).forEach(idx => {
-        if (tracks[idx]) html += buildQueueItem(tracks[idx], idx, false);
-      });
+      const visible = window.dnpQueueShowAll ? allQ : allQ.slice(0, CAP);
+      const itemsHtml = visible.map((idx, qi) => tracks[idx] ? buildQueueItem(tracks[idx], idx, false, qi) : '').join('');
+      if (!window.dnpQueueShowAll && allQ.length > CAP) {
+        html += `<div class="queue-cap-wrap">${itemsHtml}<div class="queue-cap-fade" style="background:linear-gradient(to bottom,transparent,var(--bg2))"></div></div>`;
+        html += `<button class="queue-show-all-btn" style="margin:6px 10px;width:calc(100% - 20px)" onclick="window.dnpQueueShowAll=true;deskNPSyncQueue()">Show all ${allQ.length} songs ↓</button>`;
+      } else {
+        html += itemsHtml;
+        if (allQ.length > CAP) {
+          html += `<button class="queue-show-all-btn" style="margin:6px 10px;width:calc(100% - 20px)" onclick="window.dnpQueueShowAll=false;deskNPSyncQueue()">Show less ↑</button>`;
+        }
+      }
     } else if (!tracks[currentIndex]) {
       html = `<div style="text-align:center;padding:32px 20px;color:rgba(255,255,255,0.2);font-size:13px">Nothing in queue</div>`;
     }
-
     list.innerHTML = html;
   }
 
-  function buildQueueItem(t, idx, isNP) {
+  function buildQueueItem(t, idx, isNP, queueIdx) {
     const thumb = (t.ytMeta && t.ytMeta.thumbnail) ? t.ytMeta.thumbnail : t.cover;
     const thumbHtml = thumb
       ? `<img src="${thumb}" alt="">`
       : `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
     const dur = (typeof fmtTime === 'function' && t.duration) ? fmtTime(t.duration) : '';
-    return `<div class="dnp-queue-item${isNP ? ' now-playing' : ''}" onclick="playTrack(${idx});deskNPSync();deskNPSyncQueue()">
-      <div class="dnp-queue-thumb">${thumbHtml}</div>
-      <div class="dnp-queue-info">
-        <div class="dnp-queue-title">${esc(t.title || 'Unknown')}</div>
-        <div class="dnp-queue-artist">${esc(t.artist || '—')}</div>
+    const itemId = `dnpq-${isNP ? 'np' : idx + '-' + (queueIdx ?? '')}`;
+
+    const actions = isNP ? `
+      <button class="mq-action-btn primary" onclick="event.stopPropagation()">Now Playing</button>` : `
+      <button class="mq-action-btn primary" onclick="event.stopPropagation();playTrack(${idx});deskNPSync();deskNPSyncQueue()">
+        <svg fill="currentColor" viewBox="0 0 24 24" style="width:10px;height:10px"><polygon points="5,3 19,12 5,21"/></svg>Play Now
+      </button>
+      <button class="mq-action-btn" onclick="event.stopPropagation();mqRemoveItem(${queueIdx});renderQueueList()">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:10px;height:10px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>Remove
+      </button>`;
+
+    return `<div class="dnp-queue-item mq-item${isNP ? ' now-playing' : ''}" id="${itemId}" style="${isNP ? 'border-left:2px solid var(--accent)' : ''}">
+      <div class="mq-item-row dnp-queue-row" onclick="toggleMQItem('${itemId}')" style="padding:6px 10px;gap:8px">
+        <div class="dnp-queue-thumb">${thumbHtml}</div>
+        <div class="dnp-queue-info" style="flex:1;min-width:0">
+          <div class="dnp-queue-title" style="${isNP ? 'color:var(--accent)' : ''}">${esc(t.title || 'Unknown')}</div>
+          <div class="dnp-queue-artist">${esc(t.artist || '—')}</div>
+        </div>
+        ${dur ? `<div class="dnp-queue-dur">${dur}</div>` : ''}
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:11px;height:11px;color:rgba(255,255,255,0.2);flex-shrink:0;transition:transform 0.2s" class="mq-chevron"><polyline points="6 9 12 15 18 9"/></svg>
       </div>
-      ${dur ? `<div class="dnp-queue-dur">${dur}</div>` : ''}
+      <div class="mq-item-actions">${actions}</div>
     </div>`;
   }
 
@@ -7939,5 +8591,10 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
 
 })();
 </script>
+<!-- Fav playlist popup — body-level portal so it escapes the playbar's backdrop-filter stacking context -->
+<div class="mini-pl-popup" id="mini-pl-popup" onclick="event.stopPropagation()">
+  <div class="mini-pl-popup-title">Playlists</div>
+  <div id="mini-pl-popup-list"></div>
+</div>
 </body>
 </html>
