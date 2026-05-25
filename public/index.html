@@ -8931,7 +8931,8 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
           img.style.cssText = 'width:13px;height:13px;border-radius:50%;object-fit:cover;';
           authBtn.insertBefore(img, authBtn.firstChild);
         }
-        img.src = driveUser.photo;
+        // Use backend proxy to avoid CSP/SW blocking googleusercontent.com
+        img.src = '/api/auth/photo';
       }
       quickLbl.textContent = driveSyncing ? 'Syncing…' : 'Drive Sync';
       quickBtn.querySelector('svg, img').style.color = driveSyncing ? 'var(--text2)' : 'var(--accent)';
@@ -9178,7 +9179,7 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
       '<div style="background:var(--bg3);border:1px solid var(--border);border-radius:14px;padding:16px;display:flex;flex-direction:column;gap:12px">' +
       (user
         ? '<div style="display:flex;align-items:center;gap:10px">' +
-            (user.photo ? '<img src="' + user.photo + '" style="width:32px;height:32px;border-radius:50%;object-fit:cover">' : '') +
+            (user.photo ? '<img src="/api/auth/photo" style="width:32px;height:32px;border-radius:50%;object-fit:cover">' : '') +
             '<div><div style="font-size:13px;font-weight:600">' + esc(user.displayName) + '</div>' +
             '<div style="font-size:11px;color:var(--text2)">' + esc(user.email) + '</div></div>' +
           '</div>' +
