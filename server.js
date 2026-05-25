@@ -39,7 +39,7 @@ app.use(
         styleSrc:    ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         fontSrc:     ["'self'", 'https://fonts.gstatic.com'],
         imgSrc:      ["'self'", 'data:', 'https://*.ytimg.com', 'https://*.ggpht.com'],
-        connectSrc:  ["'self'", 'https://www.googleapis.com', 'https://*.youtube.com'],
+        connectSrc:  ["'self'", 'https://www.googleapis.com', 'https://*.youtube.com', 'https://cdnjs.cloudflare.com'],
         mediaSrc:    ["'self'", 'blob:', 'https://*.googlevideo.com'],
         workerSrc:   ["'self'"],
         manifestSrc: ["'self'"],
