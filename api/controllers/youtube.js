@@ -1,22 +1,5 @@
-/**
- * api/controllers/youtube.js
- * Server-side proxy for YouTube (search/metadata) + yt-dlp (streaming).
- *
- * Stream flow:
- *   1. yt-dlp resolves a direct googlevideo.com audio URL using cookies
- *   2. Return { url, mimeType } JSON to the client
- *   3. Browser fetches audio directly from googlevideo.com CDN
- */
-
 'use strict';
 
-const { execFile } = require('child_process');
-const { promisify } = require('util');
-const fs   = require('fs');
-const os   = require('os');
-const path = require('path');
-
-const execFileAsync = promisify(execFile);
 const config = require('../../config');
 
 // ── Tiny in-memory cache ──────────────────────────────────────────────────────
@@ -33,126 +16,58 @@ function cacheSet(key, data) {
   cache.set(key, { data, ts: Date.now() });
 }
 
-// ── Shared fetch helper ───────────────────────────────────────────────────────
-async function apiFetch(url, opts = {}) {
-  const res = await fetch(url, {
-    signal: AbortSignal.timeout(opts.timeout || 8000),
-    headers: { 'User-Agent': 'Mozilla/5.0', ...(opts.headers || {}) },
+const SAAVN_API = 'https://saavnapi-nine.vercel.app';
+
+async function saavnFetch(path) {
+  const res = await fetch(`${SAAVN_API}${path}`, {
+    signal: AbortSignal.timeout(10000),
+    headers: { 'User-Agent': 'Mozilla/5.0' },
   });
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw Object.assign(new Error(`Upstream ${res.status}: ${url}`), {
-      status: res.status,
-      upstream: body,
-    });
-  }
+  if (!res.ok) throw new Error(`JioSaavn API error: ${res.status}`);
   return res.json();
 }
 
-// ── YouTube Data API v3 helpers ───────────────────────────────────────────────
-async function ytSearch(q, type = 'video', maxResults = 15) {
-  const key = config.youtube.apiKey;
-  if (!key) return null;
-
-  const url = new URL(config.youtube.searchEndpoint);
-  url.searchParams.set('part', 'snippet');
-  url.searchParams.set('q', q);
-  url.searchParams.set('type', type);
-  url.searchParams.set('maxResults', String(maxResults));
-  url.searchParams.set('key', key);
-
-  return apiFetch(url.toString());
-}
-
-async function ytVideoDetails(ids) {
-  const key = config.youtube.apiKey;
-  if (!key) return null;
-
-  const url = new URL(config.youtube.videosEndpoint);
-  url.searchParams.set('part', 'contentDetails,snippet');
-  url.searchParams.set('id', Array.isArray(ids) ? ids.join(',') : ids);
-  url.searchParams.set('key', key);
-
-  return apiFetch(url.toString());
-}
-
-async function ytPlaylistItems(playlistId, maxResults = 50) {
-  const key = config.youtube.apiKey;
-  if (!key) return null;
-
-  const url = new URL(config.youtube.playlistEndpoint);
-  url.searchParams.set('part', 'snippet');
-  url.searchParams.set('playlistId', playlistId);
-  url.searchParams.set('maxResults', String(maxResults));
-  url.searchParams.set('key', key);
-
-  return apiFetch(url.toString());
-}
-
-// ── Invidious fallback for search / playlist ──────────────────────────────────
-async function invidiousSearch(q, type = 'video') {
-  const instances = config.youtube.invidiousInstances;
-  const fields = type === 'playlist'
-    ? 'title,playlistId,author,videoCount,videos'
-    : 'title,videoId,author,lengthSeconds,videoThumbnails';
-
-  for (const instance of instances) {
-    try {
-      const url = `${instance}/api/v1/search?q=${encodeURIComponent(q)}&type=${type}&fields=${fields}`;
-      return await apiFetch(url);
-    } catch {
-      // try next instance
-    }
+function parseSong(song) {
+  const img = (song.image || '').replace('150x150', '500x500');
+  // Pick best quality download URL
+  const dlUrls = song.downloadUrl || [];
+  let audioUrl = '';
+  for (const q of ['320kbps', '160kbps', '96kbps']) {
+    const entry = dlUrls.find(d => d.quality === q);
+    if (entry && entry.url) { audioUrl = entry.url; break; }
   }
-  throw new Error('All Invidious search instances failed');
-}
+  if (!audioUrl && dlUrls.length) audioUrl = dlUrls[dlUrls.length - 1]?.url || '';
 
-async function ytdlpGetAudioUrl(videoId) {
-  const instances = config.youtube.invidiousInstances;
-  for (const instance of instances) {
-    try {
-      const url = `${instance}/latest_version?id=${videoId}&itag=140`;
-      const res = await fetch(url, {
-        redirect: 'follow',
-        signal: AbortSignal.timeout(10000),
-      });
-      if (res.ok || res.status === 206) {
-        const finalUrl = res.url; // follow redirect to googlevideo.com
-        console.log(`[VOID invidious] resolved via ${instance}: ${finalUrl.slice(0, 60)}`);
-        return { url: finalUrl, mimeType: 'audio/mp4' };
-      }
-      console.log(`[VOID invidious] ${instance} returned ${res.status}`);
-    } catch(e) {
-      console.log(`[VOID invidious] ${instance} failed: ${e.message}`);
-    }
-  }
-  return null;
+  return {
+    id: song.id,
+    videoId: song.id,          // reuse videoId field so frontend works as-is
+    title: song.name || 'Unknown',
+    artist: (song.primaryArtists || song.artists?.primary?.map(a=>a.name).join(', ') || ''),
+    album: song.album?.name || '',
+    duration: parseInt(song.duration || 0),
+    thumbnail: img,
+    audioUrl,                  // direct 320kbps mp3 URL
+    source: 'jiosaavn',
+  };
 }
 
 // ── Exported controller functions ─────────────────────────────────────────────
 
 exports.search = async (req, res, next) => {
   try {
-    const q          = String(req.query.q   || '').trim();
-    const type       = String(req.query.type || 'video');
-    const maxResults = Math.min(parseInt(req.query.max, 10) || 15, 50);
-
+    const q = String(req.query.q || '').trim();
     if (!q) return res.status(400).json({ error: 'Missing query parameter: q' });
 
-    const cacheKey = `search:${q}:${type}:${maxResults}`;
+    const cacheKey = `saavn_search:${q}`;
     const cached = cacheGet(cacheKey);
     if (cached) return res.json({ ...cached, _cached: true });
 
-    let data;
-    try {
-      data = await ytSearch(q, type, maxResults);
-      if (!data) data = await invidiousSearch(q, type);
-    } catch {
-      data = await invidiousSearch(q, type);
-    }
+    const data = await saavnFetch(`/api/search/songs?query=${encodeURIComponent(q)}&page=1&limit=15`);
+    const songs = (data.data?.results || []).map(parseSong);
+    const result = { items: songs, source: 'jiosaavn' };
 
-    cacheSet(cacheKey, data);
-    res.json(data);
+    cacheSet(cacheKey, result);
+    res.json(result);
   } catch (err) {
     next(err);
   }
@@ -163,85 +78,68 @@ exports.videoDetails = async (req, res, next) => {
     const ids = String(req.query.ids || '').trim();
     if (!ids) return res.status(400).json({ error: 'Missing query parameter: ids' });
 
-    const cacheKey = `video:${ids}`;
+    const cacheKey = `saavn_song:${ids}`;
     const cached = cacheGet(cacheKey);
-    if (cached) return res.json({ ...cached, _cached: true });
+    if (cached) return res.json(cached);
 
-    const data = await ytVideoDetails(ids);
-    if (!data) return res.status(503).json({ error: 'YouTube API key not configured' });
-
-    cacheSet(cacheKey, data);
-    res.json(data);
+    const data = await saavnFetch(`/api/songs/${ids}`);
+    const songs = (data.data || []).map(parseSong);
+    cacheSet(cacheKey, { items: songs });
+    res.json({ items: songs });
   } catch (err) {
     next(err);
   }
 };
 
 exports.playlistItems = async (req, res, next) => {
-  try {
-    const playlistId = String(req.query.id || '').trim();
-    if (!playlistId) return res.status(400).json({ error: 'Missing query parameter: id' });
-
-    const cacheKey = `playlist:${playlistId}`;
-    const cached = cacheGet(cacheKey);
-    if (cached) return res.json({ ...cached, _cached: true });
-
-    let data;
-    try {
-      data = await ytPlaylistItems(playlistId);
-      if (!data) {
-        const instance = config.youtube.invidiousInstances[0];
-        data = await apiFetch(`${instance}/api/v1/playlists/${encodeURIComponent(playlistId)}?fields=title,videos`);
-      }
-    } catch {
-      const instance = config.youtube.invidiousInstances[0];
-      data = await apiFetch(`${instance}/api/v1/playlists/${encodeURIComponent(playlistId)}?fields=title,videos`);
-    }
-
-    cacheSet(cacheKey, data);
-    res.json(data);
-  } catch (err) {
-    next(err);
-  }
+  res.status(501).json({ error: 'Playlist import not supported for JioSaavn yet' });
 };
 
-// ── Stream proxy ──────────────────────────────────────────────────────────────
-// GET /api/youtube/stream?id=VIDEO_ID
-// Returns { url, mimeType } — browser fetches audio from CDN directly.
+// GET /api/youtube/stream?id=SONG_ID
+// Returns { url, mimeType } — client sets audioEl.src directly (no blob download needed)
 exports.streamProxy = async (req, res, next) => {
-  const videoId = String(req.query.id || '').trim();
-  if (!videoId) return res.status(400).json({ error: 'Missing query parameter: id' });
-
-  console.log(`[VOID stream] resolving: ${videoId}`);
+  const songId = String(req.query.id || '').trim();
+  if (!songId) return res.status(400).json({ error: 'Missing id' });
 
   try {
-    const resolved = await ytdlpGetAudioUrl(videoId);
+    const cacheKey = `saavn_url:${songId}`;
+    const cached = cacheGet(cacheKey);
+    if (cached) return res.json(cached);
 
-    if (!resolved) {
-      return res.status(502).json({
-        error: 'Could not resolve audio stream. Try again in a moment.',
-      });
-    }
+    const data = await saavnFetch(`/api/songs/${songId}`);
+    const song = parseSong((data.data || [])[0] || {});
+    if (!song.audioUrl) return res.status(502).json({ error: 'No stream URL found' });
 
-    res.json({ url: resolved.url, mimeType: resolved.mimeType });
-
+    const result = { url: song.audioUrl, mimeType: 'audio/mpeg' };
+    cacheSet(cacheKey, result);
+    res.json(result);
   } catch (e) {
-    console.error('[VOID stream] error:', e.message);
-    if (!res.headersSent) next(e);
+    next(e);
   }
 };
 
+// GET /api/youtube/audio?id=SONG_ID
+// Pipes the audio through the server (for download/cache)
 exports.audioProxy = async (req, res, next) => {
-  const videoId = String(req.query.id || '').trim();
-  if (!videoId) return res.status(400).json({ error: 'Missing id' });
+  const songId = String(req.query.id || '').trim();
+  if (!songId) return res.status(400).json({ error: 'Missing id' });
+
   try {
-    const resolved = await ytdlpGetAudioUrl(videoId);
-    if (!resolved) return res.status(502).send('Stream unavailable');
-    const audioRes = await fetch(resolved.url, { signal: AbortSignal.timeout(30000) });
+    const data = await saavnFetch(`/api/songs/${songId}`);
+    const song = parseSong((data.data || [])[0] || {});
+    if (!song.audioUrl) return res.status(502).send('No audio URL');
+
+    const audioRes = await fetch(song.audioUrl, { signal: AbortSignal.timeout(60000) });
     if (!audioRes.ok) return res.status(502).send('Upstream failed');
-    res.setHeader('Content-Type', resolved.mimeType);
+
+    res.setHeader('Content-Type', 'audio/mpeg');
+    const contentLength = audioRes.headers.get('Content-Length');
+    if (contentLength) res.setHeader('Content-Length', contentLength);
     res.setHeader('Accept-Ranges', 'bytes');
+
     const buf = await audioRes.arrayBuffer();
     res.send(Buffer.from(buf));
-  } catch(e) { next(e); }
+  } catch (e) {
+    next(e);
+  }
 };
