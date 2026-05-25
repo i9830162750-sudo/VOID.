@@ -16,7 +16,7 @@ function cacheSet(key, data) {
   cache.set(key, { data, ts: Date.now() });
 }
 
-const SAAVN_API = 'https://saavnapi-nine.vercel.app';
+const SAAVN_API = 'https://jiosaavn-api-h375.onrender.com';
 
 async function saavnFetch(path) {
   const res = await fetch(`${SAAVN_API}${path}`, {
