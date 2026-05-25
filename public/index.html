@@ -4650,7 +4650,7 @@ function makeTrackCard(t, ri, size='track') {
     <div class="${artClass}${isNP?' is-playing':''}">
       ${thumb?`<img src="${thumb}" alt="" loading="lazy">`:`<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`}
       ${isNP&&isPlaying?`<div class="playing-indicator"><div class="playing-bars"><span></span><span></span><span></span></div></div>`:''}
-      ${t.isOnline?`<div class="${size==='track'?'feed-yt-badge':'feed-card-yt'}">YT</div>`:''}
+      ${t.isOnline&&!t.ytMeta?`<div class="${size==='track'?'feed-yt-badge':'feed-card-yt'}">SC</div>`:''}
     </div>
     <div class="${labelClass}">${esc(t.title)}</div>
     <div class="${subClass}">${esc(t.artist)}</div>
@@ -5004,7 +5004,7 @@ function openSeeAll(key) {
     return `<div class="track-item${isNP?' playing':''}" onclick="playTrack(${ri})">
       <div class="track-thumb">${thumb?`<img src="${thumb}" alt="" loading="lazy">`:`<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:18px;height:18px;color:var(--text3)"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`}${isNP&&isPlaying?`<div class="playing-indicator"><div class="playing-bars"><span></span><span></span><span></span></div></div>`:''}</div>
       <div class="track-info"><div class="track-title">${esc(t.title)}</div><div class="track-artist">${esc(t.artist)}</div></div>
-      ${t.isOnline?'<div class="track-online-badge">YT</div>':''}
+      ${(!t.isOnline && t.ytMeta)?'<div class="track-yt-dot"></div>':''}
       <div class="track-dur">${fmtTime(t.duration)}</div>
       <button class="track-more-btn" onclick="event.stopPropagation();openCtxMenu(${ri})">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="5" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="19" r="1" fill="currentColor"/></svg>
@@ -5245,7 +5245,7 @@ function renderTrackList(filter='') {
       <div class="track-thumb">${thumb?`<img src="${thumb}" alt="" loading="lazy" decoding="async">`:`<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:18px;height:18px;color:var(--text3)"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`}${isNP&&isPlaying?`<div class="playing-indicator"><div class="playing-bars"><span></span><span></span><span></span></div></div>`:''}</div>
       <div class="track-info"><div class="track-title">${esc(t.title)}</div><div class="track-artist">${esc(t.artist)}</div></div>
       ${isFav?'<div class="track-fav-dot"></div>':''}
-      ${t.isOnline?'<div class="track-online-badge">YT</div>':t.ytMeta?'<div class="track-yt-dot"></div>':''}
+      ${t.isOnline?'':t.ytMeta?'<div class="track-yt-dot"></div>':''}
       <div class="track-dur">${fmtTime(t.duration)}</div>
       <button class="track-more-btn" onclick="event.stopPropagation();openCtxMenu(${ri})">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="5" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="19" r="1" fill="currentColor"/></svg>
@@ -5265,7 +5265,7 @@ function renderTrackList(filter='') {
           <div class="track-thumb">${thumb?`<img src="${thumb}" alt="" loading="lazy" decoding="async">`:`<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:18px;height:18px;color:var(--text3)"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`}${isNP&&isPlaying?`<div class="playing-indicator"><div class="playing-bars"><span></span><span></span><span></span></div></div>`:''}</div>
           <div class="track-info"><div class="track-title">${esc(t.title)}</div><div class="track-artist">${esc(t.artist)}</div></div>
           ${isFav?'<div class="track-fav-dot"></div>':''}
-          ${t.isOnline?'<div class="track-online-badge">YT</div>':t.ytMeta?'<div class="track-yt-dot"></div>':''}
+          ${(!t.isOnline && t.ytMeta)?'<div class="track-yt-dot"></div>':''}
           <div class="track-dur">${fmtTime(t.duration)}</div>
           <button class="track-more-btn" onclick="event.stopPropagation();openCtxMenu(${ri})">
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="5" r="1" fill="currentColor"/><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="12" cy="19" r="1" fill="currentColor"/></svg>
@@ -5302,7 +5302,7 @@ function renderQueueList() {
     <div class="track-item queue-item-np" onclick="openNowPlaying()">
       <div class="track-thumb">${thumb?`<img src="${thumb}" alt="" loading="lazy">`:`<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:18px;height:18px;color:var(--text3)"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`}<div class="playing-indicator"><div class="playing-bars"><span></span><span></span><span></span></div></div></div>
       <div class="track-info"><div class="track-title" style="color:var(--accent)">${esc(t.title)}</div><div class="track-artist">${esc(t.artist)}</div></div>
-      ${t.isOnline?'<div class="track-online-badge">YT</div>':''}
+      ${(!t.isOnline && t.ytMeta)?'<div class="track-yt-dot"></div>':''}
       <div class="track-dur">${fmtTime(t.duration)}</div>
     </div>`;
   }
@@ -5462,7 +5462,7 @@ function renderPlaylistDetail() {
         <div class="track-drag-handle"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/></svg></div>
         <div class="track-thumb">${thumb?`<img src="${thumb}" alt="" loading="lazy">`:`<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:18px;height:18px;color:var(--text3)"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`}${isNP&&isPlaying?`<div class="playing-indicator"><div class="playing-bars"><span></span><span></span><span></span></div></div>`:''}</div>
         <div class="track-info"><div class="track-title">${esc(t.title)}</div><div class="track-artist">${esc(t.artist)}</div></div>
-        ${t.isOnline?'<div class="track-online-badge">YT</div>':''}
+        ${(!t.isOnline && t.ytMeta)?'<div class="track-yt-dot"></div>':''}
         <div class="track-dur">${fmtTime(t.duration)}</div>
         <button class="track-more-btn" onclick="event.stopPropagation();removePlTrack('${pl.id}','${t.id}')">
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -5674,13 +5674,13 @@ function openCtxMenu(ri) {
   document.getElementById('ctx-items-standard').style.display='block';
   document.getElementById('ctx-pl-picker').style.display='none';
   document.getElementById('ctx-pl-picker').innerHTML='';
-  // Show download option only if track has a YT source
+  // Show download option for tracks with a YT source OR that are currently online/streaming
   const dlItem = document.getElementById('ctx-download-item');
   if (dlItem) {
     const hasYT = !!(t.ytMeta && t.ytMeta.videoId);
     dlItem.style.display = hasYT ? 'flex' : 'none';
     const dlLabel = document.getElementById('ctx-download-label');
-    if (dlLabel) dlLabel.textContent = (t.url && !t.isOnline) ? 'Cached ✓' : 'Download & Cache';
+    if (dlLabel) dlLabel.textContent = (t.url && !t.isOnline) ? 'Downloaded ✓' : 'Download & Cache';
   }
   document.getElementById('ctx-overlay').classList.add('open');
 }
@@ -5711,10 +5711,8 @@ function ctxSearchYT() {
 async function ctxDownload() {
   const t = tracks[ctxTrackIndex]; if (!t) return;
   if (!t.ytMeta || !t.ytMeta.videoId) { closeCtxMenu(); showToast('No YouTube source — search YouTube first'); return; }
-  if (t.url && !t.isOnline) { closeCtxMenu(); showToast('Already cached locally'); return; }
   closeCtxMenu();
-  showToast('Downloading…');
-  await ytFetchAndPlay(ctxTrackIndex);
+  await ytDownloadAndCache(ctxTrackIndex);
 }
 
 function ctxRemove() {
@@ -6298,7 +6296,8 @@ function renderYTResults(data, query) {
       const localT=v.localMatch;
       const isMatched=!!(localT&&localT.ytMeta&&localT.ytMeta.videoId===v.videoId);
       const dlId='dl_'+v.videoId;
-      return `<div class="yt-result-item" style="cursor:pointer" onclick="ytDownloadTrack(${vi},'${dlId}')">
+      const isCached = !!(localT && localT.url && !localT.isOnline);
+      return `<div class="yt-result-item" style="cursor:pointer" onclick="ytAddAndStream(${vi})">
         <div class="yt-thumb" style="position:relative">
           ${v.thumbnail?`<img src="${v.thumbnail}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">`:`<div class="yt-thumb-placeholder"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:var(--yt);width:22px;height:22px"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16" fill="var(--yt)" stroke="none"/></svg></div>`}
           <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.3);border-radius:inherit;opacity:0;transition:opacity 0.15s" class="yt-hover-play"><svg fill="var(--accent)" viewBox="0 0 24 24" style="width:22px;height:22px"><polygon points="5,3 19,12 5,21"/></svg></div>
@@ -6316,9 +6315,15 @@ function renderYTResults(data, query) {
             :`<button class="yt-result-btn" onclick="event.stopPropagation();ytOpenMatchPicker(${vi},'${esc(query)}')" title="Match to library track">
                 <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               </button>`}
-          <div id="${dlId}" style="display:none"><div class="yt-dl-progress" style="width:0%"></div></div>
+          <button class="yt-result-btn${isCached?' dl-done':''}" id="${dlId}" onclick="event.stopPropagation();ytDownloadTrack(${vi},'${dlId}')" title="${isCached?'Cached ✓':'Download & cache'}">
+            ${isCached
+              ? `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>`
+              : `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`}
+            <div class="yt-dl-progress" style="width:0%"></div>
+          </button>
         </div>
       </div>`;
+    }).join('');
     }).join('');
 
     const relatedTerms=ytResults.slice(0,6).map(v=>v.artist).filter((a,i,arr)=>a&&arr.indexOf(a)===i).slice(0,5);
@@ -6344,37 +6349,25 @@ function ytQuickSearch(term) {
 }
 
 // ==============================
-// YOUTUBE — FETCH & PLAY (download blob, then play)
+// YOUTUBE — STREAM & PLAY (stream without downloading)
 // ==============================
-// Single entry point for all YT audio. Fetches via Invidious proxy,
-// caches as blob in IndexedDB, then plays. No raw CDN streaming.
+// Streams audio directly without caching as blob. Call ytDownloadAndCache() to explicitly download.
 async function ytFetchAndPlay(trackIdx) {
   const t = tracks[trackIdx];
 
   // Route SoundCloud tracks to the SC stream endpoint
   if (t && t.scMeta && t.scMeta.trackId) {
 
-    // Already resolved stream URL
+    // Already resolved stream URL (in-memory cache)
     if (t.streamUrl) {
-
       audioEl.src = t.streamUrl;
-
       initAudioContext();
-
-      if (audioCtx && audioCtx.state === 'suspended') {
-        await audioCtx.resume();
-      }
-
+      if (audioCtx && audioCtx.state === 'suspended') await audioCtx.resume();
       audioEl.playbackRate = playbackSpeed;
-
       await audioEl.play();
-
       isPlaying = true;
-
-      updateUI();
-      renderTrackList();
-      renderQueueList();
-
+      updateUI(); renderTrackList(); renderQueueList();
+      addToRecent(t.id); saveSettings();
       return;
     }
 
@@ -6382,54 +6375,32 @@ async function ytFetchAndPlay(trackIdx) {
     updateBufferingUI(true);
 
     try {
-
       const r = await fetch(
         `${VOID_API_BASE}/soundcloud/stream?id=${encodeURIComponent(t.scMeta.trackId)}`,
         { signal: AbortSignal.timeout(15000) }
       );
-
-      if (!r.ok) {
-        throw new Error(`SC stream HTTP ${r.status}`);
-      }
-
+      if (!r.ok) throw new Error(`SC stream HTTP ${r.status}`);
       const { url } = await r.json();
-      console.log('SC URL:', url);
-      if (!url) {
-        throw new Error('No audio URL returned');
-      }
+      if (!url) throw new Error('No audio URL returned');
 
-      // Cache resolved stream URL
+      // Cache resolved stream URL in memory for this session
       t.streamUrl = url;
-
       showToast('▶ Streaming: ' + t.title);
-
-      audioEl.src = t.streamUrl;
-
-      initAudioContext();
-
-      if (audioCtx && audioCtx.state === 'suspended') {
-        await audioCtx.resume();
-      }
-
-      audioEl.playbackRate = playbackSpeed;
-
-      await audioEl.play();
-
-      isPlaying = true;
-
-      updateUI();
-      renderTrackList();
-      renderQueueList();
-
-    } catch(e) {
-
       updateBufferingUI(false);
 
+      audioEl.src = t.streamUrl;
+      initAudioContext();
+      if (audioCtx && audioCtx.state === 'suspended') await audioCtx.resume();
+      audioEl.playbackRate = playbackSpeed;
+      await audioEl.play();
+      isPlaying = true;
+      updateUI(); renderTrackList(); renderQueueList();
+      addToRecent(t.id); saveSettings();
+    } catch(e) {
+      updateBufferingUI(false);
       showToast('⚠ SC stream failed: ' + (e.message || 'Unknown error'));
-
       console.error('SoundCloud stream error:', e);
     }
-
     return;
   }
 
@@ -6440,18 +6411,68 @@ async function ytFetchAndPlay(trackIdx) {
     return;
   }
 
-  // Already downloaded and cached — just play
+  // Already downloaded and cached locally — just play blob
   if (t.url && !t.isOnline) {
     _playBlob(trackIdx);
     return;
   }
 
-  showToast('Fetching audio…');
+  // Already have a stream URL cached in memory — just play
+  if (t.streamUrl) {
+    audioEl.src = t.streamUrl;
+    initAudioContext();
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    audioEl.playbackRate = playbackSpeed;
+    audioEl.play().catch(() => showToast('Tap play to start'));
+    isPlaying = true;
+    updateUI(); renderTrackList(); renderQueueList();
+    addToRecent(t.id); saveSettings();
+    return;
+  }
+
+  // Fetch stream URL and play directly (no blob download)
+  showToast('▶ Loading stream…');
   updateBufferingUI(true);
 
   try {
+    const streamResp = await fetch(`${VOID_API_BASE}/youtube/stream?id=${encodeURIComponent(t.ytMeta.videoId)}`, { signal: AbortSignal.timeout(15000) });
+    if (!streamResp.ok) throw new Error(`Stream resolve failed: HTTP ${streamResp.status}`);
+    const { url } = await streamResp.json();
+    if (!url) throw new Error('No audio URL returned');
 
-    const { blobUrl, blobId, mimeType } = await ytFetchBlob(
+    // Cache stream URL in memory for this session
+    t.streamUrl = url;
+    updateBufferingUI(false);
+    showToast('▶ Streaming: ' + t.title);
+
+    audioEl.src = url;
+    initAudioContext();
+    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+    audioEl.playbackRate = playbackSpeed;
+    audioEl.play().catch(() => showToast('Tap play to start'));
+    isPlaying = true;
+    updateUI(); renderTrackList(); renderQueueList();
+    addToRecent(t.id); saveSettings();
+  } catch(e) {
+    updateBufferingUI(false);
+    showToast('⚠ Could not load stream: ' + (e.message || 'Try again'));
+    console.error('ytFetchAndPlay (stream):', e);
+  }
+}
+
+// ==============================
+// YOUTUBE — DOWNLOAD & CACHE (explicit, user-triggered only)
+// ==============================
+async function ytDownloadAndCache(trackIdx) {
+  const t = tracks[trackIdx];
+  if (!t || !t.ytMeta || !t.ytMeta.videoId) { showToast('No YouTube source'); return; }
+  if (t.url && !t.isOnline) { showToast('Already cached locally ✓'); return; }
+
+  showToast('Downloading…');
+  updateBufferingUI(true);
+
+  try {
+    const { blobUrl, blobId } = await ytFetchBlob(
       t.ytMeta.videoId,
       (pct) => showToast(`Downloading… ${pct}%`)
     );
@@ -6460,33 +6481,30 @@ async function ytFetchAndPlay(trackIdx) {
     t.url = blobUrl;
     t.blobId = blobId;
     t.isOnline = false;
+    t.streamUrl = null; // use blob from now on
 
-    // Persist
     await dbPut('tracks', {
-      id: t.id,
-      blobId,
-      title: t.title,
-      artist: t.artist,
-      duration: t.duration,
-      cover: null,
-      isFav: t.isFav,
-      isOnline: false,
-      ytMeta: t.ytMeta,
+      id: t.id, blobId,
+      title: t.title, artist: t.artist, duration: t.duration,
+      cover: null, isFav: t.isFav, isOnline: false, ytMeta: t.ytMeta,
     });
 
-    saveSettings();
-
-    showToast('▶ Playing: ' + t.title);
-
-    _playBlob(trackIdx);
-
-  } catch(e) {
-
     updateBufferingUI(false);
+    saveSettings();
+    renderAll();
+    showToast('✓ Downloaded & cached: ' + t.title);
 
-    showToast('⚠ Could not load audio: ' + (e.message || 'Try again'));
-
-    console.error('ytFetchAndPlay:', e);
+    // If this is the current track, switch to blob playback
+    if (trackIdx === currentIndex) {
+      audioEl.src = blobUrl;
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      audioEl.playbackRate = playbackSpeed;
+      audioEl.play().catch(() => {});
+    }
+  } catch(e) {
+    updateBufferingUI(false);
+    showToast('⚠ Download failed: ' + (e.message || 'Try again'));
+    console.error('ytDownloadAndCache:', e);
   }
 }
 
@@ -6535,6 +6553,44 @@ async function ytFetchBlob(videoId, onProgress) {
 // ==============================
 // YOUTUBE — DOWNLOAD button (same as play but explicit)
 // ==============================
+// Add a YT search result as an online track and stream it (no blob download)
+async function ytAddAndStream(ytResultIdx) {
+  const v = (window._ytLastResults||[])[ytResultIdx]; if (!v||!v.videoId) return;
+
+  // Already cached locally — just play
+  const existing = tracks.find(t => t.ytMeta && t.ytMeta.videoId === v.videoId);
+  if (existing && existing.url && !existing.isOnline) {
+    playTrack(tracks.indexOf(existing));
+    return;
+  }
+
+  // Create or reuse track entry
+  let t = existing;
+  let tIdx;
+  if (!t) {
+    const id = 'track_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+    t = {
+      id, blobId: null, title: v.title, artist: v.artist,
+      duration: v.duration, cover: null, isFav: false, isOnline: true,
+      ytMeta: { videoId: v.videoId, thumbnail: v.thumbnail, channelTitle: v.artist, title: v.title },
+      url: null, streamUrl: null,
+    };
+    tracks.push(t);
+    tIdx = tracks.length - 1;
+    // Persist as online track
+    await dbPut('tracks', {
+      id: t.id, blobId: null, title: t.title, artist: t.artist,
+      duration: t.duration, cover: null, isFav: false, isOnline: true, ytMeta: t.ytMeta,
+    });
+    saveSettings();
+  } else {
+    tIdx = tracks.indexOf(t);
+  }
+
+  renderAll();
+  playTrack(tIdx);
+}
+
 async function ytDownloadTrack(ytResultIdx, btnId) {
   const v = (window._ytLastResults||[])[ytResultIdx]; if (!v||!v.videoId) return;
   const btn = document.getElementById(btnId);
@@ -6542,8 +6598,7 @@ async function ytDownloadTrack(ytResultIdx, btnId) {
   // Already cached locally
   const existing = tracks.find(t => t.ytMeta && t.ytMeta.videoId === v.videoId);
   if (existing && existing.url && !existing.isOnline) {
-    showToast('Already cached — playing');
-    playTrack(tracks.indexOf(existing));
+    showToast('Already cached ✓');
     return;
   }
 
@@ -6561,7 +6616,7 @@ async function ytDownloadTrack(ytResultIdx, btnId) {
         id, blobId: null, title: v.title, artist: v.artist,
         duration: v.duration, cover: null, isFav: false, isOnline: true,
         ytMeta: { videoId: v.videoId, thumbnail: v.thumbnail, channelTitle: v.artist, title: v.title },
-        url: null,
+        url: null, streamUrl: null,
       };
       tracks.push(t);
       tIdx = tracks.length - 1;
@@ -6576,6 +6631,7 @@ async function ytDownloadTrack(ytResultIdx, btnId) {
     t.url = blobUrl;
     t.blobId = blobId;
     t.isOnline = false;
+    t.streamUrl = null;
 
     await dbPut('tracks', {
       id: t.id, blobId, title: t.title, artist: t.artist,
@@ -6587,27 +6643,25 @@ async function ytDownloadTrack(ytResultIdx, btnId) {
     setTimeout(() => {
       btn.classList.remove('downloading');
       btn.classList.add('dl-done');
-      btn.title = 'Cached — playing';
+      btn.title = 'Cached ✓';
       btn.innerHTML = `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>`;
     }, 300);
 
     renderAll(); saveSettings();
-    showToast('\u2713 Cached & playing: ' + t.title);
-    playTrack(tIdx);
+    showToast('✓ Downloaded & cached: ' + t.title);
+    // If currently streaming this track, switch to blob
+    if (currentIndex === tIdx) {
+      audioEl.src = blobUrl;
+      if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      audioEl.playbackRate = playbackSpeed;
+      if (isPlaying) audioEl.play().catch(() => {});
+    }
   } catch(e) {
     btn.classList.remove('downloading');
     if (prog) prog.style.width = '0%';
     showToast('Failed: ' + (e.message || 'Try again'));
     console.error(e);
   }
-}
-
-// ==============================
-// YOUTUBE — STREAM button (now also download-then-play)
-// ==============================
-function ytStreamTrack(ytResultIdx, btnId) {
-  // Just proxy to download — streaming doesn't work reliably in browser
-  ytDownloadTrack(ytResultIdx, btnId);
 }
 // YOUTUBE — MATCH SYSTEM
 // ==============================
