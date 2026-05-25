@@ -3297,8 +3297,6 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
           <button class="yt-filter-btn active" data-filter="all" onclick="ytSetFilter('all')">All</button>
           <button class="yt-filter-btn" data-filter="song" onclick="ytSetFilter('song')">Songs</button>
           <button class="yt-filter-btn" data-filter="artist" onclick="ytSetFilter('artist')">Artists</button>
-          <button class="yt-filter-btn" data-filter="album" onclick="ytSetFilter('album')">Albums</button>
-          <button class="yt-filter-btn" data-filter="playlist" onclick="ytSetFilter('playlist')">Playlists</button>
         </div>
       </div>
       <!-- YT results section -->
@@ -3336,26 +3334,13 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
         </div>
       </div>
 
-      <!-- API KEY SECTION -->
-      <div class="yt-api-section" id="yt-api-section">
-        <div class="yt-api-section-title">YouTube API Key</div>
-        <div class="yt-api-row">
-          <input class="yt-api-input" id="yt-api-key-input" type="password" placeholder="AIzaSy… (pre-configured)" autocomplete="off">
-          <button class="yt-api-save-btn" onclick="ytSaveApiKey()">Save</button>
-        </div>
-        <div class="yt-api-status" id="yt-api-status">
-          <div class="yt-status-dot" id="yt-api-dot"></div>
-          <span id="yt-api-status-text">Loading…</span>
-        </div>
-      </div>
-
+      <!-- JIOSAAVN — no API key needed -->
+       
       <!-- SEARCH FILTERS -->
       <div class="yt-filter-row">
         <button class="yt-filter-btn active" data-filter="all" onclick="ytSetFilter('all')">All</button>
         <button class="yt-filter-btn" data-filter="song" onclick="ytSetFilter('song')">Songs</button>
         <button class="yt-filter-btn" data-filter="artist" onclick="ytSetFilter('artist')">Artists</button>
-        <button class="yt-filter-btn" data-filter="album" onclick="ytSetFilter('album')">Albums</button>
-        <button class="yt-filter-btn" data-filter="playlist" onclick="ytSetFilter('playlist')">Playlists</button>
       </div>
 
       <div class="yt-search-bar">
@@ -6042,106 +6027,28 @@ async function ytDoSearch(query, force=false) {
 }
 
 async function ytFetchResults(query) {
-  const localMatches=ytFindLocalMatches(query);
-  const effectiveQ=ytFilterToQuery(query);
-  const isPlaylistFilter=ytActiveFilter==='playlist';
-  let ytResults=[], ytPlaylistResults=[];
+  const localMatches = ytFindLocalMatches(query);
+  let ytResults = [], ytPlaylistResults = [];
 
-  // Route through backend proxy (required when served via Express — CSP blocks direct fetches)
-  if (VOID_USE_BACKEND_PROXY) {
-    try {
-      const type=isPlaylistFilter?'playlist':'video';
-      const resp=await fetch(`${VOID_API_BASE}/youtube/search?q=${encodeURIComponent(effectiveQ)}&type=${type}&max=15`,{signal:AbortSignal.timeout(12000)});
-      if (resp.ok) {
-        const data=await resp.json();
-        const items=Array.isArray(data)?data:(data.items||[]);
-        if (isPlaylistFilter) {
-          ytPlaylistResults=items.map(item=>({
-            playlistId:item.playlistId||item.id?.playlistId,
-            title:item.title||item.snippet?.title||'Unknown',
-            artist:item.author||item.snippet?.channelTitle||'',
-            thumbnail:item.playlistThumbnail||item.snippet?.thumbnails?.medium?.url||null,
-            videoCount:item.videoCount||null,
-          })).filter(p=>p.playlistId);
-        } else {
-          ytResults=items.map(item=>({
-            videoId:item.videoId||item.id?.videoId,
-            title:item.title||item.snippet?.title||'Unknown',
-            artist:item.author||item.snippet?.channelTitle||'',
-            duration:item.lengthSeconds||0,
-            thumbnail:item.videoThumbnails?(item.videoThumbnails.find(t=>t.quality==='medium')?.url||item.videoThumbnails[0]?.url):item.snippet?.thumbnails?.medium?.url||null,
-            localMatch:ytFindExactLocalMatch(item.title||item.snippet?.title||'',item.author||item.snippet?.channelTitle||''),
-          })).filter(v=>v.videoId);
-        }
-        return {ytResults,ytPlaylistResults,localMatches,source:'proxy'};
-      }
-    } catch(e) { console.warn('[VOID search proxy]',e.message); }
-    return {ytResults,ytPlaylistResults,localMatches,source:'none'};
-  }
+  try {
+    const resp = await fetch(`${VOID_API_BASE}/youtube/search?q=${encodeURIComponent(query)}&max=15`, { signal: AbortSignal.timeout(12000) });
+    if (resp.ok) {
+      const data = await resp.json();
+      const items = data.items || [];
+      ytResults = items.map(item => ({
+        videoId: item.id,
+        title: item.title || 'Unknown',
+        artist: item.artist || '',
+        album: item.album || '',
+        duration: item.duration || 0,
+        thumbnail: item.thumbnail || null,
+        audioUrl: item.audioUrl || null,
+        localMatch: ytFindExactLocalMatch(item.title || '', item.artist || ''),
+      }));
+    }
+  } catch(e) { console.warn('[VOID saavn search]', e.message); }
 
-  if (ytApiKey) {
-    try {
-      const videoType=isPlaylistFilter?'playlist':'video';
-      const resp=await fetch(
-        `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(effectiveQ)}&type=${videoType}&maxResults=15&key=${encodeURIComponent(ytApiKey)}`,
-        {signal:AbortSignal.timeout(8000)}
-      );
-      if (resp.ok) {
-        const data=await resp.json();
-        const items=data.items||[];
-        if (isPlaylistFilter) {
-          ytPlaylistResults=items.map(item=>({
-            playlistId:item.id.playlistId,
-            title:item.snippet.title||'Unknown',
-            artist:item.snippet.channelTitle||'',
-            thumbnail:item.snippet.thumbnails?.medium?.url||item.snippet.thumbnails?.default?.url||null,
-            videoCount:null,
-          }));
-        } else {
-          const videoIds=items.map(i=>i.id.videoId).filter(Boolean).join(',');
-          let durMap={};
-          if (videoIds) {
-            try {
-              const dr=await fetch(`https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${videoIds}&key=${encodeURIComponent(ytApiKey)}`,{signal:AbortSignal.timeout(5000)});
-              if (dr.ok) { const dd=await dr.json(); (dd.items||[]).forEach(v=>{durMap[v.id]=ytIso8601ToDur(v.contentDetails?.duration||'');}); }
-            } catch(e) {}
-          }
-          ytResults=items.filter(i=>i.id.videoId).map(item=>({
-            videoId:item.id.videoId,
-            title:item.snippet.title||'Unknown',
-            artist:item.snippet.channelTitle||'',
-            duration:durMap[item.id.videoId]||0,
-            thumbnail:item.snippet.thumbnails?.medium?.url||item.snippet.thumbnails?.default?.url||null,
-            localMatch:ytFindExactLocalMatch(item.snippet.title,item.snippet.channelTitle),
-          }));
-        }
-        return {ytResults,ytPlaylistResults,localMatches,source:'yt_api'};
-      }
-    } catch(e) {}
-  }
-
-  // Invidious fallback
-  const type=isPlaylistFilter?'playlist':'video';
-  const fields=isPlaylistFilter?'playlistId,title,author,videoCount,playlistThumbnail':'videoId,title,author,lengthSeconds,videoThumbnails';
-  for (const instance of YT_INVIDIOUS) {
-    try {
-      const resp=await fetch(`${instance}/api/v1/search?q=${encodeURIComponent(effectiveQ)}&type=${type}&fields=${fields}`,{signal:AbortSignal.timeout(7000)});
-      if (!resp.ok) continue;
-      const data=await resp.json();
-      if (!Array.isArray(data)||!data.length) continue;
-      if (isPlaylistFilter) {
-        ytPlaylistResults=data.slice(0,12).map(p=>({playlistId:p.playlistId,title:p.title||'Unknown',artist:p.author||'',thumbnail:p.playlistThumbnail||null,videoCount:p.videoCount||null}));
-      } else {
-        ytResults=data.slice(0,15).map(v=>({
-          videoId:v.videoId,title:v.title||'Unknown',artist:v.author||'',duration:v.lengthSeconds||0,
-          thumbnail:v.videoThumbnails?(v.videoThumbnails.find(t=>t.quality==='medium')?.url||v.videoThumbnails[0]?.url):null,
-          localMatch:ytFindExactLocalMatch(v.title,v.author),
-        }));
-      }
-      return {ytResults,ytPlaylistResults,localMatches,source:'invidious'};
-    } catch(e) { continue; }
-  }
-  return {ytResults,ytPlaylistResults,localMatches,source:'none'};
+  return { ytResults, ytPlaylistResults, localMatches, source: 'jiosaavn' };
 }
 
 function ytIso8601ToDur(iso) {
@@ -6331,61 +6238,31 @@ function _playBlob(trackIdx) {
 
 // Fetches audio via Invidious proxy, returns {blobUrl, blobId, mimeType}
 async function ytFetchBlob(videoId, onProgress) {
-  const errors = [];
+  // videoId is the JioSaavn song ID
+  // First get the direct MP3 URL from backend
+  const streamResp = await fetch(`${VOID_API_BASE}/youtube/stream?id=${encodeURIComponent(videoId)}`, { signal: AbortSignal.timeout(15000) });
+  if (!streamResp.ok) throw new Error(`Stream resolve failed: HTTP ${streamResp.status}`);
+  const { url, mimeType } = await streamResp.json();
+  if (!url) throw new Error('No audio URL returned');
 
-  // Route through backend audio proxy when running under Express
-  if (VOID_USE_BACKEND_PROXY) {
-    const resp = await fetch(`${VOID_API_BASE}/youtube/audio?id=${encodeURIComponent(videoId)}`, { signal: AbortSignal.timeout(120000) });
-    if (!resp.ok) throw new Error(`Backend audio proxy failed: HTTP ${resp.status}`);
-    const total = parseInt(resp.headers.get('Content-Length') || '0');
-    const reader = resp.body.getReader();
-    const chunks = [];
-    let received = 0;
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      chunks.push(value);
-      received += value.length;
-      if (total && onProgress) onProgress(Math.round((received / total) * 100));
-    }
-    const mimeType = resp.headers.get('Content-Type') || 'audio/mp4';
-    const blob = new Blob(chunks, { type: mimeType });
-    const blobId = 'blob_yt_' + videoId + '_' + Date.now();
-    await dbPut('blobs', { id: blobId, blob });
-    return { blobUrl: URL.createObjectURL(blob), blobId, mimeType };
+  // Fetch the actual audio and store as blob
+  const resp = await fetch(url, { signal: AbortSignal.timeout(120000) });
+  if (!resp.ok) throw new Error(`Audio fetch failed: HTTP ${resp.status}`);
+  const total = parseInt(resp.headers.get('Content-Length') || '0');
+  const reader = resp.body.getReader();
+  const chunks = [];
+  let received = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    received += value.length;
+    if (total && onProgress) onProgress(Math.round((received / total) * 100));
   }
-
-  for (const inst of YT_INVIDIOUS) {
-    // Try audio-only itags: 251=opus, 140=m4a, 250=opus-low, 18=mp4-360p
-    for (const itag of [251, 140, 250, 18]) {
-      const url = `${inst}/latest_version?id=${encodeURIComponent(videoId)}&itag=${itag}&local=true`;
-      try {
-        const resp = await fetch(url, { signal: AbortSignal.timeout(30000) });
-        if (!resp.ok) { errors.push(`${inst} ${itag}: HTTP ${resp.status}`); continue; }
-
-        // Stream with progress
-        const total = parseInt(resp.headers.get('Content-Length') || '0');
-        const reader = resp.body.getReader();
-        const chunks = [];
-        let received = 0;
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          chunks.push(value);
-          received += value.length;
-          if (total && onProgress) onProgress(Math.round((received / total) * 100));
-        }
-
-        const mimeType = itag === 251 || itag === 250 ? 'audio/webm' : 'audio/mp4';
-        const blob = new Blob(chunks, { type: mimeType });
-        const blobId = 'blob_yt_' + videoId + '_' + Date.now();
-        await dbPut('blobs', { id: blobId, blob });
-        return { blobUrl: URL.createObjectURL(blob), blobId, mimeType };
-      } catch(e) { errors.push(`${inst} ${itag}: ${e.message}`); }
-    }
-  }
-
-  throw new Error('All sources failed: ' + errors.slice(0,3).join('; '));
+  const blob = new Blob(chunks, { type: mimeType || 'audio/mpeg' });
+  const blobId = 'blob_saavn_' + videoId + '_' + Date.now();
+  await dbPut('blobs', { id: blobId, blob });
+  return { blobUrl: URL.createObjectURL(blob), blobId, mimeType: mimeType || 'audio/mpeg' };
 }
 
 // ==============================
