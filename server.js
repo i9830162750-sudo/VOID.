@@ -41,7 +41,7 @@ app.use(
         fontSrc:     ["'self'", 'https://fonts.gstatic.com'],
         imgSrc:      ["'self'", 'data:', 'https://*.ytimg.com', 'https://*.ggpht.com', 'https://*.saavncdn.com', 'https://*.jiosaavn.com', 'https://*.sndcdn.com'],
         connectSrc:  ["'self'", 'https://cdnjs.cloudflare.com', 'https://*.saavncdn.com'],
-        mediaSrc:    ["'self'", 'blob:', 'https://*.saavncdn.com'],
+        mediaSrc:    ["'self'", 'blob:', 'https://*.saavncdn.com', 'https://cf-media.sndcdn.com'],
         workerSrc:   ["'self'"],
         manifestSrc: ["'self'"],
       },
