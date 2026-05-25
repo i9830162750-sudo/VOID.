@@ -1,4 +1,4 @@
-const CACHE = 'void-v8';
+const CACHE = 'void-v9';
 const ASSETS = [
   '/',
   '/index.html',
@@ -27,17 +27,25 @@ self.addEventListener('fetch', e => {
 
   const url = new URL(e.request.url);
 
-  // Never cache: YouTube / Google API calls or our own /api/* backend routes
+  // Only handle http(s) — skip chrome-extension://, data:, blob:, etc.
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+
+  // Never cache: API calls, Google services, CDNs, external audio
   if (
     url.hostname.includes('youtube.com') ||
     url.hostname.includes('ytimg.com') ||
     url.hostname.includes('googleapis.com') ||
     url.hostname.includes('googlevideo.com') ||
+    url.hostname.includes('googleusercontent.com') ||
     url.hostname.includes('fonts.googleapis.com') ||
     url.hostname.includes('fonts.gstatic.com') ||
+    url.hostname.includes('sndcdn.com') ||
+    url.hostname.includes('saavncdn.com') ||
+    url.hostname.includes('cdnjs.cloudflare.com') ||
+    url.hostname.includes('jsdelivr.net') ||
     url.pathname.startsWith('/api/')
   ) {
-    return; // fall through to network
+    return; // fall through to network, no SW involvement
   }
 
   // Cache-first for app shell assets
