@@ -6393,7 +6393,7 @@ async function ytFetchAndPlay(trackIdx) {
       }
 
       const { url } = await r.json();
-
+      console.log('SC URL:', url);
       if (!url) {
         throw new Error('No audio URL returned');
       }
