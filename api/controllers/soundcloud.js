@@ -72,7 +72,7 @@ exports.streamProxy = async (req, res, next) => {
     const cached = cacheGet(cacheKey);
     if (cached) return res.json(cached);
 
-    const data = await scFetch(`/stream/${trackId}`);
+    const data = await scFetch(`/stream?id=${trackId}`);
     const url = data.url || data.stream_url || data.audioUrl || '';
     if (!url) return res.status(502).json({ error: 'No stream URL found' });
 
@@ -90,7 +90,7 @@ exports.audioProxy = async (req, res, next) => {
   if (!trackId) return res.status(400).json({ error: 'Missing id' });
 
   try {
-    const data = await scFetch(`/stream/${trackId}`);
+    const data = await scFetch(`/stream?id=${trackId}`);
     const url = data.url || data.stream_url || data.audioUrl || '';
     if (!url) return res.status(502).send('No audio URL');
 
