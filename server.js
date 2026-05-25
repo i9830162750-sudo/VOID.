@@ -84,8 +84,7 @@ app.use(
         workerSrc: ["'self'"],
     
         manifestSrc: ["'self'"],
-      },
-    },
+        
           },
         },
       })
