@@ -1,6 +1,6 @@
 'use strict';
 
-const config = require('../../config');
+const SAAVN_API = 'https://jiosaavn-api-h375.onrender.com/api';
 
 // ── Tiny in-memory cache ──────────────────────────────────────────────────────
 const cache = new Map();
@@ -16,11 +16,9 @@ function cacheSet(key, data) {
   cache.set(key, { data, ts: Date.now() });
 }
 
-const SAAVN_API = 'https://jiosaavn-api-h375.onrender.com/api';
-
 async function saavnFetch(path) {
   const res = await fetch(`${SAAVN_API}${path}`, {
-    signal: AbortSignal.timeout(10000),
+    signal: AbortSignal.timeout(12000),
     headers: { 'User-Agent': 'Mozilla/5.0' },
   });
   if (!res.ok) throw new Error(`JioSaavn API error: ${res.status}`);
@@ -28,25 +26,38 @@ async function saavnFetch(path) {
 }
 
 function parseSong(song) {
-  const img = (song.image || '').replace('150x150', '500x500');
+  // Image is an array of quality objects
+  const imgArr = Array.isArray(song.image) ? song.image : [];
+  const img = imgArr.find(i => i.quality === '500x500')?.url
+    || imgArr[imgArr.length - 1]?.url
+    || '';
+
   // Pick best quality download URL
-  const dlUrls = song.downloadUrl || [];
+  const dlUrls = Array.isArray(song.downloadUrl) ? song.downloadUrl : [];
   let audioUrl = '';
-  for (const q of ['320kbps', '160kbps', '96kbps']) {
+  for (const q of ['320kbps', '160kbps', '96kbps', '48kbps', '12kbps']) {
     const entry = dlUrls.find(d => d.quality === q);
     if (entry && entry.url) { audioUrl = entry.url; break; }
   }
   if (!audioUrl && dlUrls.length) audioUrl = dlUrls[dlUrls.length - 1]?.url || '';
 
+  // Artist name — handle both array and string formats
+  let artist = '';
+  if (song.artists?.primary?.length) {
+    artist = song.artists.primary.map(a => a.name).join(', ');
+  } else if (typeof song.primaryArtists === 'string') {
+    artist = song.primaryArtists;
+  }
+
   return {
     id: song.id,
-    videoId: song.id,          // reuse videoId field so frontend works as-is
+    videoId: song.id,
     title: song.name || 'Unknown',
-    artist: (song.primaryArtists || song.artists?.primary?.map(a=>a.name).join(', ') || ''),
+    artist,
     album: song.album?.name || '',
     duration: parseInt(song.duration || 0),
     thumbnail: img,
-    audioUrl,                  // direct 320kbps mp3 URL
+    audioUrl,
     source: 'jiosaavn',
   };
 }
@@ -62,13 +73,15 @@ exports.search = async (req, res, next) => {
     const cached = cacheGet(cacheKey);
     if (cached) return res.json({ ...cached, _cached: true });
 
-    const data = await saavnFetch(`/api/search/songs?query=${encodeURIComponent(q)}&page=1&limit=15`);
-    const songs = (data.data?.results || []).map(parseSong);
+    const data = await saavnFetch(`/search/songs?query=${encodeURIComponent(q)}&page=1&limit=15`);
+    const results = data.data?.results || data.results || [];
+    const songs = results.map(parseSong);
     const result = { items: songs, source: 'jiosaavn' };
 
     cacheSet(cacheKey, result);
     res.json(result);
   } catch (err) {
+    console.error('[JioSaavn search error]', err.message);
     next(err);
   }
 };
@@ -82,21 +95,23 @@ exports.videoDetails = async (req, res, next) => {
     const cached = cacheGet(cacheKey);
     if (cached) return res.json(cached);
 
-    const data = await saavnFetch(`/api/songs/${ids}`);
-    const songs = (data.data || []).map(parseSong);
+    const data = await saavnFetch(`/songs?id=${ids}`);
+    const results = data.data || data.results || [];
+    const songs = (Array.isArray(results) ? results : [results]).map(parseSong);
     cacheSet(cacheKey, { items: songs });
     res.json({ items: songs });
   } catch (err) {
+    console.error('[JioSaavn videoDetails error]', err.message);
     next(err);
   }
 };
 
 exports.playlistItems = async (req, res, next) => {
-  res.status(501).json({ error: 'Playlist import not supported for JioSaavn yet' });
+  res.status(501).json({ error: 'Playlist import not supported for JioSaavn' });
 };
 
 // GET /api/youtube/stream?id=SONG_ID
-// Returns { url, mimeType } — client sets audioEl.src directly (no blob download needed)
+// Returns { url, mimeType } — client downloads audio directly
 exports.streamProxy = async (req, res, next) => {
   const songId = String(req.query.id || '').trim();
   if (!songId) return res.status(400).json({ error: 'Missing id' });
@@ -106,27 +121,34 @@ exports.streamProxy = async (req, res, next) => {
     const cached = cacheGet(cacheKey);
     if (cached) return res.json(cached);
 
-    const data = await saavnFetch(`/api/songs/${songId}`);
-    const song = parseSong((data.data || [])[0] || {});
+    const data = await saavnFetch(`/songs?id=${songId}`);
+    const results = data.data || data.results || [];
+    const arr = Array.isArray(results) ? results : [results];
+    const song = parseSong(arr[0] || {});
+
     if (!song.audioUrl) return res.status(502).json({ error: 'No stream URL found' });
 
     const result = { url: song.audioUrl, mimeType: 'audio/mpeg' };
     cacheSet(cacheKey, result);
     res.json(result);
   } catch (e) {
+    console.error('[JioSaavn stream error]', e.message);
     next(e);
   }
 };
 
 // GET /api/youtube/audio?id=SONG_ID
-// Pipes the audio through the server (for download/cache)
+// Pipes audio through server (for download/cache)
 exports.audioProxy = async (req, res, next) => {
   const songId = String(req.query.id || '').trim();
   if (!songId) return res.status(400).json({ error: 'Missing id' });
 
   try {
-    const data = await saavnFetch(`/api/songs/${songId}`);
-    const song = parseSong((data.data || [])[0] || {});
+    const data = await saavnFetch(`/songs?id=${songId}`);
+    const results = data.data || data.results || [];
+    const arr = Array.isArray(results) ? results : [results];
+    const song = parseSong(arr[0] || {});
+
     if (!song.audioUrl) return res.status(502).send('No audio URL');
 
     const audioRes = await fetch(song.audioUrl, { signal: AbortSignal.timeout(60000) });
@@ -140,6 +162,7 @@ exports.audioProxy = async (req, res, next) => {
     const buf = await audioRes.arrayBuffer();
     res.send(Buffer.from(buf));
   } catch (e) {
+    console.error('[JioSaavn audio error]', e.message);
     next(e);
   }
 };
