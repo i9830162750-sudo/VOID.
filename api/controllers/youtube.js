@@ -95,7 +95,7 @@ exports.videoDetails = async (req, res, next) => {
     const cached = cacheGet(cacheKey);
     if (cached) return res.json(cached);
 
-    const data = await saavnFetch(`/songs?id=${ids}`);
+    const data = await saavnFetch(`/songs/${ids}`);
     const results = data.data || data.results || [];
     const songs = (Array.isArray(results) ? results : [results]).map(parseSong);
     cacheSet(cacheKey, { items: songs });
@@ -121,7 +121,7 @@ exports.streamProxy = async (req, res, next) => {
     const cached = cacheGet(cacheKey);
     if (cached) return res.json(cached);
 
-    const data = await saavnFetch(`/songs?id=${songId}`);
+    const data = await saavnFetch(`/songs/${songId}`);
     const results = data.data || data.results || [];
     const arr = Array.isArray(results) ? results : [results];
     const song = parseSong(arr[0] || {});
@@ -144,7 +144,7 @@ exports.audioProxy = async (req, res, next) => {
   if (!songId) return res.status(400).json({ error: 'Missing id' });
 
   try {
-    const data = await saavnFetch(`/songs?id=${songId}`);
+    const data = await saavnFetch(`/songs/${songId}`);
     const results = data.data || data.results || [];
     const arr = Array.isArray(results) ? results : [results];
     const song = parseSong(arr[0] || {});
