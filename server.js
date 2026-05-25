@@ -39,7 +39,7 @@ app.use(
         scriptSrcAttr: ["'unsafe-inline'"],
         styleSrc:    ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
         fontSrc:     ["'self'", 'https://fonts.gstatic.com'],
-        imgSrc:      ["'self'", 'data:', 'https://*.ytimg.com', 'https://*.ggpht.com', 'https://*.saavncdn.com', 'https://*.jiosaavn.com'],
+        imgSrc:      ["'self'", 'data:', 'https://*.ytimg.com', 'https://*.ggpht.com', 'https://*.saavncdn.com', 'https://*.jiosaavn.com', 'https://*.sndcdn.com'],
         connectSrc:  ["'self'", 'https://cdnjs.cloudflare.com', 'https://*.saavncdn.com'],
         mediaSrc:    ["'self'", 'blob:', 'https://*.saavncdn.com'],
         workerSrc:   ["'self'"],
