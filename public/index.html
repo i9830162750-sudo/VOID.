@@ -6352,7 +6352,11 @@ async function ytFetchAndPlay(trackIdx) {
   const t = tracks[trackIdx];
   // Route SoundCloud tracks to the SC stream endpoint
   if (t && t.scMeta && t.scMeta.trackId) {
-    if (t.streamUrl) { _playStreamUrl(trackIdx, t.streamUrl); return; }
+    if (t.streamUrl) {
+        audio.src = t.streamUrl;
+        audio.play();
+        return;
+      }
     showToast('▶ Loading…'); updateBufferingUI(true);
     try {
       const r = await fetch(`${VOID_API_BASE}/soundcloud/stream?id=${encodeURIComponent(t.scMeta.trackId)}`, { signal: AbortSignal.timeout(15000) });
@@ -6361,7 +6365,8 @@ async function ytFetchAndPlay(trackIdx) {
       if (!url) throw new Error('No audio URL returned');
       t.streamUrl = url;
       showToast('▶ Streaming: ' + t.title);
-      _playStreamUrl(trackIdx, url);
+      audio.src = url;
+      await audio.play();
     } catch(e) { updateBufferingUI(false); showToast('⚠ SC stream failed: ' + e.message); }
     return;
   }
