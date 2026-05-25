@@ -16,7 +16,7 @@ function cacheSet(key, data) {
   cache.set(key, { data, ts: Date.now() });
 }
 
-const SAAVN_API = 'https://jiosaavn-api-h375.onrender.com';
+const SAAVN_API = 'https://jiosaavn-api-h375.onrender.com/api';
 
 async function saavnFetch(path) {
   const res = await fetch(`${SAAVN_API}${path}`, {
