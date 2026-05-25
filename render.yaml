@@ -1,0 +1,27 @@
+# render.yaml
+# VOID Player — Render deployment configuration
+# https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: void-player
+    runtime: node
+    plan: free
+    region: oregon
+
+    buildCommand: npm install --omit=dev && python3 -m pip install -U yt-dlp && python3 -m yt_dlp --version && which yt-dlp || find /opt/render -name "yt-dlp" 2>/dev/null || echo "yt-dlp not found in PATH"
+    startCommand: node server.js
+    healthCheckPath: /api/health
+    autoDeploy: true
+
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      # Set these in the Render dashboard → Environment tab:
+      # VOID_YT_API_KEY        — YouTube Data API v3 key
+      # GOOGLE_CLIENT_ID       — Google OAuth client ID
+      # GOOGLE_CLIENT_SECRET   — Google OAuth client secret
+      # GOOGLE_CALLBACK_URL    — https://your-app.onrender.com/api/auth/google/callback
+      # SESSION_SECRET         — random 32+ char string
