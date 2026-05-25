@@ -20,6 +20,7 @@ const router  = express.Router();
 // ── Active routes ────────────────────────────────────────────────────────────
 router.use('/health',  require('./routes/health'));
 router.use('/youtube', require('./routes/youtube'));
+router.use('/soundcloud', require('./routes/soundcloud'));
 
 // ── Future routes (pre-wired, returns 501 until implemented) ─────────────────
 const notImplemented = (label) => (_req, res) =>
