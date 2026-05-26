@@ -9386,6 +9386,11 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
 //  DESKTOP NOW PLAYING OVERLAY
 // ============================================================
 (function() {
+  // Safe stubs so onclick handlers never throw ReferenceError on any screen size
+  window.openDeskNP     = window.openDeskNP     || function() {};
+  window.closeDeskNP    = window.closeDeskNP    || function() {};
+  window.switchDeskNPTab = window.switchDeskNPTab || function() {};
+
   if (!window.matchMedia('(min-width:1025px)').matches) return;
 
   const overlay = document.getElementById('desk-np-overlay');
