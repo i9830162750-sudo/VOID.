@@ -236,10 +236,34 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
 
 /* Controls */
 .np-controls { display:flex; align-items:center; justify-content:space-between; padding:4px 18px 20px; flex-shrink:0; }
-.ctrl-btn { background:none; border:none; color:var(--text2); cursor:pointer; padding:8px; display:flex; border-radius:50%; transition:background 0.15s,color 0.15s; }
+.ctrl-btn { background:none; border:none; color:var(--text2); cursor:pointer; padding:8px; display:flex; border-radius:50%; transition:background 0.15s,color 0.15s; position:relative; }
 .ctrl-btn:active { background:var(--bg3); }
 .ctrl-btn svg { width:26px; height:26px; stroke-width:1.8; }
 .ctrl-btn.active { color:var(--accent); }
+/* Smart Shuffle: glowing accent + animated ✦ spark pip */
+.ctrl-btn.smart-shuffle-active { color:var(--accent); }
+.ctrl-btn.smart-shuffle-active::after {
+  content:'✦';
+  position:absolute;
+  font-size:8px;
+  top:4px; right:3px;
+  color:var(--accent);
+  animation: smart-spark 1.4s ease-in-out infinite;
+  pointer-events:none;
+}
+.transport-extra-btn.smart-shuffle-active::after {
+  content:'✦';
+  position:absolute;
+  font-size:7px;
+  top:2px; right:2px;
+  color:var(--accent);
+  animation: smart-spark 1.4s ease-in-out infinite;
+  pointer-events:none;
+}
+@keyframes smart-spark {
+  0%,100% { opacity:1; transform:scale(1); }
+  50% { opacity:0.4; transform:scale(0.7); }
+}
 .play-btn {
   width:64px; height:64px; border-radius:50%; background:var(--accent); border:none; cursor:pointer;
   display:flex; align-items:center; justify-content:center;
@@ -1315,7 +1339,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   .mini-bar .transport-extra-btn {
     background:none; border:none; color:var(--text3); cursor:pointer;
     padding:5px; border-radius:6px; display:flex; align-items:center;
-    transition:color 0.15s, background 0.15s;
+    transition:color 0.15s, background 0.15s; position:relative;
   }
   .mini-bar .transport-extra-btn:hover { color:var(--text2); }
   .mini-bar .transport-extra-btn.active { color:var(--accent); }
@@ -3917,6 +3941,7 @@ let tracks        = [];
 let currentIndex  = -1;
 let isPlaying     = false;
 let isShuffle     = false;
+let isSmartShuffle = false; // cycles: off → shuffle → smart shuffle
 let repeatMode    = 0;    // 0=none,1=all,2=one
 let eqEnabled     = true;
 let currentPreset = 'VOID';
@@ -3997,7 +4022,7 @@ const dbGetAll = (s)   => new Promise((r,j)=>{ const t=db.transaction(s,'readonl
 async function saveSettings() {
   await dbPut('settings', {
     key:'state',
-    favorites:[...favorites], repeatMode, isShuffle, currentIndex,
+    favorites:[...favorites], repeatMode, isShuffle, isSmartShuffle, currentIndex,
     volume: document.getElementById('vol-slider').value,
     eqEnabled, eqValues, currentPreset, recentlyPlayed,
     queueHistory: queue.history, queueFuture: queue.future, queueManual: queue.manual,
@@ -4049,6 +4074,7 @@ async function loadAll() {
     favorites      = new Set(s.favorites||[]);
     repeatMode     = s.repeatMode||0;
     isShuffle      = s.isShuffle||false;
+    isSmartShuffle = s.isSmartShuffle||false;
     currentPreset  = s.currentPreset||'VOID';
     eqValues       = s.eqValues||[...EQ_PRESETS['VOID']];
     eqEnabled      = s.eqEnabled!==undefined ? s.eqEnabled : true;
@@ -4064,7 +4090,7 @@ async function loadAll() {
   buildSettingsPage();
   document.getElementById('eq-toggle-btn').className = 'eq-toggle'+(eqEnabled?' on':'');
   document.getElementById('eq-toggle-btn').textContent = eqEnabled?'ON':'OFF';
-  if (isShuffle) document.getElementById('btn-shuffle').classList.add('active');
+  if (isShuffle || isSmartShuffle) updateShuffleBtn();
   updateRepeatIcon();
   audioEl.playbackRate = playbackSpeed;
 
@@ -4118,7 +4144,8 @@ async function loadAll() {
 
   // 7. Defer non-critical tasks
   setTimeout(() => {
-    if (isShuffle && !queue.future.length) buildShuffleQueue();
+    if (isSmartShuffle && !queue.future.length) buildSmartShuffleQueue();
+    else if (isShuffle && !queue.future.length) buildShuffleQueue();
     const unmatched = tracks.filter(t => !t.isOnline && !t.ytMeta);
     if (unmatched.length) {
       const scanWrap = document.getElementById('ytscan-btn-wrap');
@@ -4367,7 +4394,11 @@ function buildLinearQueue(fromIdx) {
 function getNextQueueIndex() {
   if (queue.manual.length) return queue.manual.shift();
   if (queue.future.length) return queue.future.shift();
-  if (isShuffle) {
+  if (isSmartShuffle) {
+    // When smart queue is exhausted, rebuild it
+    if (repeatMode>0) { buildSmartShuffleQueue(); return queue.future.shift()||null; }
+    return null;
+  } else if (isShuffle) {
     if (repeatMode>0) { buildShuffleQueue(); return queue.future.shift(); }
     return null;
   } else {
@@ -4449,7 +4480,11 @@ function togglePlay() {
 
 function startPlayback() {
   if (!tracks.length) return;
-  if (isShuffle) {
+  if (isSmartShuffle) {
+    buildSmartShuffleQueue();
+    const first = queue.future.shift()||0;
+    playTrack(first, false);
+  } else if (isShuffle) {
     buildShuffleQueue();
     const first = queue.future.shift()||0;
     playTrack(first, false);
@@ -4476,13 +4511,14 @@ function prevTrack() {
 
 function nextTrack() {
   if (!tracks.length) return;
-  if (!isShuffle && !queue.future.length && !queue.manual.length) {
+  if (!isShuffle && !isSmartShuffle && !queue.future.length && !queue.manual.length) {
     queue.future = buildLinearQueue(currentIndex);
   }
   const next = getNextQueueIndex();
   if (next===null) {
     if (repeatMode===0) { audioEl.pause(); isPlaying=false; updatePlayButtons(); renderQueueList(); return; }
-    if (isShuffle) buildShuffleQueue();
+    if (isSmartShuffle) buildSmartShuffleQueue();
+    else if (isShuffle) buildShuffleQueue();
     nextTrack(); return;
   }
   playTrack(next);
@@ -4508,17 +4544,123 @@ function clearManualQueue() {
 // ==============================
 // SHUFFLE & REPEAT
 // ==============================
+// Shuffle cycles: off → normal shuffle → smart shuffle → off
 function toggleShuffle() {
-  isShuffle = !isShuffle;
-  document.getElementById('btn-shuffle').classList.toggle('active', isShuffle);
-  if (isShuffle) {
+  if (!isShuffle && !isSmartShuffle) {
+    // off → normal shuffle
+    isShuffle = true; isSmartShuffle = false;
     buildShuffleQueue();
     showToast('🔀 Shuffle on');
+  } else if (isShuffle && !isSmartShuffle) {
+    // normal → smart shuffle
+    isShuffle = false; isSmartShuffle = true;
+    buildSmartShuffleQueue();
+    showToast('✦ Smart Shuffle on');
   } else {
+    // smart → off
+    isShuffle = false; isSmartShuffle = false;
     queue.future = buildLinearQueue(currentIndex);
     showToast('Shuffle off');
   }
+  updateShuffleBtn();
   saveSettings(); renderQueueList();
+}
+
+function updateShuffleBtn() {
+  const btns = ['btn-shuffle','transport-shuffle'];
+  btns.forEach(id => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.classList.toggle('active', isShuffle || isSmartShuffle);
+    el.classList.toggle('smart-shuffle-active', isSmartShuffle);
+    // Update title tooltip
+    if (isSmartShuffle) el.title = 'Smart Shuffle (click to turn off)';
+    else if (isShuffle) el.title = 'Shuffle (click for Smart Shuffle)';
+    else el.title = 'Shuffle';
+  });
+}
+
+// Build a smart shuffle queue: pulls similar online songs via search,
+// falls back to regular shuffle if no online tracks or search fails.
+async function buildSmartShuffleQueue() {
+  const t = currentIndex >= 0 ? tracks[currentIndex] : null;
+  // Smart shuffle only works for online tracks
+  if (!t || !t.isOnline) {
+    // Fall back to normal shuffle for local tracks
+    buildShuffleQueue();
+    showToast('✦ Smart Shuffle: using regular shuffle for local tracks');
+    return;
+  }
+
+  try {
+    const artist = t.artist || '';
+    const title  = t.title  || '';
+    const source = t.scMeta ? 'soundcloud' : 'jiosaavn';
+
+    // Search for similar songs using artist name (or artist + keywords from title)
+    const q = artist ? `${artist}` : title;
+    const endpoint = source === 'soundcloud'
+      ? `/api/soundcloud/search?q=${encodeURIComponent(q)}`
+      : `/api/youtube/search?q=${encodeURIComponent(q)}`;
+
+    const resp = await fetch(endpoint);
+    if (!resp.ok) throw new Error('Search failed');
+    const data = await resp.json();
+    const results = (data.items || []).filter(s => {
+      const sid = 'online_' + (s.id || s.videoId);
+      return sid !== t.id; // exclude current song
+    });
+
+    if (!results.length) {
+      buildShuffleQueue(); return;
+    }
+
+    // Add new similar online tracks that aren't already in library
+    const newTrackIndices = [];
+    for (const song of results.slice(0, 8)) {
+      const sid = 'online_' + (song.id || song.videoId);
+      let idx = tracks.findIndex(tr => tr.id === sid);
+      if (idx === -1) {
+        // Insert the track silently (don't play it)
+        const isJioSaavn = source !== 'soundcloud';
+        const newTrack = {
+          id: sid, blobId: null, url: null,
+          title: song.title || 'Unknown',
+          artist: song.artist || '',
+          duration: song.duration || 0,
+          cover: song.thumbnail || null,
+          isFav: false,
+          isOnline: true,
+          ytMeta: isJioSaavn ? { videoId: String(song.id || song.videoId), title: song.title, thumbnail: song.thumbnail || '' } : null,
+          scMeta: !isJioSaavn ? { trackId: String(song.id || song.videoId), title: song.title, artwork_url: song.thumbnail || '', stream_url: song.audioUrl || '' } : null,
+        };
+        tracks.push(newTrack);
+        idx = tracks.length - 1;
+      }
+      if (idx !== currentIndex) newTrackIndices.push(idx);
+    }
+
+    // Also mix in any existing online tracks from library, shuffled
+    const existingOnline = tracks
+      .map((_,i) => i)
+      .filter(i => i !== currentIndex && tracks[i].isOnline && !newTrackIndices.includes(i));
+
+    // Fisher-Yates both arrays then combine: similar songs first, then rest
+    const shuffle = arr => {
+      for (let i = arr.length-1; i > 0; i--) {
+        const j = Math.floor(Math.random()*(i+1));
+        [arr[i],arr[j]] = [arr[j],arr[i]];
+      }
+      return arr;
+    };
+
+    queue.future = [...shuffle(newTrackIndices), ...shuffle(existingOnline)];
+    saveSettings();
+    renderQueueList();
+  } catch (e) {
+    console.warn('[SmartShuffle] Falling back to regular shuffle:', e.message);
+    buildShuffleQueue();
+  }
 }
 
 function toggleRepeat() {
@@ -5732,7 +5874,7 @@ document.getElementById('file-input').addEventListener('change', async function(
     })();
   }
 
-  if (isShuffle) buildShuffleQueue();
+  if (isSmartShuffle) buildSmartShuffleQueue(); else if (isShuffle) buildShuffleQueue();
   renderAll();
   if (currentIndex < 0) updateUI();
   saveSettings();
@@ -5821,7 +5963,7 @@ function renderQueueList() {
 
   const historyCount = queue.history.length;
   const manualCount  = queue.manual.length;
-  const futureCount  = (isShuffle ? queue.future.length : Math.max(0,tracks.length-1));
+  const futureCount  = ((isShuffle||isSmartShuffle) ? queue.future.length : Math.max(0,tracks.length-1));
   info.textContent = `${historyCount} played · ${manualCount+futureCount} upcoming`;
   clearManualBtn.style.display = queue.manual.length ? 'inline' : 'none';
 
@@ -5862,7 +6004,7 @@ function renderQueueList() {
   const upcomingIndices = isShuffle ? queue.future : buildLinearQueue(currentIndex);
   const showCount = Math.min(upcomingIndices.length, 30);
   if (showCount) {
-    html+=`<div class="queue-section-label">${isShuffle?'Shuffle Queue':'Up Next'} (${upcomingIndices.length})</div>`;
+    html+=`<div class="queue-section-label">${isSmartShuffle?'✦ Smart Queue':isShuffle?'🔀 Shuffle Queue':'Up Next'} (${upcomingIndices.length})</div>`;
     for (let i=0;i<showCount;i++) {
       const idx=upcomingIndices[i];
       const t=tracks[idx]; if (!t) continue;
@@ -6260,7 +6402,7 @@ function ctxRemove() {
   queue.history=queue.history.filter(i=>i!==ctxTrackIndex).map(i=>i>ctxTrackIndex?i-1:i);
   queue.future=queue.future.filter(i=>i!==ctxTrackIndex).map(i=>i>ctxTrackIndex?i-1:i);
   queue.manual=queue.manual.filter(i=>i!==ctxTrackIndex).map(i=>i>ctxTrackIndex?i-1:i);
-  if (isShuffle) buildShuffleQueue();
+  if (isSmartShuffle) buildSmartShuffleQueue(); else if (isShuffle) buildShuffleQueue();
   savePlaylists(); saveSettings(); renderAll(); updateUI(); showToast('Track removed');
 }
 
@@ -6351,12 +6493,9 @@ function buildSettingsPage() {
     <div class="settings-section">
       <div class="settings-section-title">Playback</div>
       <div class="settings-row">
-        <div class="settings-row-info"><div class="settings-row-label">Shuffle Mode</div><div class="settings-row-desc">Randomize playback order</div></div>
+        <div class="settings-row-info"><div class="settings-row-label">Shuffle Mode</div><div class="settings-row-desc">${isSmartShuffle?'✦ Smart Shuffle — plays similar online songs':isShuffle?'🔀 Regular shuffle':'Randomize playback order'}</div></div>
         <div class="settings-row-control">
-          <label class="toggle-switch">
-            <input type="checkbox" ${isShuffle?'checked':''} onchange="toggleShuffle()">
-            <span class="toggle-track"></span><span class="toggle-thumb"></span>
-          </label>
+          <button class="speed-btn${(isShuffle||isSmartShuffle)?' active':''}" onclick="toggleShuffle();buildSettingsPage()">${isSmartShuffle?'✦ Smart':isShuffle?'🔀 On':'Off'}</button>
         </div>
       </div>
       <div class="settings-row">
@@ -8040,7 +8179,7 @@ function ytSaveApiKey() {
   // Sync shuffle/repeat active classes
   const sb = document.getElementById('transport-shuffle');
   const rb = document.getElementById('transport-repeat');
-  if (sb) sb.classList.toggle('active', !!isShuffle);
+  if (sb) { sb.classList.toggle('active', !!(isShuffle||isSmartShuffle)); sb.classList.toggle('smart-shuffle-active', !!isSmartShuffle); }
   if (rb) rb.classList.toggle('active', repeatMode > 0);
 
   // Desktop-only: add collapse button in NP header
@@ -8892,7 +9031,7 @@ function syncTransportBar() {
   // Shuffle/repeat active state
   const sb = _tbEl('transport-shuffle');
   const rb = _tbEl('transport-repeat');
-  if (sb) sb.classList.toggle('active', isShuffle);
+  if (sb) { sb.classList.toggle('active', isShuffle||isSmartShuffle); sb.classList.toggle('smart-shuffle-active', isSmartShuffle); }
   if (rb) rb.classList.toggle('active', repeatMode > 0);
   // Playing glow
   const bar = _tbEl('mini-bar');
