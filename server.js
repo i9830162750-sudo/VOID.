@@ -5,7 +5,6 @@
  * v6.1 additions:
  *   • express-session + passport for Google OAuth
  *   • /api/auth/* — OAuth flow
- *   • /api/drive/* — Google Drive sync (library JSON + audio files)
  */
 
 'use strict';
