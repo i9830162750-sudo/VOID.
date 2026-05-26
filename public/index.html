@@ -4598,7 +4598,8 @@ async function buildSmartShuffleQueue() {
     const source = t.scMeta ? 'soundcloud' : 'jiosaavn';
 
     // Search for similar songs using artist name (or artist + keywords from title)
-    const q = artist ? `${artist}` : title;
+    const rawQ = artist ? `${artist}` : title;
+    const q = _enrichQuery(rawQ);
     const endpoint = source === 'soundcloud'
       ? `/api/soundcloud/search?q=${encodeURIComponent(q)}`
       : `/api/youtube/search?q=${encodeURIComponent(q)}`;
@@ -6754,12 +6755,57 @@ async function ytDoSearch(query, force=false) {
   }
 }
 
+// ── Smart Search: AI query expansion ─────────────────────────────────────────
+// Cache expanded queries so we don't re-call the API on every keystroke
+// ── Smart Search: local vibe→query enrichment (no external API needed) ──────
+const _VIBE_MAP = {
+  workout:'workout motivation energy songs', gym:'gym pump up energy songs',
+  running:'running cardio energy songs', cardio:'cardio workout pump songs',
+  yoga:'yoga meditation calm music', meditation:'meditation peaceful calm music',
+  focus:'focus study concentration music', study:'study music lofi concentration',
+  coding:'coding focus lofi instrumental', concentration:'concentration study calm music',
+  sad:'sad emotional heartbreak songs', happy:'happy feel good upbeat songs',
+  heartbreak:'heartbreak sad breakup songs', breakup:'breakup sad emotional songs',
+  angry:'angry intense energy songs', anger:'angry intense energy songs',
+  cry:'emotional crying sad songs', chill:'chill relaxing smooth songs',
+  relax:'relaxing calm soothing songs', sleep:'sleep calm peaceful music',
+  lofi:'lofi chill beats instrumental', party:'party dance hits songs',
+  club:'club dance electronic songs', hype:'hype energy bangers songs',
+  dance:'dance hits upbeat songs', morning:'morning fresh uplifting songs',
+  night:'night vibes late chill songs', 'night drive':'night drive chill ambient songs',
+  summer:'summer hits feel good songs', winter:'winter cozy warm songs',
+  rain:'rainy day sad chill songs', romantic:'romantic love songs soft',
+  love:'love songs romantic hits', date:'romantic date night songs',
+  'road trip':'road trip driving songs', driving:'driving road trip energy songs',
+  travel:'travel adventure feel good songs', nostalgia:'nostalgia throwback classic hits',
+  throwback:'throwback classic retro hits', groove:'groove funk soul songs',
+  hustle:'hustle grind motivation songs', motivation:'motivation inspiring energy songs',
+  vibe:'chill vibes smooth songs', mood:'mood songs emotional hits',
+  energy:'energy pump up hype songs', jazz:'jazz smooth instrumental songs',
+  classical:'classical instrumental piano songs', instrumental:'instrumental background music',
+};
+
+// Enrich a vibe/mood query using the map; pass through artist/song names unchanged
+function _enrichQuery(q) {
+  const lower = q.toLowerCase().trim();
+  for (const [key, enriched] of Object.entries(_VIBE_MAP)) {
+    if (lower === key || lower.includes(key)) return enriched;
+  }
+  // 1-2 word all-lowercase query with no digits/ft/feat → likely a vibe, append "songs"
+  const words = lower.split(/\s+/);
+  if (words.length <= 2 && lower === lower.toLowerCase() && !/[0-9]/.test(lower) && !lower.includes('ft') && !lower.includes('feat') && lower.length > 2) {
+    return `${q} songs`;
+  }
+  return q;
+}
+
 async function ytFetchResults(query) {
   const localMatches = ytFindLocalMatches(query);
   let ytResults = [], ytPlaylistResults = [];
-
+  // Silently enrich vibe/mood queries before hitting the API
+  const enriched = _enrichQuery(query);
   try {
-    const resp = await fetch(`${VOID_API_BASE}/youtube/search?q=${encodeURIComponent(query)}&max=15`, { signal: AbortSignal.timeout(12000) });
+    const resp = await fetch(`${VOID_API_BASE}/youtube/search?q=${encodeURIComponent(enriched)}&max=15`, { signal: AbortSignal.timeout(12000) });
     if (resp.ok) {
       const data = await resp.json();
       const items = data.items || [];
@@ -6775,7 +6821,6 @@ async function ytFetchResults(query) {
       }));
     }
   } catch(e) { console.warn('[VOID saavn search]', e.message); }
-
   return { ytResults, ytPlaylistResults, localMatches, source: 'jiosaavn' };
 }
 
@@ -6801,11 +6846,12 @@ async function scDoSearch(query, force=false) {
   if (!results) return;
   results.innerHTML=`<div class="yt-loading"><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div></div>`;
   try {
-    const resp = await fetch(`${VOID_API_BASE}/soundcloud/search?q=${encodeURIComponent(query)}&max=15`, { signal: AbortSignal.timeout(12000) });
+    // Silently enrich vibe/mood queries before hitting the API
+    const enriched = _enrichQuery(query);
+    const resp = await fetch(`${VOID_API_BASE}/soundcloud/search?q=${encodeURIComponent(enriched)}&max=15`, { signal: AbortSignal.timeout(12000) });
     if (!resp.ok) throw new Error(`SC search HTTP ${resp.status}`);
     const data = await resp.json();
-    const items = data.items || [];
-    const scResults = items.map(item => ({
+    const scResults = (data.items || []).map(item => ({
       videoId:   String(item.id || item.videoId),
       title:     item.title  || 'Unknown',
       artist:    item.artist || '',
@@ -6910,10 +6956,17 @@ function ytFindExactLocalMatch(title,artist) {
 // YOUTUBE — RENDER RESULTS
 // ==============================
 function renderYTResults(data, query) {
-  const {ytResults, ytPlaylistResults, localMatches, source}=data;
+  const {ytResults, ytPlaylistResults, localMatches, source, smartLabel}=data;
   const results=document.getElementById('lib-yt-results');
   if (!results) return;
   let html='';
+
+  // Smart search banner
+  if (smartLabel) {
+    html+=`<div style="display:flex;align-items:center;gap:8px;padding:10px 14px 6px;margin-bottom:2px">
+      <span style="font-size:10px;letter-spacing:.08em;font-family:'Space Mono',monospace;color:var(--accent)">✦ SMART</span>
+      <span style="font-size:13px;font-weight:600;color:var(--text1)">${esc(smartLabel)}</span>
+    </div>`;
 
   const srcBadge = source==='yt_api'
     ? `<span style="font-size:9px;color:var(--accent);font-family:'Space Mono',monospace;margin-left:6px">● LIVE</span>`
