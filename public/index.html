@@ -5227,6 +5227,7 @@ document.getElementById('file-input').addEventListener('change', async function(
   Promise.all(validResults.map(({ track, file }) => persistTrack(track, file).catch(() => {})));
 
   // Upload to Google Drive in background if user is signed in
+  console.log('[Drive] file handler reached upload block, voidDriveReady:', typeof voidDriveReady, 'voidDriveUploadTrack:', typeof voidDriveUploadTrack);
   if (typeof voidDriveUploadTrack === 'function' && typeof voidDriveReady === 'function') {
     (async () => {
       // Wait for auth check to complete before deciding whether to upload
@@ -8940,8 +8941,9 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
         updateDriveUI();
         _driveReadyResolve(driveUser);
         if (authResult === 'success') {
-          // Fresh login — restore library from Drive
+          // Fresh login — restore library from Drive, then upload any existing local tracks
           await driveRestoreLibrary();
+          await driveBackfillLocalTracks();
         }
       } else {
         updateDriveUI();
@@ -9124,6 +9126,39 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
     } catch(e) {
       console.error('[Drive] restore error:', e);
       showToast('Could not load library from Drive');
+    }
+  }
+
+  // ── Backfill: upload all existing local tracks that aren't on Drive yet ─
+  async function driveBackfillLocalTracks() {
+    if (!driveUser) return;
+    var localTracks = (window.tracks || []).filter(function(t) {
+      return t.blobId && !t.driveFileId && !t.isOnline;
+    });
+    if (!localTracks.length) return;
+    showToast('Uploading ' + localTracks.length + ' existing track' + (localTracks.length !== 1 ? 's' : '') + ' to Drive…');
+    var uploaded = 0;
+    for (var i = 0; i < localTracks.length; i++) {
+      var t = localTracks[i];
+      try {
+        var blob = await dbGet('blobs', t.blobId).catch(function() { return null; });
+        if (!blob || !blob.blob) continue;
+        var fd = new FormData();
+        fd.append('audio', blob.blob, t.blobId);
+        fd.append('blobId', t.blobId);
+        var resp = await fetch('/api/drive/upload-audio', { method: 'POST', credentials: 'include', body: fd });
+        var data = await resp.json();
+        if (data.ok) {
+          t.driveFileId = data.fileId;
+          uploaded++;
+        }
+      } catch(e) {
+        console.warn('[Drive] backfill error for', t.title, e);
+      }
+    }
+    if (uploaded > 0) {
+      showToast('✓ Backed up ' + uploaded + ' track' + (uploaded !== 1 ? 's' : '') + ' to Drive');
+      driveSaveLibrary(false);
     }
   }
 
