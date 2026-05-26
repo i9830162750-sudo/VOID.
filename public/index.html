@@ -9030,9 +9030,11 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
 
   // ── Build library snapshot for Drive ──────────────────────────────────
   function buildLibrarySnapshot() {
+    // tracks is a let variable in the outer scope; window.tracks is a fallback alias
+    var allTracks = (typeof tracks !== 'undefined' && tracks.length) ? tracks : (window.tracks || []);
     // Collect all state from the app globals
     var snapshot = {
-      tracks: (window.tracks || []).map(function(t) {
+      tracks: allTracks.map(function(t) {
         return {
           id:       t.id,
           blobId:   t.blobId,
@@ -9104,7 +9106,8 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
 
       // Merge Drive tracks with local (Drive wins for metadata, local wins for blobs)
       var localById = {};
-      (window.tracks || []).forEach(function(t) { localById[t.id] = t; });
+      var currentTracks = (typeof tracks !== 'undefined' && tracks.length) ? tracks : (window.tracks || []);
+      currentTracks.forEach(function(t) { localById[t.id] = t; });
 
       var merged = (lib.tracks || []).map(function(dt) {
         var local = localById[dt.id];
@@ -9116,7 +9119,11 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
         });
       });
 
-      // Apply to app state
+      // Apply to app state — update both the local var and window alias
+      if (typeof tracks !== 'undefined') {
+        tracks.length = 0;
+        merged.forEach(function(t) { tracks.push(t); });
+      }
       window.tracks = merged;
       if (lib.playlists)    window.playlists = lib.playlists;
       if (lib.favorites)    window.favorites = new Set(lib.favorites);
@@ -9139,7 +9146,8 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
   // ── Backfill: upload all existing local tracks that aren't on Drive yet ─
   async function driveBackfillLocalTracks() {
     if (!driveUser) return;
-    var localTracks = (window.tracks || []).filter(function(t) {
+    var allTracks = (typeof tracks !== 'undefined' && tracks.length) ? tracks : (window.tracks || []);
+    var localTracks = allTracks.filter(function(t) {
       return t.blobId && !t.driveFileId && !t.isOnline;
     });
     if (!localTracks.length) return;
