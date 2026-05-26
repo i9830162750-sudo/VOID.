@@ -5,6 +5,7 @@
  * v6.1 additions:
  *   • express-session + passport for Google OAuth
  *   • /api/auth/* — OAuth flow
+ *   • /api/drive/* — Google Drive sync (library JSON + audio files)
  */
 
 'use strict';
@@ -153,6 +154,14 @@ app.use(
     maxAge:  config.isDev ? '0' : '1d',
     etag:    true,
     setHeaders(res, filePath) {
+      // index.html must never be browser-cached — it carries CSP headers from
+      // helmet that must always be served fresh so security policy changes
+      // (imgSrc, mediaSrc, connectSrc etc.) take effect immediately.
+      if (filePath.endsWith('index.html')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+      }
       if (filePath.endsWith('sw.js')) {
         res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
         res.setHeader('Service-Worker-Allowed', '/');
@@ -161,8 +170,13 @@ app.use(
   })
 );
 
-// ── SPA fallback ─────────────────────────────────────────────────────────────
+// ── SPA fallback — also no-cache so CSP headers always come from server ──────
+// This handles the case where express.static doesn't match (e.g. direct nav to /)
+
 app.get('*', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
