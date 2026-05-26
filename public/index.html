@@ -5036,7 +5036,7 @@ function playOnlineTrack(song, source) {
       } : null,
     };
     tracks.push(newTrack);
-    saveTracks();
+    saveSettings();
     playTrack(tracks.length - 1);
     showToast(`Added · ${newTrack.title}`);
     renderHomeRecent();
