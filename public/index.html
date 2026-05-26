@@ -4126,7 +4126,76 @@ async function loadAll() {
     }
     ytCheckApiStatus();
   }, 800);
+
+  // 8. One-time ID3 backfill: re-extract metadata from blobs for tracks missing cover or artist.
+  //    Runs silently in the background after the app is interactive.
+  //    Only processes tracks that have a local blob but were saved without ID3 metadata.
+  setTimeout(() => backfillLocalID3Metadata(), 2000);
 }
+
+// ── Retroactively read ID3 tags for existing local tracks that lack cover/artist ──
+async function backfillLocalID3Metadata() {
+  const needsBackfill = tracks.filter(t =>
+    !t.isOnline && t.blobId && (!t.cover || t.artist === 'Unknown Artist' || t.artist === '')
+  );
+  if (!needsBackfill.length) return;
+
+  console.log('[ID3 Backfill] checking', needsBackfill.length, 'tracks');
+  let updated = 0;
+
+  for (const t of needsBackfill) {
+    try {
+      const stored = await dbGet('blobs', t.blobId).catch(() => null);
+      if (!stored || !stored.blob) continue;
+
+      // Route to correct parser: sniff the blob's first 8 bytes for ftyp (M4A/MP4 magic)
+      // If the blob has no name we check the track's title extension as a hint.
+      const tags = await (async () => {
+        try {
+          const readSize = Math.min(stored.blob.size, 6 * 1024 * 1024);
+          const buf = await stored.blob.slice(0, readSize).arrayBuffer();
+          // M4A/MP4 magic: bytes 4-7 are 'ftyp'
+          const header = new Uint8Array(buf, 0, Math.min(8, buf.byteLength));
+          const isMp4 = header[4]===0x66&&header[5]===0x74&&header[6]===0x79&&header[7]===0x70;
+          return isMp4 ? parseM4A(buf) : parseID3(buf);
+        } catch(_) { return null; }
+      })();
+
+      if (!tags) continue;
+      let changed = false;
+
+      if (tags.title  && !t.title)                             { t.title  = tags.title;  changed = true; }
+      if (tags.artist && (t.artist === 'Unknown Artist' || !t.artist)) { t.artist = tags.artist; changed = true; }
+      if (!t.cover && tags.picture && tags.picture.data && tags.picture.data.length > 0) {
+        try {
+          const picBlob = new Blob([tags.picture.data], { type: tags.picture.format || 'image/jpeg' });
+          const dataUrl = await new Promise((res, rej) => {
+            const fr2 = new FileReader();
+            fr2.onload  = () => res(fr2.result);
+            fr2.onerror = () => rej(fr2.error);
+            fr2.readAsDataURL(picBlob);
+          });
+          t.cover = dataUrl;
+          changed = true;
+        } catch(e) { /* cover stays null */ }
+      }
+
+      if (changed) {
+        await updateTrackMeta(t).catch(() => {});
+        updated++;
+      }
+    } catch(e) {
+      console.warn('[ID3 Backfill] error on', t.title, e);
+    }
+  }
+
+  if (updated > 0) {
+    console.log('[ID3 Backfill] updated', updated, 'tracks');
+    renderAll();
+    if (currentIndex >= 0) updateUI();
+  }
+}
+
 
 // ==============================
 // AUDIO ENGINE
@@ -5395,8 +5464,9 @@ function parseID3(buf) {
         const enc = fd[0]; const raw = fd.subarray(1);
         let text = '';
         try {
-          text = (enc===1||enc===2) ? new TextDecoder('utf-16').decode(raw).replace(/\x00/g,'').trim()
-                                    : new TextDecoder('utf-8').decode(raw).replace(/\x00/g,'').trim();
+          if (enc===1) text = new TextDecoder('utf-16').decode(raw).replace(/\x00/g,'').trim();
+          else if (enc===2) text = new TextDecoder('utf-16be').decode(raw).replace(/\x00/g,'').trim();
+          else text = new TextDecoder('utf-8').decode(raw).replace(/\x00/g,'').trim();
         } catch(e) { text = latin(raw); }
         if (frameId==='TIT2'||frameId==='TT2') result.title  = text;
         if (frameId==='TPE1'||frameId==='TP1') result.artist = text;
@@ -5412,8 +5482,13 @@ function parseID3(buf) {
           if (enc===1||enc===2) { while(i+1<fd.length&&!(fd[i]===0&&fd[i+1]===0)){i+=2;} i+=2; }
           else { while(i<fd.length&&fd[i]!==0){i++;} i++; }
           if (i < fd.length) {
-            const fmt = mime.includes('png')?'image/png':'image/jpeg';
-            result.picture = { data: fd.subarray(i), format: fmt };
+            let fmt = 'image/jpeg'; // safe default
+            const ml = mime.toLowerCase();
+            if (ml.includes('png'))  fmt = 'image/png';
+            else if (ml.includes('webp')) fmt = 'image/webp';
+            else if (ml.includes('gif'))  fmt = 'image/gif';
+            // Some encoders write "JPG" as the three-char v2.2 mime — keep default jpeg
+            result.picture = { data: new Uint8Array(fd.buffer, fd.byteOffset + i, fd.length - i), format: fmt };
           }
         } catch(e) {}
       }
@@ -5435,11 +5510,123 @@ function parseID3(buf) {
 }
 
 async function readFileID3(file) {
-  // Read first 3MB — some encoders embed cover art much later in the file
+  // Read first 6MB — some encoders embed cover art well past the 3MB mark
   try {
-    const readSize = Math.min(file.size, 3 * 1024 * 1024);
+    const readSize = Math.min(file.size, 6 * 1024 * 1024);
     const buf = await file.slice(0, readSize).arrayBuffer();
     return parseID3(buf);
+  } catch(e) { return null; }
+}
+
+// ── iTunes / MP4 atom metadata parser ────────────────────────────────────────
+// Handles .m4a, .m4b, .aac, .mp4, .alac — any ISO Base Media file.
+// These files use iTunes 'ilst' atoms, NOT ID3 tags.
+// Returns the same shape as parseID3: { title, artist, album, picture }
+function parseM4A(buf) {
+  const v   = new Uint8Array(buf);
+  const len = v.length;
+  const result = { title: '', artist: '', album: '', picture: null };
+
+  // Read a 4-byte big-endian uint
+  const u32 = (i) => ((v[i]<<24)|(v[i+1]<<16)|(v[i+2]<<8)|v[i+3]) >>> 0;
+  const str4 = (i) => String.fromCharCode(v[i],v[i+1],v[i+2],v[i+3]);
+
+  // Walk top-level atoms to find 'moov'
+  function walkAtoms(start, end, targetName, cb) {
+    let i = start;
+    while (i + 8 <= end && i < len) {
+      let size = u32(i);
+      const name = str4(i + 4);
+      if (size === 1) {
+        // 64-bit extended size — we won't have files this big in a 6MB read, skip
+        break;
+      }
+      if (size < 8) break; // corrupt
+      const atomEnd = Math.min(i + size, end, len);
+      if (name === targetName) cb(i, atomEnd);
+      i += size;
+    }
+  }
+
+  // Find moov → udta → meta → ilst  OR  moov → meta → ilst (iTunes variants)
+  let ilstStart = -1, ilstEnd = -1;
+
+  walkAtoms(0, len, 'moov', (moovStart, moovEnd) => {
+    // Try moov > udta > meta > ilst
+    walkAtoms(moovStart + 8, moovEnd, 'udta', (udtaS, udtaE) => {
+      walkAtoms(udtaS + 8, udtaE, 'meta', (metaS, metaE) => {
+        // meta has a 4-byte version/flags field before its children
+        walkAtoms(metaS + 12, metaE, 'ilst', (s, e) => { ilstStart = s + 8; ilstEnd = e; });
+      });
+    });
+    // Fallback: moov > meta > ilst (some encoders skip udta)
+    if (ilstStart < 0) {
+      walkAtoms(moovStart + 8, moovEnd, 'meta', (metaS, metaE) => {
+        walkAtoms(metaS + 12, metaE, 'ilst', (s, e) => { ilstStart = s + 8; ilstEnd = e; });
+      });
+    }
+  });
+
+  if (ilstStart < 0) return result; // no ilst found
+
+  // Walk ilst children — each is a named atom containing a 'data' sub-atom
+  let i = ilstStart;
+  while (i + 8 <= ilstEnd && i < len) {
+    const size = u32(i);
+    if (size < 8) break;
+    const name = str4(i + 4);         // e.g. '©nam', '©ART', 'covr'
+    const atomEnd = Math.min(i + size, ilstEnd, len);
+
+    // Find the 'data' child inside this ilst entry
+    let di = i + 8;
+    while (di + 16 <= atomEnd) {
+      const dSize  = u32(di);
+      const dName  = str4(di + 4);
+      if (dName === 'data' && dSize >= 16) {
+        // data atom: [size(4)][name(4)][type_flags(4)][locale(4)][payload...]
+        const typeFlags = u32(di + 8);  // 1 = UTF-8 text, 13 = JPEG, 14 = PNG
+        const payloadStart = di + 16;
+        const payloadEnd   = Math.min(di + dSize, atomEnd, len);
+        const payloadLen   = payloadEnd - payloadStart;
+
+        if (payloadLen > 0) {
+          if (typeFlags === 1 || typeFlags === 0) {
+            // UTF-8 (or implicit) text
+            let text = '';
+            try { text = new TextDecoder('utf-8').decode(v.subarray(payloadStart, payloadEnd)).replace(/\x00/g,'').trim(); }
+            catch(e) { text = ''; }
+            if      (name === '\xa9nam') result.title  = text;  // ©nam
+            else if (name === '\xa9ART') result.artist = text;  // ©ART
+            else if (name === '\xa9alb') result.album  = text;  // ©alb
+            else if (name === 'aART' && !result.artist) result.artist = text; // album artist fallback
+          } else if ((typeFlags === 13 || typeFlags === 14) && !result.picture) {
+            // 13 = JPEG, 14 = PNG
+            const fmt = typeFlags === 14 ? 'image/png' : 'image/jpeg';
+            result.picture = { data: new Uint8Array(buf, payloadStart, payloadLen), format: fmt };
+          }
+        }
+      }
+      if (dSize < 8) break;
+      di += dSize;
+    }
+    i += size;
+  }
+  return result;
+}
+
+// ── Unified metadata reader: routes to ID3 or M4A parser based on file type ──
+async function readFileTags(file) {
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  const extIsM4 = ext === 'm4a' || ext === 'm4b' || ext === 'mp4' || ext === 'aac' || ext === 'alac';
+  const mimeIsM4 = !!(file.type && (file.type.includes('mp4') || file.type.includes('m4a') || file.type.includes('aac')));
+  try {
+    const readSize = Math.min(file.size, 6 * 1024 * 1024);
+    const buf = await file.slice(0, readSize).arrayBuffer();
+    // Magic byte sniff: bytes 4-7 == 'ftyp' means ISO Base Media (M4A/MP4/AAC)
+    const header = new Uint8Array(buf, 0, Math.min(8, buf.byteLength));
+    const magicIsM4 = header[4]===0x66&&header[5]===0x74&&header[6]===0x79&&header[7]===0x70;
+    const isM4 = extIsM4 || mimeIsM4 || magicIsM4;
+    return isM4 ? parseM4A(buf) : parseID3(buf);
   } catch(e) { return null; }
 }
 
@@ -5464,44 +5651,40 @@ document.getElementById('file-input').addEventListener('change', async function(
       title  = parts[1].trim();
     }
 
-    // Metadata + duration in parallel — inline ID3 parser, no CDN needed
-    const [metaResult, durationResult] = await Promise.allSettled([
-      readFileID3(file),
-      (async () => {
-        try {
-          const tmp = new Audio();
-          tmp.preload = 'metadata';
-          tmp.src = url;
-          return await Promise.race([
-            new Promise(r => tmp.addEventListener('loadedmetadata', () => r(tmp.duration || 0), {once:true})),
-            new Promise(r => tmp.addEventListener('error', () => r(0), {once:true})),
-            new Promise(r => setTimeout(() => r(0), 3000)),
-          ]);
-        } catch(e) { return 0; }
-      })(),
-    ]);
+    // Step 1: Read metadata tags — routes to ID3 parser (MP3/FLAC/OGG) or
+    //         iTunes atom parser (M4A/M4B/MP4/AAC) based on file extension.
+    const tags = await readFileTags(file);
 
-    // Apply ID3 tags if parsed
-    const tags = metaResult.status === 'fulfilled' && metaResult.value;
+    // Apply tags
     if (tags) {
       if (tags.title)  title  = tags.title;
       if (tags.artist) artist = tags.artist;
-      if (tags.picture) {
+      if (tags.picture && tags.picture.data && tags.picture.data.length > 0) {
         try {
-          const bytes = tags.picture.data;
-          // Use FileReader-based approach — avoids btoa/spread stack overflow on large images
-          const blob = new Blob([bytes], { type: tags.picture.format });
+          const picBlob = new Blob([tags.picture.data], { type: tags.picture.format || 'image/jpeg' });
           cover = await new Promise((res, rej) => {
-            const fr = new FileReader();
-            fr.onload = () => res(fr.result);
-            fr.onerror = () => rej(fr.error);
-            fr.readAsDataURL(blob);
+            const fr2 = new FileReader();
+            fr2.onload  = () => res(fr2.result);
+            fr2.onerror = () => rej(fr2.error);
+            fr2.readAsDataURL(picBlob);
           });
         } catch(e) { cover = null; }
       }
     }
 
-    const duration = durationResult.status === 'fulfilled' ? (durationResult.value || 0) : 0;
+    // Step 2: Get duration via audio element (after ID3 read so no file-read contention)
+    const duration = await (async () => {
+      try {
+        const tmp = new Audio();
+        tmp.preload = 'metadata';
+        tmp.src = url;
+        return await Promise.race([
+          new Promise(r => tmp.addEventListener('loadedmetadata', () => { r(tmp.duration || 0); tmp.src=''; }, {once:true})),
+          new Promise(r => tmp.addEventListener('error', () => { r(0); tmp.src=''; }, {once:true})),
+          new Promise(r => setTimeout(() => { r(0); }, 4000)),
+        ]);
+      } catch(e) { return 0; }
+    })();
     const id     = 'track_' + Date.now() + '_' + Math.random().toString(36).slice(2);
     const blobId = 'blob_' + id;
 
@@ -9340,7 +9523,10 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
           blobId:   t.blobId,
           title:    t.title,
           artist:   t.artist,
-          cover:    t.cover,
+          // Omit cover from Drive snapshot — base64 art can be 100-500KB per track,
+          // making the JSON payload huge. Cover is re-read from local IDB on load,
+          // and re-extracted from the audio blob if missing (see loadAll backfill).
+          cover:    null,
           duration: t.duration,
           isFav:    t.isFav,
           ytMeta:   t.ytMeta,
@@ -9414,6 +9600,8 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
         return Object.assign({}, dt, {
           // If we have a local blob URL, keep it; otherwise mark as no-blob
           url:  (local && local.url) ? local.url : (dt.driveFileId ? '/api/drive/audio/' + dt.driveFileId : null),
+          // Preserve local cover art — Drive snapshot intentionally omits it to save bandwidth
+          cover: (local && local.cover) ? local.cover : (dt.cover || null),
           // Restore blob from Drive if we have a driveFileId but no local blob
           _needsDriveFetch: !local && !!dt.driveFileId,
         });
