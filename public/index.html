@@ -9056,7 +9056,12 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
 
   // ── Save library to Drive ──────────────────────────────────────────────
   async function driveSaveLibrary(manual) {
-    if (!driveUser || driveSyncing) return;
+    if (!driveUser) return;
+    // Wait if already syncing rather than silently dropping the save
+    var attempts = 0;
+    while (driveSyncing && attempts++ < 20) {
+      await new Promise(function(r) { setTimeout(r, 500); });
+    }
     driveSyncing = true;
     updateDriveUI();
     try {
@@ -9094,6 +9099,8 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
         return;
       }
       var lib = data.library;
+      console.log('[Drive] restore: library has', (lib.tracks||[]).length, 'tracks, savedAt:', lib._savedAt);
+      console.log('[Drive] restore: first track sample:', JSON.stringify((lib.tracks||[])[0]));
 
       // Merge Drive tracks with local (Drive wins for metadata, local wins for blobs)
       var localById = {};
