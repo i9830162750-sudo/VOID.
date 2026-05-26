@@ -3261,6 +3261,44 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
       <!-- Genre sections (dynamically inserted here) -->
       <div id="home-genre-sections"></div>
 
+      <!-- ── ONLINE FEED SECTIONS ── -->
+
+      <!-- Trending Now (JioSaavn) -->
+      <div class="home-section" id="home-trending-section" style="display:none">
+        <div class="home-section-hdr">
+          <div class="home-section-title" style="display:flex;align-items:center;gap:8px">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:15px;height:15px;color:var(--accent)"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            Trending Now
+          </div>
+          <div id="home-trending-loader" style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace">loading…</div>
+        </div>
+        <div class="home-feed-row" id="home-trending-list"></div>
+      </div>
+
+      <!-- New Releases (JioSaavn) -->
+      <div class="home-section" id="home-newrel-section" style="display:none">
+        <div class="home-section-hdr">
+          <div class="home-section-title" style="display:flex;align-items:center;gap:8px">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:15px;height:15px;color:var(--accent)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+            New Releases
+          </div>
+          <div id="home-newrel-loader" style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace">loading…</div>
+        </div>
+        <div class="home-feed-row" id="home-newrel-list"></div>
+      </div>
+
+      <!-- Popular on SoundCloud -->
+      <div class="home-section" id="home-sc-section" style="display:none">
+        <div class="home-section-hdr">
+          <div class="home-section-title" style="display:flex;align-items:center;gap:8px">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:15px;height:15px;color:#f50"><path d="M11.56 8.87V17h8.76c.89 0 1.68-.6 1.68-1.49 0-.77-.55-1.41-1.29-1.56a2.87 2.87 0 00-2.46-4.33 2.8 2.8 0 00-.86.14 3.5 3.5 0 00-3.44-2.9c-.86 0-1.64.3-2.39.01z"/><path d="M3 17h1.5V9.5S3 9.96 3 11.5V17z"/><path d="M5.5 17H7V9s-1.5.45-1.5 2V17z"/><path d="M8 17h1.5V8.5S8 9 8 10.5V17z"/></svg>
+            Popular on SoundCloud
+          </div>
+          <div id="home-sc-loader" style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace">loading…</div>
+        </div>
+        <div class="home-feed-row" id="home-sc-list"></div>
+      </div>
+
       <!-- Favorites section -->
       <div class="home-section" id="home-favs-section" style="display:none">
         <div class="home-section-hdr">
@@ -4806,6 +4844,121 @@ function renderHomeRecs() {
 }
 
 // ==============================
+// ONLINE HOME FEED
+// ==============================
+let _onlineFeedLoaded = false;
+let _onlineFeedLoading = false;
+
+// Queries for each section — rotate based on day so it feels fresh
+const TRENDING_QUERIES   = ['trending hindi 2025','top hits 2025','trending songs','viral hits 2025','bollywood hits 2025'];
+const NEWREL_QUERIES     = ['new releases 2025','latest songs 2025','new music 2025','fresh tracks 2025','new bollywood 2025'];
+const SC_QUERIES         = ['soundcloud trending','underground music 2025','indie electronic 2025','lo-fi chill 2025','phonk 2025'];
+
+function _dailyQuery(arr) {
+  const d = new Date(); const idx = (d.getFullYear()*10000 + (d.getMonth()+1)*100 + d.getDate()) % arr.length;
+  return arr[idx];
+}
+
+function makeOnlineCard(song, source) {
+  const thumb = song.thumbnail || '';
+  const title = song.title || 'Unknown';
+  const artist = song.artist || '';
+  const isYT = source === 'jiosaavn';
+  const badge = isYT ? '' : '<div class="feed-yt-badge" style="background:rgba(255,80,0,0.85)">SC</div>';
+  return `<div class="feed-track-card" onclick="playOnlineTrack(${JSON.stringify(JSON.stringify(song))}, '${source}')">
+    <div class="feed-track-art">
+      ${thumb ? `<img src="${thumb}" alt="" loading="lazy">` : `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`}
+      ${badge}
+    </div>
+    <div class="feed-track-label">${esc(title)}</div>
+    <div class="feed-track-sub">${esc(artist)}</div>
+  </div>`;
+}
+
+async function loadOnlineHomeFeed(force) {
+  if (_onlineFeedLoading) return;
+  if (_onlineFeedLoaded && !force) return;
+  _onlineFeedLoading = true;
+
+  // Show sections in loading state
+  ['home-trending-section','home-newrel-section','home-sc-section'].forEach(id => {
+    const el = document.getElementById(id); if (el) el.style.display = 'block';
+  });
+
+  async function fetchSection(sectionId, listId, loaderId, apiPath) {
+    const loader = document.getElementById(loaderId);
+    const list   = document.getElementById(listId);
+    const section = document.getElementById(sectionId);
+    if (!list || !section) return;
+    try {
+      const resp = await fetch(`${VOID_API_BASE}${apiPath}`, { signal: AbortSignal.timeout(12000) });
+      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const data = await resp.json();
+      const items = data.items || [];
+      if (!items.length) { section.style.display = 'none'; return; }
+      if (loader) loader.style.display = 'none';
+      const src = data.source || 'jiosaavn';
+      list.innerHTML = items.slice(0, 12).map(s => makeOnlineCard(s, src)).join('');
+      section.style.display = 'block';
+    } catch(e) {
+      console.warn(`[OnlineFeed] ${sectionId}:`, e.message);
+      section.style.display = 'none';
+    }
+  }
+
+  const tq  = encodeURIComponent(_dailyQuery(TRENDING_QUERIES));
+  const nq  = encodeURIComponent(_dailyQuery(NEWREL_QUERIES));
+  const scq = encodeURIComponent(_dailyQuery(SC_QUERIES));
+
+  await Promise.allSettled([
+    fetchSection('home-trending-section', 'home-trending-list', 'home-trending-loader', `/youtube/search?q=${tq}&max=12`),
+    fetchSection('home-newrel-section',   'home-newrel-list',   'home-newrel-loader',   `/youtube/search?q=${nq}&max=12`),
+    fetchSection('home-sc-section',       'home-sc-list',       'home-sc-loader',       `/soundcloud/search?q=${scq}&max=12`),
+  ]);
+
+  _onlineFeedLoaded = true;
+  _onlineFeedLoading = false;
+}
+
+// Play a card from the online home feed — adds as temporary online track and plays
+function playOnlineTrack(songJson, source) {
+  try {
+    const song = JSON.parse(songJson);
+    const id = 'online_' + (song.id || song.videoId || Date.now());
+    // Check if already in library
+    const existing = tracks.find(t => t.id === id || (t.ytMeta && t.ytMeta.videoId === String(song.id || song.videoId)));
+    if (existing) { const ri = tracks.indexOf(existing); playTrack(ri); return; }
+
+    const isJioSaavn = source === 'jiosaavn';
+    const newTrack = {
+      id, blobId: null, url: null,
+      title: song.title || 'Unknown',
+      artist: song.artist || '',
+      duration: song.duration || 0,
+      cover: song.thumbnail || null,
+      isFav: false,
+      isOnline: true,
+      ytMeta: isJioSaavn ? {
+        videoId: String(song.id || song.videoId),
+        title: song.title,
+        thumbnail: song.thumbnail || '',
+      } : null,
+      scMeta: !isJioSaavn ? {
+        trackId: String(song.id || song.videoId),
+        title: song.title,
+        artwork_url: song.thumbnail || '',
+        stream_url: song.audioUrl || '',
+      } : null,
+    };
+    tracks.push(newTrack);
+    saveTracks();
+    playTrack(tracks.length - 1);
+    showToast(`Added · ${newTrack.title}`);
+    renderHomeRecent();
+  } catch(e) { console.error('[playOnlineTrack]', e); showToast('Could not play track'); }
+}
+
+// ==============================
 // SEE-ALL OVERLAY
 // ==============================
 // ==============================
@@ -5273,6 +5426,7 @@ function renderAll() {
   const cnt=tracks.length+' track'+(tracks.length!==1?'s':'');
   document.getElementById('home-count').textContent=cnt;
   document.getElementById('home-count-lib').textContent=cnt;
+  loadOnlineHomeFeed();
 }
 
 function renderTrackList(filter='') {
@@ -7254,7 +7408,7 @@ function isDesktop() { return window.matchMedia('(min-width:1025px)').matches; }
   // Pages that are cheap to re-render on demand
   // Maps page name → render function (called when page becomes active)
   const PAGE_RENDERERS = {
-    home:      () => { renderHomeRecent(); renderHomePlaylists(); updateHomeCard(); },
+    home:      () => { renderHomeRecent(); renderHomePlaylists(); updateHomeCard(); loadOnlineHomeFeed(); },
     library:   () => renderTrackList(document.getElementById('search-input')?.value || ''),
     queue:     () => renderQueueList(),
     playlists: () => renderPlaylistsPage(),
@@ -7397,7 +7551,7 @@ function showPage(name) {
   if (name==='library')   { renderTrackList(document.getElementById('search-input').value); }
   if (name==='queue')     renderQueueList();
   if (name==='playlists') renderPlaylistsPage();
-  if (name==='home')      { renderHomeRecent(); renderHomePlaylists(); updateHomeCard(); }
+  if (name==='home')      { renderHomeRecent(); renderHomePlaylists(); updateHomeCard(); loadOnlineHomeFeed(); }
   if (name==='settings')  { buildSettingsPage(); setTimeout(()=>ytCheckApiStatus(), 50); }
 }
 
