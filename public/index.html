@@ -3299,6 +3299,54 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
         <div class="home-feed-row" id="home-sc-list"></div>
       </div>
 
+      <!-- Chill Vibes (JioSaavn) -->
+      <div class="home-section" id="home-chill-section" style="display:none">
+        <div class="home-section-hdr">
+          <div class="home-section-title" style="display:flex;align-items:center;gap:8px">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:15px;height:15px;color:var(--accent)"><path d="M17 8C8 10 5.9 16.17 3.82 22"/><path d="M9.5 9.5c1-2.3 4-3.7 7.5-3.5"/><path d="M12 12c-2 3-2 6 0 10"/></svg>
+            Chill Vibes
+          </div>
+          <div id="home-chill-loader" style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace">loading…</div>
+        </div>
+        <div class="home-feed-row" id="home-chill-list"></div>
+      </div>
+
+      <!-- Workout & Energy (JioSaavn) -->
+      <div class="home-section" id="home-workout-section" style="display:none">
+        <div class="home-section-hdr">
+          <div class="home-section-title" style="display:flex;align-items:center;gap:8px">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:15px;height:15px;color:#ff6b35"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+            Workout &amp; Energy
+          </div>
+          <div id="home-workout-loader" style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace">loading…</div>
+        </div>
+        <div class="home-feed-row" id="home-workout-list"></div>
+      </div>
+
+      <!-- Late Night (SoundCloud) -->
+      <div class="home-section" id="home-night-section" style="display:none">
+        <div class="home-section-hdr">
+          <div class="home-section-title" style="display:flex;align-items:center;gap:8px">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:15px;height:15px;color:#8b5cf6"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+            Late Night
+          </div>
+          <div id="home-night-loader" style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace">loading…</div>
+        </div>
+        <div class="home-feed-row" id="home-night-list"></div>
+      </div>
+
+      <!-- Desi Hits (JioSaavn) -->
+      <div class="home-section" id="home-desi-section" style="display:none">
+        <div class="home-section-hdr">
+          <div class="home-section-title" style="display:flex;align-items:center;gap:8px">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:15px;height:15px;color:#f59e0b"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            Desi Hits
+          </div>
+          <div id="home-desi-loader" style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace">loading…</div>
+        </div>
+        <div class="home-feed-row" id="home-desi-list"></div>
+      </div>
+
       <!-- Favorites section -->
       <div class="home-section" id="home-favs-section" style="display:none">
         <div class="home-section-hdr">
@@ -4032,6 +4080,10 @@ async function loadAll() {
   for (let i = 0; i < localTracks.length; i++) {
     if (blobResults[i]) {
       localTracks[i].url = URL.createObjectURL(blobResults[i].blob);
+      tracks.push(localTracks[i]);
+    } else if (localTracks[i].driveFileId) {
+      // No local blob but track exists on Drive — restore with Drive URL so it can be played
+      localTracks[i].url = '/api/drive/audio/' + localTracks[i].driveFileId;
       tracks.push(localTracks[i]);
     }
   }
@@ -4853,6 +4905,10 @@ let _onlineFeedLoading = false;
 const TRENDING_QUERIES   = ['trending hindi 2025','top hits 2025','trending songs','viral hits 2025','bollywood hits 2025'];
 const NEWREL_QUERIES     = ['new releases 2025','latest songs 2025','new music 2025','fresh tracks 2025','new bollywood 2025'];
 const SC_QUERIES         = ['soundcloud trending','underground music 2025','indie electronic 2025','lo-fi chill 2025','phonk 2025'];
+const CHILL_QUERIES      = ['chill hits 2025','lo-fi beats','chill indian songs','chill english songs','peaceful music 2025'];
+const WORKOUT_QUERIES    = ['workout music 2025','gym hits','high energy songs 2025','motivation music','power songs 2025'];
+const NIGHT_QUERIES      = ['late night music','midnight vibes soundcloud','dark ambient 2025','night drive music','2am playlist'];
+const DESI_QUERIES       = ['punjabi hits 2025','hindi rap 2025','desi pop 2025','ap dhillon new songs','arijit singh 2025'];
 
 function _dailyQuery(arr) {
   const d = new Date(); const idx = (d.getFullYear()*10000 + (d.getMonth()+1)*100 + d.getDate()) % arr.length;
@@ -4863,9 +4919,15 @@ function makeOnlineCard(song, source) {
   const thumb = song.thumbnail || '';
   const title = song.title || 'Unknown';
   const artist = song.artist || '';
-  const isYT = source === 'jiosaavn';
-  const badge = isYT ? '' : '<div class="feed-yt-badge" style="background:rgba(255,80,0,0.85)">SC</div>';
-  return `<div class="feed-track-card" onclick="playOnlineTrack(${JSON.stringify(JSON.stringify(song))}, '${source}')">
+  const isJioSaavn = source === 'jiosaavn';
+  const badge = isJioSaavn ? '' : '<div class="feed-yt-badge" style="background:rgba(255,80,0,0.85)">SC</div>';
+  // Use data attributes to safely store song JSON — avoids HTML/JS injection from special chars in titles
+  const safeJson = song._cardId ? '' : '';
+  const cardId = 'oc_' + (song.id || song.videoId || Math.random().toString(36).slice(2));
+  // Register song in a global map so onclick can look it up by ID safely
+  if (!window._onlineCardMap) window._onlineCardMap = {};
+  window._onlineCardMap[cardId] = { song, source };
+  return `<div class="feed-track-card" onclick="playOnlineCardById('${cardId}')">
     <div class="feed-track-art">
       ${thumb ? `<img src="${thumb}" alt="" loading="lazy">` : `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`}
       ${badge}
@@ -4875,13 +4937,23 @@ function makeOnlineCard(song, source) {
   </div>`;
 }
 
+function playOnlineCardById(cardId) {
+  if (!window._onlineCardMap || !window._onlineCardMap[cardId]) {
+    showToast('Could not find track');
+    return;
+  }
+  const { song, source } = window._onlineCardMap[cardId];
+  playOnlineTrack(song, source);
+}
+
 async function loadOnlineHomeFeed(force) {
   if (_onlineFeedLoading) return;
   if (_onlineFeedLoaded && !force) return;
   _onlineFeedLoading = true;
 
-  // Show sections in loading state
-  ['home-trending-section','home-newrel-section','home-sc-section'].forEach(id => {
+  // Show all online sections in loading state
+  ['home-trending-section','home-newrel-section','home-sc-section',
+   'home-chill-section','home-workout-section','home-night-section','home-desi-section'].forEach(id => {
     const el = document.getElementById(id); if (el) el.style.display = 'block';
   });
 
@@ -4909,11 +4981,24 @@ async function loadOnlineHomeFeed(force) {
   const tq  = encodeURIComponent(_dailyQuery(TRENDING_QUERIES));
   const nq  = encodeURIComponent(_dailyQuery(NEWREL_QUERIES));
   const scq = encodeURIComponent(_dailyQuery(SC_QUERIES));
+  const cq  = encodeURIComponent(_dailyQuery(CHILL_QUERIES));
+  const wq  = encodeURIComponent(_dailyQuery(WORKOUT_QUERIES));
+  const ngq = encodeURIComponent(_dailyQuery(NIGHT_QUERIES));
+  const dq  = encodeURIComponent(_dailyQuery(DESI_QUERIES));
 
+  // Load the first 3 sections immediately (above the fold)
   await Promise.allSettled([
     fetchSection('home-trending-section', 'home-trending-list', 'home-trending-loader', `/youtube/search?q=${tq}&max=12`),
     fetchSection('home-newrel-section',   'home-newrel-list',   'home-newrel-loader',   `/youtube/search?q=${nq}&max=12`),
     fetchSection('home-sc-section',       'home-sc-list',       'home-sc-loader',       `/soundcloud/search?q=${scq}&max=12`),
+  ]);
+
+  // Load remaining sections in background (below the fold)
+  Promise.allSettled([
+    fetchSection('home-chill-section',   'home-chill-list',   'home-chill-loader',   `/youtube/search?q=${cq}&max=12`),
+    fetchSection('home-workout-section', 'home-workout-list', 'home-workout-loader', `/youtube/search?q=${wq}&max=12`),
+    fetchSection('home-night-section',   'home-night-list',   'home-night-loader',   `/soundcloud/search?q=${ngq}&max=12`),
+    fetchSection('home-desi-section',    'home-desi-list',    'home-desi-loader',    `/youtube/search?q=${dq}&max=12`),
   ]);
 
   _onlineFeedLoaded = true;
@@ -4921,9 +5006,9 @@ async function loadOnlineHomeFeed(force) {
 }
 
 // Play a card from the online home feed — adds as temporary online track and plays
-function playOnlineTrack(songJson, source) {
+function playOnlineTrack(song, source) {
   try {
-    const song = JSON.parse(songJson);
+    if (typeof song === 'string') song = JSON.parse(song); // backward compat
     const id = 'online_' + (song.id || song.videoId || Date.now());
     // Check if already in library
     const existing = tracks.find(t => t.id === id || (t.ytMeta && t.ytMeta.videoId === String(song.id || song.videoId)));
@@ -5345,9 +5430,10 @@ function parseID3(buf) {
 }
 
 async function readFileID3(file) {
-  // Read only the first 600KB — covers virtually any embedded cover art
+  // Read first 3MB — some encoders embed cover art much later in the file
   try {
-    const buf = await file.slice(0, 614400).arrayBuffer();
+    const readSize = Math.min(file.size, 3 * 1024 * 1024);
+    const buf = await file.slice(0, readSize).arrayBuffer();
     return parseID3(buf);
   } catch(e) { return null; }
 }
@@ -9337,6 +9423,15 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
       if (typeof renderAll === 'function') renderAll();
       if (typeof saveSettings === 'function') saveSettings();
       if (typeof savePlaylists === 'function') savePlaylists();
+
+      // Persist restored track metadata to IndexedDB so they survive page reloads
+      Promise.all(merged.map(function(t) {
+        var meta = { id: t.id, blobId: t.blobId, title: t.title, artist: t.artist,
+                     duration: t.duration, cover: t.cover, isFav: t.isFav,
+                     ytMeta: t.ytMeta || null, isOnline: t.isOnline || false,
+                     driveFileId: t.driveFileId || null };
+        return dbPut('tracks', meta).catch(function(){});
+      }));
 
       var count = merged.length;
       showToast('✓ Restored ' + count + ' track' + (count !== 1 ? 's' : '') + ' from Google Drive');
