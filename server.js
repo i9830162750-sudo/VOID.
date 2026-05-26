@@ -55,6 +55,7 @@ app.use(
         imgSrc: [
           "'self'",
           'data:',
+          'blob:',
           'https://*.ytimg.com',
           'https://*.ggpht.com',
           'https://*.saavncdn.com',
@@ -62,12 +63,19 @@ app.use(
           'https://*.sndcdn.com',
           'https://lh3.googleusercontent.com', // Google profile photos
           'https://*.googleusercontent.com',
+          'https://i1.sndcdn.com',
+          'https://i2.sndcdn.com',
+          'https://i3.sndcdn.com',
+          'https://i4.sndcdn.com',
         ],
         connectSrc: [
           "'self'",
           'https://cdnjs.cloudflare.com',
           'https://*.saavncdn.com',
+          'https://aac.saavncdn.com',
           'https://*.sndcdn.com',
+          'https://cf-media.sndcdn.com',
+          'https://cf-preview-media.sndcdn.com',
           'https://accounts.google.com',
           'https://oauth2.googleapis.com',
           'https://www.googleapis.com',
