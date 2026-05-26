@@ -5380,7 +5380,12 @@ function parseID3(buf) {
         dataStart = pos + 10;
       }
       if (!frameId || frameId.charCodeAt(0) === 0) break;
-      if (frameSize <= 0 || dataStart + frameSize > v.length) break;
+      if (frameSize <= 0) { pos = dataStart; continue; } // skip zero-size frame
+      if (dataStart + frameSize > v.length) {
+        // Frame extends beyond our read window — try to read text frames only (they're small)
+        // Skip picture frames that are truncated; for text frames attempt anyway
+        if (frameId[0] !== 'T') { pos = dataStart + frameSize; continue; }
+      }
 
       const fd = v.subarray(dataStart, dataStart + frameSize);
       const isText = frameId[0]==='T' && frameId!=='TXXX' && frameId!=='TXX';
@@ -5484,13 +5489,15 @@ document.getElementById('file-input').addEventListener('change', async function(
       if (tags.picture) {
         try {
           const bytes = tags.picture.data;
-          const CHUNK = 8192;
-          let base64 = '';
-          for (let i = 0; i < bytes.length; i += CHUNK) {
-            base64 += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
-          }
-          cover = `data:${tags.picture.format};base64,${btoa(base64)}`;
-        } catch(e) {}
+          // Use FileReader-based approach — avoids btoa/spread stack overflow on large images
+          const blob = new Blob([bytes], { type: tags.picture.format });
+          cover = await new Promise((res, rej) => {
+            const fr = new FileReader();
+            fr.onload = () => res(fr.result);
+            fr.onerror = () => rej(fr.error);
+            fr.readAsDataURL(blob);
+          });
+        } catch(e) { cover = null; }
       }
     }
 
@@ -5501,14 +5508,18 @@ document.getElementById('file-input').addEventListener('change', async function(
     return { track: { id, blobId, title, artist, url, cover, duration, isFav:false, ytMeta:null, isOnline:false }, file };
   };
 
-  // Process all files fully in parallel
-  const results = await Promise.all(files.map(f => processFile(f).catch(err => {
-    console.warn('Failed to process file:', err); return null;
-  })));
+  // Process files with limited concurrency to avoid memory pressure on large batches
+  const CONCURRENCY = 3;
+  const validResults = [];
+  for (let i = 0; i < files.length; i += CONCURRENCY) {
+    const batch = files.slice(i, i + CONCURRENCY);
+    const batchResults = await Promise.all(batch.map(f => processFile(f).catch(err => {
+      console.warn('Failed to process file:', err); return null;
+    })));
+    validResults.push(...batchResults.filter(Boolean));
+  }
 
-  // Persist to DB in parallel (non-blocking batch)
-  const validResults = results.filter(Boolean);
-  for (const { track, file } of validResults) {
+  for (const { track } of validResults) {
     tracks.push(track);
   }
   // Fire-and-forget batch persist (don't block UI)
