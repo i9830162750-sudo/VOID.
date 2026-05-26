@@ -5265,7 +5265,7 @@ function renderHomePlaylists() {
 // Returns { title, artist, album, picture: {data:Uint8Array, format:string}|null }
 function parseID3(buf) {
   const v = new Uint8Array(buf);
-  const latin = s => { try { return new TextDecoder('latin1').decode(s).replace(//g,'').trim(); } catch(e){ return ''; } };
+  const latin = s => { try { return new TextDecoder('latin1').decode(s).replace(/\0/g,'').trim(); } catch(e){ return ''; } };
   const int28 = (a,b,c,d) => ((a&0x7f)<<21)|((b&0x7f)<<14)|((c&0x7f)<<7)|(d&0x7f);
   const int32 = (a,b,c,d) => ((a<<24)|(b<<16)|(c<<8)|d) >>> 0;
 
@@ -5305,8 +5305,8 @@ function parseID3(buf) {
         const enc = fd[0]; const raw = fd.subarray(1);
         let text = '';
         try {
-          text = (enc===1||enc===2) ? new TextDecoder('utf-16').decode(raw).replace(//g,'').trim()
-                                    : new TextDecoder('utf-8').decode(raw).replace(//g,'').trim();
+          text = (enc===1||enc===2) ? new TextDecoder('utf-16').decode(raw).replace(/\x00/g,'').trim()
+                                    : new TextDecoder('utf-8').decode(raw).replace(/\x00/g,'').trim();
         } catch(e) { text = latin(raw); }
         if (frameId==='TIT2'||frameId==='TT2') result.title  = text;
         if (frameId==='TPE1'||frameId==='TP1') result.artist = text;
