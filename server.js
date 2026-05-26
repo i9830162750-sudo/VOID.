@@ -105,8 +105,16 @@ app.use(
 );
 
 // ── Body parsing ─────────────────────────────────────────────────────────────
-app.use(express.json({ limit: '5mb' }));
-app.use(express.urlencoded({ extended: true, limit: '5mb' }));
+// Skip json/urlencoded parsing for multipart (multer handles those)
+app.use((req, res, next) => {
+  if (req.headers['content-type'] && req.headers['content-type'].startsWith('multipart/')) {
+    return next();
+  }
+  express.json({ limit: '5mb' })(req, res, (err) => {
+    if (err) return next(err);
+    express.urlencoded({ extended: true, limit: '5mb' })(req, res, next);
+  });
+});
 
 // ── Sessions (required for Passport) ─────────────────────────────────────────
 app.use(
