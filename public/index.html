@@ -5259,23 +5259,97 @@ function renderHomePlaylists() {
 // ==============================
 // FILE UPLOAD
 // ==============================
-let jsmediatagsLib=null;
-async function loadJsmediatags() {
-  if (jsmediatagsLib) return jsmediatagsLib;
-  return new Promise((res,rej)=>{
-    const s=document.createElement('script');
-    s.src='https://cdnjs.cloudflare.com/ajax/libs/jsmediatags/3.9.5/jsmediatags.min.js';
-    s.onload=()=>{ jsmediatagsLib=window.jsmediatags; res(jsmediatagsLib); };
-    s.onerror=rej; document.head.appendChild(s);
-  });
+
+// ── Inline ID3 metadata parser (no CDN dependency) ────────────────────────
+// Supports ID3v2.2, v2.3, v2.4 and ID3v1 fallback.
+// Returns { title, artist, album, picture: {data:Uint8Array, format:string}|null }
+function parseID3(buf) {
+  const v = new Uint8Array(buf);
+  const latin = s => { try { return new TextDecoder('latin1').decode(s).replace(//g,'').trim(); } catch(e){ return ''; } };
+  const int28 = (a,b,c,d) => ((a&0x7f)<<21)|((b&0x7f)<<14)|((c&0x7f)<<7)|(d&0x7f);
+  const int32 = (a,b,c,d) => ((a<<24)|(b<<16)|(c<<8)|d) >>> 0;
+
+  let result = { title:'', artist:'', album:'', picture: null };
+  if (v.length < 10) return result;
+
+  // ── ID3v2 ──
+  if (v[0]===0x49&&v[1]===0x44&&v[2]===0x33) {
+    const ver = v[3];
+    const tagSize = int28(v[6],v[7],v[8],v[9]) + 10;
+    let pos = 10;
+    if ((v[5]&0x40) && ver>=3) {
+      const ehSize = ver===4 ? int28(v[10],v[11],v[12],v[13]) : int32(v[10],v[11],v[12],v[13]);
+      pos += ehSize;
+    }
+
+    while (pos < tagSize - 6 && pos < v.length - 6) {
+      let frameId, frameSize, dataStart;
+      if (ver === 2) {
+        frameId = latin(v.subarray(pos, pos+3));
+        frameSize = (v[pos+3]<<16)|(v[pos+4]<<8)|v[pos+5];
+        dataStart = pos + 6;
+      } else {
+        frameId = latin(v.subarray(pos, pos+4));
+        frameSize = ver===4 ? int28(v[pos+4],v[pos+5],v[pos+6],v[pos+7])
+                            : int32(v[pos+4],v[pos+5],v[pos+6],v[pos+7]);
+        dataStart = pos + 10;
+      }
+      if (!frameId || frameId.charCodeAt(0) === 0) break;
+      if (frameSize <= 0 || dataStart + frameSize > v.length) break;
+
+      const fd = v.subarray(dataStart, dataStart + frameSize);
+      const isText = frameId[0]==='T' && frameId!=='TXXX' && frameId!=='TXX';
+      const isPic  = frameId==='APIC' || frameId==='PIC';
+
+      if (isText && fd.length > 1) {
+        const enc = fd[0]; const raw = fd.subarray(1);
+        let text = '';
+        try {
+          text = (enc===1||enc===2) ? new TextDecoder('utf-16').decode(raw).replace(//g,'').trim()
+                                    : new TextDecoder('utf-8').decode(raw).replace(//g,'').trim();
+        } catch(e) { text = latin(raw); }
+        if (frameId==='TIT2'||frameId==='TT2') result.title  = text;
+        if (frameId==='TPE1'||frameId==='TP1') result.artist = text;
+        if (frameId==='TALB'||frameId==='TAL') result.album  = text;
+      }
+
+      if (isPic && !result.picture && fd.length > 4) {
+        try {
+          const enc = fd[0]; let i = 1, mime = '';
+          if (ver===2) { mime = latin(fd.subarray(1,4)); i = 4; }
+          else { while(i<fd.length&&fd[i]!==0) mime+=String.fromCharCode(fd[i++]); i++; }
+          i++; // picture type
+          if (enc===1||enc===2) { while(i+1<fd.length&&!(fd[i]===0&&fd[i+1]===0)){i+=2;} i+=2; }
+          else { while(i<fd.length&&fd[i]!==0){i++;} i++; }
+          if (i < fd.length) {
+            const fmt = mime.includes('png')?'image/png':'image/jpeg';
+            result.picture = { data: fd.subarray(i), format: fmt };
+          }
+        } catch(e) {}
+      }
+
+      pos = dataStart + frameSize;
+    }
+  }
+
+  // ── ID3v1 fallback ──
+  if (!result.title && !result.artist && v.length >= 128) {
+    const t1 = v.subarray(v.length - 128);
+    if (t1[0]===0x54&&t1[1]===0x41&&t1[2]===0x47) {
+      result.title  = latin(t1.subarray(3,33));
+      result.artist = latin(t1.subarray(33,63));
+      result.album  = latin(t1.subarray(63,93));
+    }
+  }
+  return result;
 }
-async function readCover(jsmediatags,file) {
-  return new Promise(res=>{
-    jsmediatags.read(file,{
-      onSuccess(tag){ const pic=tag.tags.picture; if(!pic){res(null);return;} const bytes=new Uint8Array(pic.data); const blob=new Blob([bytes],{type:pic.format}); res(URL.createObjectURL(blob)); },
-      onError(){ res(null); }
-    });
-  });
+
+async function readFileID3(file) {
+  // Read only the first 600KB — covers virtually any embedded cover art
+  try {
+    const buf = await file.slice(0, 614400).arrayBuffer();
+    return parseID3(buf);
+  } catch(e) { return null; }
 }
 
 document.getElementById('file-input').addEventListener('change', async function(e) {
@@ -5285,81 +5359,56 @@ document.getElementById('file-input').addEventListener('change', async function(
 
   showToast('Loading ' + files.length + ' track' + (files.length !== 1 ? 's' : '') + '…');
 
-  // On mobile, skip jsmediatags for very large batches (>10 files) to keep upload fast
-  const isLite = !window.matchMedia('(min-width:1025px)').matches && files.length > 10;
-
-  // Load jsmediatags only once, only on non-lite, in background
-  let jsmediatags = null;
-  if (!isLite) {
-    try { jsmediatags = await loadJsmediatags(); } catch(e) {}
-  }
-
   // ── Fast parallel processing ──────────────────────────────────────────────
-  // Build all tracks in parallel, then batch-persist
   const processFile = async (file) => {
     const url = URL.createObjectURL(file);
     const name = file.name.replace(/\.[^.]+$/, '');
 
     let title = name, artist = 'Unknown Artist', cover = null;
 
-    // Filename parsing (fast, always run)
+    // Filename parsing fallback (fast, always run first)
     if (name.includes(' - ')) {
       const parts = name.split(' - ', 2);
       artist = parts[0].trim();
       title  = parts[1].trim();
     }
 
-    // Metadata + duration in parallel
+    // Metadata + duration in parallel — inline ID3 parser, no CDN needed
     const [metaResult, durationResult] = await Promise.allSettled([
-      // Metadata via jsmediatags (only if loaded)
-      jsmediatags
-        ? new Promise((resolve) => {
-            jsmediatags.read(file, {
-              onSuccess: resolve,
-              onError: () => resolve(null),
-            });
-          })
-        : Promise.resolve(null),
-
-      // Duration: fast AudioContext decode (much faster than new Audio() + load)
+      readFileID3(file),
       (async () => {
         try {
-          // Try cheap metadata via audio element first (fast on most browsers)
           const tmp = new Audio();
           tmp.preload = 'metadata';
           tmp.src = url;
           return await Promise.race([
             new Promise(r => tmp.addEventListener('loadedmetadata', () => r(tmp.duration || 0), {once:true})),
             new Promise(r => tmp.addEventListener('error', () => r(0), {once:true})),
-            new Promise(r => setTimeout(() => r(0), 3000)), // 3s timeout
+            new Promise(r => setTimeout(() => r(0), 3000)),
           ]);
         } catch(e) { return 0; }
       })(),
     ]);
 
-    // Apply metadata tags if available
-    const tags = metaResult.status === 'fulfilled' && metaResult.value?.tags;
+    // Apply ID3 tags if parsed
+    const tags = metaResult.status === 'fulfilled' && metaResult.value;
     if (tags) {
-      if (tags.title?.trim()) title = tags.title.trim();
-      if (tags.artist?.trim()) artist = tags.artist.trim();
-      if (tags.picture && !isLite) {
-        // Only decode cover art on non-lite mode (memory expensive)
+      if (tags.title)  title  = tags.title;
+      if (tags.artist) artist = tags.artist;
+      if (tags.picture) {
         try {
-          const pic = tags.picture;
-          let base64 = '';
-          // Use Uint8Array.reduce for large buffers to avoid call stack limit
-          const bytes = new Uint8Array(pic.data);
+          const bytes = tags.picture.data;
           const CHUNK = 8192;
+          let base64 = '';
           for (let i = 0; i < bytes.length; i += CHUNK) {
             base64 += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
           }
-          cover = `data:${pic.format};base64,${btoa(base64)}`;
+          cover = `data:${tags.picture.format};base64,${btoa(base64)}`;
         } catch(e) {}
       }
     }
 
     const duration = durationResult.status === 'fulfilled' ? (durationResult.value || 0) : 0;
-
     const id     = 'track_' + Date.now() + '_' + Math.random().toString(36).slice(2);
     const blobId = 'blob_' + id;
 
