@@ -1,14 +1,12 @@
-const CACHE = 'void-v9';
-const ASSETS = [
-  '/',
-  '/index.html',
+const CACHE = 'void-v10';
+const STATIC_ASSETS = [
   '/manifest.json',
   '/icon.svg'
 ];
 
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(ASSETS).catch(() => {}))
+    caches.open(CACHE).then(c => c.addAll(STATIC_ASSETS).catch(() => {}))
   );
   self.skipWaiting();
 });
@@ -48,24 +46,35 @@ self.addEventListener('fetch', e => {
     return; // fall through to network, no SW involvement
   }
 
-  // Cache-first for app shell assets
-  const isAppShell = ASSETS.some(a => url.pathname === a || url.pathname === '/index.html');
+  // ── index.html: ALWAYS network-first so CSP headers stay fresh ──
+  // Never serve index.html from cache — it must come from the server
+  // so helmet's Content-Security-Policy headers are always up to date.
+  if (url.pathname === '/' || url.pathname === '/index.html') {
+    e.respondWith(
+      fetch(e.request).catch(() => caches.match('/index.html'))
+    );
+    return;
+  }
 
-  if (isAppShell) {
+  // Cache-first for true static assets (manifest, icons)
+  const isStatic = STATIC_ASSETS.some(a => url.pathname === a);
+  if (isStatic) {
     e.respondWith(
       caches.match(e.request).then(cached => cached || fetch(e.request))
     );
-  } else {
-    e.respondWith(
-      fetch(e.request)
-        .then(r => {
-          if (r && r.status === 200 && r.type !== 'opaque') {
-            const clone = r.clone();
-            caches.open(CACHE).then(c => c.put(e.request, clone));
-          }
-          return r;
-        })
-        .catch(() => caches.match(e.request))
-    );
+    return;
   }
+
+  // Network-first with cache fallback for everything else
+  e.respondWith(
+    fetch(e.request)
+      .then(r => {
+        if (r && r.status === 200 && r.type !== 'opaque') {
+          const clone = r.clone();
+          caches.open(CACHE).then(c => c.put(e.request, clone));
+        }
+        return r;
+      })
+      .catch(() => caches.match(e.request))
+  );
 });
