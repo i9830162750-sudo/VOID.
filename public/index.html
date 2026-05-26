@@ -5227,9 +5227,13 @@ document.getElementById('file-input').addEventListener('change', async function(
   Promise.all(validResults.map(({ track, file }) => persistTrack(track, file).catch(() => {})));
 
   // Upload to Google Drive in background if user is signed in
-  if (typeof voidDriveUploadTrack === 'function' && typeof voidDriveGetUser === 'function' && voidDriveGetUser()) {
-    showToast('Uploading to Google Drive…');
+  if (typeof voidDriveUploadTrack === 'function' && typeof voidDriveReady === 'function') {
     (async () => {
+      // Wait for auth check to complete before deciding whether to upload
+      const user = await voidDriveReady();
+      console.log('[Drive] auth ready, user:', user ? user.displayName : 'not signed in');
+      if (!user) return;
+      showToast('Uploading to Google Drive…');
       let uploaded = 0;
       for (const { track, file } of validResults) {
         console.log('[Drive] uploading track:', track.title, 'file size:', file.size);
@@ -5243,8 +5247,6 @@ document.getElementById('file-input').addEventListener('change', async function(
         if (typeof voidDriveSaveNow === 'function') voidDriveSaveNow();
       }
     })();
-  } else {
-    console.log('[Drive] skipping upload — user:', typeof voidDriveGetUser === 'function' ? voidDriveGetUser() : 'fn not found');
   }
 
   if (isShuffle) buildShuffleQueue();
@@ -8909,6 +8911,11 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
   var driveAutoSave  = null;   // debounce timer
   var AUTOSAVE_MS    = 8000;   // auto-save after 8s of quiet
 
+  // Promise that resolves once /api/auth/me has responded (user or null)
+  var _driveReadyResolve;
+  var driveReady = new Promise(function(res) { _driveReadyResolve = res; });
+  window.voidDriveReady = function() { return driveReady; };
+
   // ── DOM helpers ────────────────────────────────────────────────────────
   function _el(id) { return document.getElementById(id); }
 
@@ -8931,16 +8938,19 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
       if (data.user) {
         driveUser = data.user;
         updateDriveUI();
+        _driveReadyResolve(driveUser);
         if (authResult === 'success') {
           // Fresh login — restore library from Drive
           await driveRestoreLibrary();
         }
       } else {
         updateDriveUI();
+        _driveReadyResolve(null);
       }
     } catch(e) {
       // OAuth not configured or network error — silently hide the buttons
       console.log('[Drive] Auth check failed (OAuth may not be configured):', e.message);
+      _driveReadyResolve(null);
     }
   }
 
