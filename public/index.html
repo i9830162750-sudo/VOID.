@@ -829,158 +829,6 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
 .yt-result-btn { background:var(--bg3); border:1px solid var(--border2); border-radius:8px; padding:7px 9px; cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--text2); transition:all 0.15s; }
 .yt-result-btn:active { background:var(--bg4); color:var(--text); }
 .yt-result-btn svg { width:16px; height:16px; }
-
-/* ====== UNIFIED SEARCH PAGE ====== */
-/* Search input — full-width, provider-agnostic */
-.void-search-bar {
-  margin:0 20px 0;
-  position:relative;
-}
-.void-search-bar input {
-  width:100%; background:var(--bg2); border:1px solid var(--border2);
-  border-radius:12px; padding:12px 44px 12px 42px;
-  color:var(--text); font-size:15px; font-family:'DM Sans',sans-serif;
-  outline:none; transition:border-color 0.2s;
-}
-.void-search-bar input:focus { border-color:var(--accent); }
-.void-search-bar input::placeholder { color:var(--text3); }
-.void-search-bar .vsb-icon {
-  position:absolute; left:13px; top:50%; transform:translateY(-50%);
-  width:18px; height:18px; color:var(--text3); pointer-events:none;
-}
-.void-search-bar .vsb-clear {
-  position:absolute; right:10px; top:50%; transform:translateY(-50%);
-  background:none; border:none; color:var(--text3); cursor:pointer;
-  padding:5px; display:none;
-}
-.void-search-bar .vsb-clear.visible { display:flex; }
-.void-search-bar .vsb-clear svg { width:15px; height:15px; }
-
-/* Scope chips row — replaces mode toggle buttons */
-.void-scope-row {
-  display:flex; gap:6px; padding:10px 20px 4px;
-  overflow-x:auto; scrollbar-width:none; flex-shrink:0;
-}
-.void-scope-row::-webkit-scrollbar { display:none; }
-.void-scope-chip {
-  white-space:nowrap; background:var(--bg3); border:1px solid var(--border2);
-  color:var(--text3); font-size:11px; font-weight:600;
-  padding:5px 13px; border-radius:20px; cursor:pointer;
-  font-family:'DM Sans',sans-serif; transition:all 0.18s; flex-shrink:0;
-}
-.void-scope-chip.active {
-  background:var(--accent-dim); border-color:var(--accent); color:var(--accent);
-}
-
-/* Results container */
-.void-search-results { padding:0 20px; }
-
-/* Result group — replaces divider spam */
-.void-result-group { margin-top:20px; }
-.void-result-group:first-child { margin-top:14px; }
-.void-group-label {
-  font-size:10px; text-transform:uppercase; letter-spacing:1.8px;
-  color:var(--text3); font-weight:700; font-family:'Space Mono',monospace;
-  padding:0 0 8px; display:flex; align-items:center; gap:7px;
-}
-.void-group-label::after {
-  content:''; flex:1; height:1px; background:var(--border);
-}
-
-/* Source badge — provider-agnostic, inline pill */
-.void-src-badge {
-  font-size:8px; font-weight:700; font-family:'Space Mono',monospace;
-  padding:2px 6px; border-radius:4px; flex-shrink:0; letter-spacing:0.4px;
-}
-.void-src-badge.yt  { color:var(--yt);  background:rgba(255,68,68,0.1); }
-.void-src-badge.sc  { color:#ff5500;    background:rgba(255,85,0,0.1); }
-.void-src-badge.sav { color:var(--accent); background:var(--accent-dim); }
-.void-src-badge.loc { color:var(--text3); background:var(--bg4); }
-
-/* Media type stub cards — playlists, podcasts, artists */
-.void-media-row {
-  display:flex; gap:10px; overflow-x:auto; scrollbar-width:none;
-  padding-bottom:4px;
-}
-.void-media-row::-webkit-scrollbar { display:none; }
-.void-artist-chip {
-  display:flex; flex-direction:column; align-items:center;
-  gap:6px; flex-shrink:0; cursor:pointer;
-}
-.void-artist-avatar {
-  width:60px; height:60px; border-radius:50%;
-  background:var(--bg4); overflow:hidden; display:flex;
-  align-items:center; justify-content:center;
-}
-.void-artist-avatar img { width:100%; height:100%; object-fit:cover; }
-.void-artist-avatar svg { width:24px; height:24px; color:var(--text3); }
-.void-artist-name {
-  font-size:11px; font-weight:600; color:var(--text2);
-  white-space:nowrap; max-width:72px; overflow:hidden; text-overflow:ellipsis;
-  text-align:center;
-}
-.void-pl-card {
-  flex-shrink:0; width:120px; cursor:pointer;
-}
-.void-pl-card-art {
-  width:120px; height:120px; border-radius:10px;
-  background:var(--bg4); overflow:hidden; display:flex;
-  align-items:center; justify-content:center; margin-bottom:6px;
-}
-.void-pl-card-art img { width:100%; height:100%; object-fit:cover; }
-.void-pl-card-art svg { width:28px; height:28px; color:var(--text3); }
-.void-pl-card-name {
-  font-size:12px; font-weight:600; white-space:nowrap;
-  overflow:hidden; text-overflow:ellipsis; color:var(--text);
-}
-.void-pl-card-meta { font-size:10px; color:var(--text3); margin-top:2px; }
-
-/* Podcast chip — lightweight stub */
-.void-podcast-item {
-  display:flex; align-items:center; gap:10px;
-  padding:9px 0; border-bottom:1px solid var(--border); cursor:pointer;
-}
-.void-podcast-art {
-  width:52px; height:52px; border-radius:8px; flex-shrink:0;
-  background:var(--bg4); overflow:hidden; display:flex;
-  align-items:center; justify-content:center;
-}
-.void-podcast-art img { width:100%; height:100%; object-fit:cover; }
-.void-podcast-art svg { width:20px; height:20px; color:var(--text3); }
-.void-podcast-info { flex:1; min-width:0; }
-.void-podcast-title {
-  font-size:13px; font-weight:600;
-  white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
-}
-.void-podcast-sub { font-size:11px; color:var(--text2); margin-top:2px; }
-
-/* Empty / idle state */
-.void-search-idle {
-  padding:40px 20px 20px; text-align:center; color:var(--text3);
-}
-.void-search-idle svg { width:40px; height:40px; margin:0 auto 12px; display:block; opacity:0.3; }
-.void-search-idle p { font-size:13px; line-height:1.6; }
-
-/* ====== FEED HIERARCHY IMPROVEMENTS ====== */
-/* Tier 1 sections — visually heavier header */
-.home-section.tier1 .home-section-title {
-  font-size:18px; letter-spacing:-0.4px;
-}
-/* Separator between feed groups */
-.home-section-divider {
-  height:1px; background:var(--border); margin:4px 20px 0; opacity:0.5;
-}
-/* Provider label in feed section headers */
-.feed-provider-tag {
-  font-size:8px; font-weight:700; font-family:'Space Mono',monospace;
-  padding:2px 7px; border-radius:10px; margin-left:6px;
-  background:var(--bg4); color:var(--text3); letter-spacing:0.5px;
-  vertical-align:middle;
-}
-.feed-provider-tag.yt  { background:rgba(255,68,68,0.1); color:var(--yt); }
-.feed-provider-tag.sc  { background:rgba(255,85,0,0.1); color:#ff5500; }
-.feed-provider-tag.sav { background:var(--accent-dim); color:var(--accent); }
-
 .yt-result-btn.matched { border-color:var(--accent); color:var(--accent); background:var(--accent-dim); }
 /* Download progress */
 .yt-result-btn.downloading { border-color:var(--yt); color:var(--yt); position:relative; overflow:hidden; }
@@ -3440,11 +3288,11 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
       <!-- ── ONLINE FEED SECTIONS ── -->
 
       <!-- Trending Now (JioSaavn) -->
-      <div class="home-section tier1" id="home-trending-section" style="display:none">
+      <div class="home-section" id="home-trending-section" style="display:none">
         <div class="home-section-hdr">
           <div class="home-section-title" style="display:flex;align-items:center;gap:8px">
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:15px;height:15px;color:var(--accent)"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-            Trending Now<span class="feed-provider-tag sav">SAAVN</span>
+            Trending Now
           </div>
           <div id="home-trending-loader" style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace">loading…</div>
         </div>
@@ -3452,11 +3300,11 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
       </div>
 
       <!-- New Releases (JioSaavn) -->
-      <div class="home-section tier1" id="home-newrel-section" style="display:none">
+      <div class="home-section" id="home-newrel-section" style="display:none">
         <div class="home-section-hdr">
           <div class="home-section-title" style="display:flex;align-items:center;gap:8px">
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:15px;height:15px;color:var(--accent)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-            New Releases<span class="feed-provider-tag sav">SAAVN</span>
+            New Releases
           </div>
           <div id="home-newrel-loader" style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace">loading…</div>
         </div>
@@ -3464,11 +3312,11 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
       </div>
 
       <!-- Popular on SoundCloud -->
-      <div class="home-section tier1" id="home-sc-section" style="display:none">
+      <div class="home-section" id="home-sc-section" style="display:none">
         <div class="home-section-hdr">
           <div class="home-section-title" style="display:flex;align-items:center;gap:8px">
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:15px;height:15px;color:#f50"><path d="M11.56 8.87V17h8.76c.89 0 1.68-.6 1.68-1.49 0-.77-.55-1.41-1.29-1.56a2.87 2.87 0 00-2.46-4.33 2.8 2.8 0 00-.86.14 3.5 3.5 0 00-3.44-2.9c-.86 0-1.64.3-2.39.01z"/><path d="M3 17h1.5V9.5S3 9.96 3 11.5V17z"/><path d="M5.5 17H7V9s-1.5.45-1.5 2V17z"/><path d="M8 17h1.5V8.5S8 9 8 10.5V17z"/></svg>
-            Popular on SoundCloud<span class="feed-provider-tag sc">SC</span>
+            Popular on SoundCloud
           </div>
           <div id="home-sc-loader" style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace">loading…</div>
         </div>
@@ -3641,38 +3489,6 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
       <div class="yt-results" id="yt-results"></div>
     </div>
 
-    <!-- UNIFIED SEARCH PAGE -->
-    <div class="page" id="page-search">
-      <div class="topbar">
-        <h1>Search</h1>
-      </div>
-      <div class="void-search-bar">
-        <svg class="vsb-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" id="void-search-input" placeholder="Tracks, artists, playlists…"
-          autocomplete="off"
-          oninput="voidSearchInput(this.value)"
-          onkeydown="if(event.key==='Enter')voidSearchCommit(this.value)">
-        <button class="vsb-clear" id="void-search-clear" onclick="voidSearchClear()">
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      </div>
-      <!-- Scope chips -->
-      <div class="void-scope-row" id="void-scope-row">
-        <button class="void-scope-chip active" data-scope="all"       onclick="voidSetScope('all')">All</button>
-        <button class="void-scope-chip"        data-scope="tracks"    onclick="voidSetScope('tracks')">Tracks</button>
-        <button class="void-scope-chip"        data-scope="artists"   onclick="voidSetScope('artists')">Artists</button>
-        <button class="void-scope-chip"        data-scope="playlists" onclick="voidSetScope('playlists')">Playlists</button>
-        <button class="void-scope-chip"        data-scope="podcasts"  onclick="voidSetScope('podcasts')">Podcasts</button>
-      </div>
-      <!-- Results -->
-      <div class="void-search-results" id="void-search-results">
-        <div class="void-search-idle">
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <p>Search across your library,<br>YouTube, and SoundCloud</p>
-        </div>
-      </div>
-    </div>
-
     <!-- PLAYLISTS PAGE -->
     <div class="page" id="page-playlists">
       <div class="topbar">
@@ -3816,10 +3632,6 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
     <button class="nav-btn" id="nav-playlists" onclick="showPage('playlists')" aria-label="Playlists">
       <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
       Playlists
-    </button>
-    <button class="nav-btn" id="nav-search" onclick="showPage('search')" aria-label="Search">
-      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      Search
     </button>
 
     <!-- Sidebar playlist quick-access panel (desktop only) -->
@@ -6876,167 +6688,6 @@ function setLibSearchMode(mode) {
     if (val.length > 1) { scLastQuery=''; scDoSearch(val, true); }
     else renderSCDefault();
   }
-}
-
-// ==============================
-// UNIFIED SEARCH — VOID
-// ==============================
-var voidSearchScope = 'all';
-var voidSearchTimer = null;
-
-function voidSetScope(scope) {
-  voidSearchScope = scope;
-  document.querySelectorAll('.void-scope-chip').forEach(function(c) {
-    c.classList.toggle('active', c.dataset.scope === scope);
-  });
-  var val = (document.getElementById('void-search-input')||{}).value || '';
-  if (val.trim().length > 1) voidSearchCommit(val.trim());
-}
-
-function voidSearchInput(val) {
-  var clearBtn = document.getElementById('void-search-clear');
-  if (clearBtn) clearBtn.classList.toggle('visible', val.length > 0);
-  clearTimeout(voidSearchTimer);
-  if (val.trim().length > 2) {
-    voidSearchTimer = setTimeout(function() { voidSearchCommit(val.trim()); }, 480);
-  } else if (!val.trim()) {
-    var res = document.getElementById('void-search-results');
-    if (res) res.innerHTML = '<div class="void-search-idle"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><p>Search across your library,<br>YouTube, and SoundCloud</p></div>';
-  }
-}
-
-function voidSearchClear() {
-  var inp = document.getElementById('void-search-input');
-  if (inp) { inp.value = ''; inp.focus(); }
-  var clearBtn = document.getElementById('void-search-clear');
-  if (clearBtn) clearBtn.classList.remove('visible');
-  var res = document.getElementById('void-search-results');
-  if (res) res.innerHTML = '<div class="void-search-idle"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><p>Search across your library,<br>YouTube, and SoundCloud</p></div>';
-}
-
-function voidSearchCommit(q) {
-  if (!q || q.length < 2) return;
-  var res = document.getElementById('void-search-results');
-  if (!res) return;
-  var scope = voidSearchScope;
-  var html = '';
-
-  // ── LOCAL TRACKS ──
-  if (scope === 'all' || scope === 'tracks' || scope === 'artists') {
-    var q_lc = q.toLowerCase();
-    var localHits = (typeof tracks !== 'undefined' ? tracks : []).filter(function(t) {
-      return (t.title||'').toLowerCase().includes(q_lc) ||
-             (t.artist||'').toLowerCase().includes(q_lc);
-    }).slice(0, 6);
-
-    if (localHits.length && (scope === 'all' || scope === 'tracks')) {
-      html += '<div class="void-result-group"><div class="void-group-label">Library</div>';
-      localHits.forEach(function(t) {
-        var ri = tracks.indexOf(t);
-        var thumb = (t.ytMeta && t.ytMeta.thumbnail) ? t.ytMeta.thumbnail : t.cover;
-        var srcLabel = t.isOnline ? (t.scMeta ? '<span class="void-src-badge sc">SC</span>' : '<span class="void-src-badge yt">YT</span>') : '<span class="void-src-badge loc">LOCAL</span>';
-        html += '<div class="yt-result-item" onclick="playTrack('+ri+')">'
-          + '<div class="yt-thumb">' + (thumb ? '<img src="'+thumb+'" alt="" loading="lazy">' : '<div class="yt-thumb-placeholder"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:20px;height:20px;color:var(--text3)"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>') + '</div>'
-          + '<div class="yt-result-info"><div class="yt-result-title">'+esc(t.title)+'</div><div class="yt-result-artist">'+esc(t.artist)+'</div></div>'
-          + srcLabel
-          + '</div>';
-      });
-      html += '</div>';
-    }
-
-    // ── ARTISTS (from local library) ──
-    if (scope === 'all' || scope === 'artists') {
-      var artistMap = {};
-      (typeof tracks !== 'undefined' ? tracks : []).forEach(function(t) {
-        if (!t.artist) return;
-        var a = t.artist.toLowerCase();
-        if (a.includes(q_lc)) {
-          if (!artistMap[t.artist]) {
-            var thumb = (t.ytMeta && t.ytMeta.thumbnail) ? t.ytMeta.thumbnail : t.cover;
-            artistMap[t.artist] = { name: t.artist, thumb: thumb };
-          }
-        }
-      });
-      var artists = Object.values(artistMap).slice(0, 8);
-      if (artists.length) {
-        html += '<div class="void-result-group"><div class="void-group-label">Artists</div>';
-        html += '<div class="void-media-row">';
-        artists.forEach(function(a) {
-          html += '<div class="void-artist-chip" onclick="showPage(\'library\')">'
-            + '<div class="void-artist-avatar">'
-            + (a.thumb ? '<img src="'+a.thumb+'" alt="" loading="lazy">' : '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>')
-            + '</div><div class="void-artist-name">'+esc(a.name)+'</div></div>';
-        });
-        html += '</div></div>';
-      }
-    }
-  }
-
-  // ── PLAYLISTS ──
-  if ((scope === 'all' || scope === 'playlists') && typeof playlists !== 'undefined') {
-    var q_lc2 = q.toLowerCase();
-    var plHits = playlists.filter(function(p) { return (p.name||'').toLowerCase().includes(q_lc2); }).slice(0,4);
-    if (plHits.length) {
-      html += '<div class="void-result-group"><div class="void-group-label">Playlists</div>';
-      html += '<div class="void-media-row">';
-      plHits.forEach(function(pl) {
-        var thumbs = (pl.trackIds||[]).slice(0,1).map(function(id) {
-          var t = (typeof tracks !== 'undefined' ? tracks : []).find(function(x){return x.id===id;});
-          return t ? ((t.ytMeta&&t.ytMeta.thumbnail)?t.ytMeta.thumbnail:t.cover) : null;
-        }).filter(Boolean);
-        var coverHtml = thumbs.length
-          ? '<img src="'+thumbs[0]+'" alt="" style="width:100%;height:100%;object-fit:cover">'
-          : '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>';
-        html += '<div class="void-pl-card" onclick="showPage(\'playlists\')">'
-          + '<div class="void-pl-card-art">'+coverHtml+'</div>'
-          + '<div class="void-pl-card-name">'+esc(pl.name)+'</div>'
-          + '<div class="void-pl-card-meta">'+(pl.trackIds||[]).length+' tracks</div>'
-          + '</div>';
-      });
-      html += '</div></div>';
-    }
-  }
-
-  // ── PODCASTS stub — shows intent without backend ──
-  if (scope === 'all' || scope === 'podcasts') {
-    html += '<div class="void-result-group"><div class="void-group-label">Podcasts</div>'
-      + '<div class="void-podcast-item" style="opacity:0.5;pointer-events:none">'
-      + '<div class="void-podcast-art"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="11" r="3"/><path d="M12 2a9 9 0 010 18"/><path d="M12 2a9 9 0 000 18"/><line x1="12" y1="20" x2="12" y2="22"/></svg></div>'
-      + '<div class="void-podcast-info"><div class="void-podcast-title">Podcasts coming soon</div><div class="void-podcast-sub">Support is on the roadmap</div></div>'
-      + '</div></div>';
-  }
-
-  // ── Trigger online search (YT + SC) async ──
-  if (scope === 'all' || scope === 'tracks') {
-    html += '<div class="void-result-group" id="void-online-results"><div class="void-group-label">Streaming</div>'
-      + '<div style="padding:12px 0;color:var(--text3);font-size:12px">Searching…</div></div>';
-    // Fire YT search and inject results when ready
-    if (typeof ytDoSearch === 'function') {
-      // Sync search-input so ytDoSearch can use it
-      var si = document.getElementById('search-input');
-      if (si) si.value = q;
-      ytLastQuery = '';
-      // Capture results via the existing yt renderer, then move them here
-      setTimeout(function() {
-        var ytRes = document.getElementById('lib-yt-results');
-        var onlineGroup = document.getElementById('void-online-results');
-        if (ytRes && onlineGroup) {
-          onlineGroup.innerHTML = '<div class="void-group-label">Streaming <span class="void-src-badge yt">YT</span></div>' + ytRes.innerHTML;
-        }
-      }, 2000);
-      // Kick off the search in library (hidden)
-      setLibSearchMode('yt');
-      ytDoSearch(q, true);
-      // Switch back display-wise so we stay on search page
-      document.getElementById('lib-local-section').style.display = 'none';
-      document.getElementById('lib-yt-section').style.display = 'none';
-    }
-  }
-
-  if (!html) {
-    html = '<div class="void-search-idle"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><p>No results for "'+esc(q)+'"</p></div>';
-  }
-  res.innerHTML = html;
 }
 
 function libHandleInput(val) {
