@@ -1,6 +1,6 @@
 'use strict';
 
-const SC_API = 'https://void-soundcloud-service.onrender.com';
+const SAAVN_API = 'https://jiosaavn-api-h375.onrender.com/api';
 
 // ── Tiny in-memory cache ──────────────────────────────────────────────────────
 const cache = new Map();
@@ -16,230 +16,404 @@ function cacheSet(key, data) {
   cache.set(key, { data, ts: Date.now() });
 }
 
-async function scFetch(path) {
-  const res = await fetch(`${SC_API}${path}`, {
+async function saavnFetch(path) {
+  const res = await fetch(`${SAAVN_API}${path}`, {
     signal: AbortSignal.timeout(12000),
     headers: { 'User-Agent': 'Mozilla/5.0' },
   });
-  if (!res.ok) throw new Error(`SoundCloud service error: ${res.status}`);
+  if (!res.ok) throw new Error(`JioSaavn API error: ${res.status}`);
   return res.json();
 }
 
-function parseSCTrack(track) {
+function parseSong(song) {
+  const imgArr = Array.isArray(song.image) ? song.image : [];
+  const img = imgArr.find(i => i.quality === '500x500')?.url
+    || imgArr[imgArr.length - 1]?.url
+    || '';
+
+  const dlUrls = Array.isArray(song.downloadUrl) ? song.downloadUrl : [];
+  let audioUrl = '';
+  for (const q of ['320kbps', '160kbps', '96kbps', '48kbps', '12kbps']) {
+    const entry = dlUrls.find(d => d.quality === q);
+    if (entry && entry.url) { audioUrl = entry.url; break; }
+  }
+  if (!audioUrl && dlUrls.length) audioUrl = dlUrls[dlUrls.length - 1]?.url || '';
+
+  let artist = '';
+  if (song.artists?.primary?.length) {
+    artist = song.artists.primary.map(a => a.name).join(', ');
+  } else if (typeof song.primaryArtists === 'string') {
+    artist = song.primaryArtists;
+  }
+
   return {
-    id:        track.id,
-    videoId:   String(track.id),
-    title:     track.title   || track.name || 'Unknown',
-    artist:    track.artist  || track.user?.username || '',
-    album:     track.album   || '',
-    duration:  Math.round((track.duration || 0) / 1000),
-    thumbnail: track.artwork_url || track.thumbnail || '',
-    audioUrl:  track.stream_url  || track.audioUrl  || '',
-    source:    'soundcloud',
-    type:      'song',
+    id: song.id,
+    videoId: song.id,
+    title: song.name || 'Unknown',
+    artist,
+    album: song.album?.name || '',
+    duration: parseInt(song.duration || 0),
+    thumbnail: img,
+    audioUrl,
+    source: 'jiosaavn',
+    type: 'song',
   };
 }
 
-function parseSCUser(user) {
+function parseArtist(a) {
+  const imgArr = Array.isArray(a.image) ? a.image : [];
+  const img = imgArr.find(i => i.quality === '500x500')?.url
+    || imgArr[imgArr.length - 1]?.url || '';
   return {
-    id:          String(user.id),
-    name:        user.username || user.full_name || 'Unknown',
-    thumbnail:   user.avatar_url || user.thumbnail || '',
-    followerCount: user.followers_count || 0,
-    type:        'artist',
-    source:      'soundcloud',
+    id: a.id,
+    name: a.name || 'Unknown Artist',
+    thumbnail: img,
+    followerCount: a.followerCount || 0,
+    type: 'artist',
+    source: 'jiosaavn',
   };
 }
 
-function parseSCPlaylist(pl) {
+function parseAlbum(al) {
+  const imgArr = Array.isArray(al.image) ? al.image : [];
+  const img = imgArr.find(i => i.quality === '500x500')?.url
+    || imgArr[imgArr.length - 1]?.url || '';
+  let artist = '';
+  if (Array.isArray(al.artists?.primary)) artist = al.artists.primary.map(a => a.name).join(', ');
+  else if (typeof al.primaryArtists === 'string') artist = al.primaryArtists;
   return {
-    id:          String(pl.id),
-    name:        pl.title || pl.name || 'Playlist',
-    artist:      pl.user?.username || pl.artist || '',
-    thumbnail:   pl.artwork_url || pl.thumbnail || '',
-    trackCount:  pl.track_count || (pl.tracks?.length) || 0,
-    type:        'playlist',
-    source:      'soundcloud',
+    id: al.id,
+    name: al.name || al.title || 'Unknown Album',
+    artist,
+    thumbnail: img,
+    year: al.year || '',
+    songCount: al.songCount || 0,
+    type: 'album',
+    source: 'jiosaavn',
+  };
+}
+
+function parsePodcast(show) {
+  const imgArr = Array.isArray(show.image) ? show.image : [];
+  const img = imgArr.find(i => i.quality === '500x500')?.url
+    || imgArr[imgArr.length - 1]?.url || '';
+  return {
+    id: show.id,
+    name: show.name || show.title || 'Unknown Show',
+    artist: show.header_desc || show.subTitle || '',
+    thumbnail: img,
+    type: 'podcast',
+    source: 'jiosaavn',
   };
 }
 
 // ── Exported controller functions ─────────────────────────────────────────────
 
-// GET /api/soundcloud/search?q=&type=all|song|artist|playlist|podcast
+// GET /api/youtube/search?q=&type=all|song|artist|album
 exports.search = async (req, res, next) => {
   try {
     const q = String(req.query.q || '').trim();
     const type = String(req.query.type || 'all').trim();
     if (!q) return res.status(400).json({ error: 'Missing query parameter: q' });
 
-    const cacheKey = `sc_search:${q}:${type}`;
+    const cacheKey = `saavn_search:${q}:${type}`;
     const cached = cacheGet(cacheKey);
     if (cached) return res.json({ ...cached, _cached: true });
 
     if (type === 'all') {
-      // Fetch tracks + users + playlists in parallel
-      const [tracksData, usersData, playlistsData] = await Promise.allSettled([
-        scFetch(`/search?q=${encodeURIComponent(q)}&type=tracks&limit=15`),
-        scFetch(`/search?q=${encodeURIComponent(q)}&type=users&limit=5`),
-        scFetch(`/search?q=${encodeURIComponent(q)}&type=playlists&limit=5`),
+      const [songsData, artistsData, albumsData, playlistsData] = await Promise.allSettled([
+        saavnFetch(`/search/songs?query=${encodeURIComponent(q)}&page=1&limit=15`),
+        saavnFetch(`/search/artists?query=${encodeURIComponent(q)}&page=1&limit=5`),
+        saavnFetch(`/search/albums?query=${encodeURIComponent(q)}&page=1&limit=5`),
+        saavnFetch(`/search/playlists?query=${encodeURIComponent(q)}&page=1&limit=10`),
       ]);
 
-      const tracks = tracksData.status === 'fulfilled'
-        ? (tracksData.value.items || tracksData.value.collection || tracksData.value.results || tracksData.value.tracks || []).map(parseSCTrack)
+      const songs = songsData.status === 'fulfilled'
+        ? (songsData.value.data?.results || songsData.value.results || []).map(parseSong)
         : [];
-      const artists = usersData.status === 'fulfilled'
-        ? (usersData.value.items || usersData.value.collection || usersData.value.results || usersData.value.users || []).map(parseSCUser)
+      const artists = artistsData.status === 'fulfilled'
+        ? (artistsData.value.data?.results || artistsData.value.results || []).map(parseArtist)
         : [];
-      const playlists = playlistsData.status === 'fulfilled'
-        ? (playlistsData.value.items || playlistsData.value.collection || playlistsData.value.results || playlistsData.value.playlists || []).map(parseSCPlaylist)
+      const albums = albumsData.status === 'fulfilled'
+        ? (albumsData.value.data?.results || albumsData.value.results || []).map(parseAlbum)
         : [];
+      // Playlists with type "show" are podcast shows on JioSaavn
+      const allPlaylists = playlistsData.status === 'fulfilled'
+        ? (playlistsData.value.data?.results || playlistsData.value.results || [])
+        : [];
+      const podcasts = allPlaylists
+        .filter(p => p.type === 'show' || p.type === 'podcast')
+        .map(parsePodcast);
 
-      const result = { items: tracks, artists, playlists, source: 'soundcloud' };
+      const result = { items: songs, artists, albums, podcasts, source: 'jiosaavn' };
       cacheSet(cacheKey, result);
       return res.json(result);
     }
 
-    if (type === 'artist' || type === 'user') {
-      const data = await scFetch(`/search?q=${encodeURIComponent(q)}&type=users&limit=20`);
-      const users = (data.items || data.collection || data.results || data.users || []).map(parseSCUser);
-      const result = { items: [], artists: users, playlists: [], source: 'soundcloud' };
+    if (type === 'artist') {
+      const data = await saavnFetch(`/search/artists?query=${encodeURIComponent(q)}&page=1&limit=20`);
+      const results = data.data?.results || data.results || [];
+      const result = { items: [], artists: results.map(parseArtist), albums: [], podcasts: [], source: 'jiosaavn' };
       cacheSet(cacheKey, result);
       return res.json(result);
     }
 
-    if (type === 'playlist') {
-      const data = await scFetch(`/search?q=${encodeURIComponent(q)}&type=playlists&limit=20`);
-      const pls = (data.items || data.collection || data.results || data.playlists || []).map(parseSCPlaylist);
-      const result = { items: [], artists: [], playlists: pls, source: 'soundcloud' };
+    if (type === 'album') {
+      const data = await saavnFetch(`/search/albums?query=${encodeURIComponent(q)}&page=1&limit=20`);
+      const results = data.data?.results || data.results || [];
+      const result = { items: [], artists: [], albums: results.map(parseAlbum), podcasts: [], source: 'jiosaavn' };
       cacheSet(cacheKey, result);
       return res.json(result);
     }
 
-    // Default: tracks
-    const data = await scFetch(`/search?q=${encodeURIComponent(q)}&limit=20`);
-    const results = data.items || data.results || data.tracks || data || [];
-    const songs = (Array.isArray(results) ? results : []).map(parseSCTrack);
-    const result = { items: songs, artists: [], playlists: [], source: 'soundcloud' };
+
+    // Default: songs only
+    const data = await saavnFetch(`/search/songs?query=${encodeURIComponent(q)}&page=1&limit=20`);
+    const results = data.data?.results || data.results || [];
+    const result = { items: results.map(parseSong), artists: [], albums: [], podcasts: [], source: 'jiosaavn' };
     cacheSet(cacheKey, result);
     res.json(result);
   } catch (err) {
-    console.error('[SoundCloud search error]', err.message);
-    next(err);
+    console.error('[JioSaavn search error]', err.message);
+    // Graceful fallback: never surface a 500 to the frontend for search failures.
+    // Return an empty result set so the UI can show "no results" instead of crashing.
+    return res.json({ items: [], artists: [], albums: [], podcasts: [], source: 'jiosaavn', _error: err.message });
   }
 };
 
-// GET /api/soundcloud/artist?id=USER_ID
-// Returns user profile + tracks
+// GET /api/youtube/artist?id=ARTIST_ID
+// Returns artist info + top songs
 exports.artistPage = async (req, res, next) => {
   try {
     const id = String(req.query.id || '').trim();
     if (!id) return res.status(400).json({ error: 'Missing id' });
 
-    const cacheKey = `sc_artist:${id}`;
+    const cacheKey = `saavn_artist:${id}`;
     const cached = cacheGet(cacheKey);
     if (cached) return res.json(cached);
 
-    const [userRes, tracksRes] = await Promise.allSettled([
-      scFetch(`/user?id=${encodeURIComponent(id)}`),
-      scFetch(`/user/tracks?id=${encodeURIComponent(id)}&limit=40`),
+    const [infoData, songsData] = await Promise.allSettled([
+      saavnFetch(`/artists/${id}`),
+      saavnFetch(`/artists/${id}/songs?page=1&songCount=40`),
     ]);
 
-    let artistInfo = { id, name: '', thumbnail: '', followerCount: 0 };
-    if (userRes.status === 'fulfilled') {
-      const u = userRes.value.data || userRes.value;
+    let artistInfo = {};
+    if (infoData.status === 'fulfilled') {
+      const d = infoData.value.data || infoData.value;
+      const imgArr = Array.isArray(d.image) ? d.image : [];
       artistInfo = {
-        id: String(u.id || id),
-        name: u.username || u.full_name || '',
-        thumbnail: u.avatar_url || u.thumbnail || '',
-        followerCount: u.followers_count || 0,
-        description: u.description || '',
+        id: d.id || id,
+        name: d.name || '',
+        bio: (Array.isArray(d.bio) ? d.bio.map(b => b.text).join(' ') : d.bio) || '',
+        thumbnail: imgArr.find(i => i.quality === '500x500')?.url || imgArr[imgArr.length - 1]?.url || '',
+        followerCount: d.followerCount || 0,
+        dominantType: d.dominantType || '',
       };
     }
 
     let songs = [];
-    if (tracksRes.status === 'fulfilled') {
-      const d = tracksRes.value;
-      songs = (d.items || d.collection || d.tracks || d.results || []).map(parseSCTrack);
+    if (songsData.status === 'fulfilled') {
+      const d = songsData.value.data || songsData.value;
+      songs = (d.songs || d.results || []).map(parseSong);
     }
 
-    const result = { artist: artistInfo, songs, source: 'soundcloud' };
+    const result = { artist: artistInfo, songs, source: 'jiosaavn' };
     cacheSet(cacheKey, result);
     res.json(result);
   } catch (err) {
-    console.error('[SoundCloud artist error]', err.message);
+    console.error('[JioSaavn artist error]', err.message);
     next(err);
   }
 };
 
-// GET /api/soundcloud/playlist?id=PLAYLIST_ID_OR_URL
-// Supports SoundCloud playlist/set URLs
-exports.playlistPage = async (req, res, next) => {
+// GET /api/youtube/album?id=ALBUM_ID
+// Returns album info + songs
+exports.albumPage = async (req, res, next) => {
+  try {
+    const id = String(req.query.id || '').trim();
+    if (!id) return res.status(400).json({ error: 'Missing id' });
+
+    const cacheKey = `saavn_album:${id}`;
+    const cached = cacheGet(cacheKey);
+    if (cached) return res.json(cached);
+
+    const data = await saavnFetch(`/albums?id=${encodeURIComponent(id)}`);
+    const d = data.data || data;
+    const imgArr = Array.isArray(d.image) ? d.image : [];
+    let artist = '';
+    if (Array.isArray(d.artists?.primary)) artist = d.artists.primary.map(a => a.name).join(', ');
+    else if (typeof d.primaryArtists === 'string') artist = d.primaryArtists;
+
+    const albumInfo = {
+      id: d.id || id,
+      name: d.name || d.title || '',
+      artist,
+      thumbnail: imgArr.find(i => i.quality === '500x500')?.url || imgArr[imgArr.length - 1]?.url || '',
+      year: d.year || '',
+      description: d.description || '',
+    };
+    const songs = (d.songs || []).map(parseSong);
+    const result = { album: albumInfo, songs, source: 'jiosaavn' };
+    cacheSet(cacheKey, result);
+    res.json(result);
+  } catch (err) {
+    console.error('[JioSaavn album error]', err.message);
+    next(err);
+  }
+};
+
+// GET /api/youtube/podcast?id=SHOW_ID
+// Returns podcast show + episodes
+exports.podcastPage = async (req, res, next) => {
+  try {
+    const id = String(req.query.id || '').trim();
+    if (!id) return res.status(400).json({ error: 'Missing id' });
+
+    const cacheKey = `saavn_podcast:${id}`;
+    const cached = cacheGet(cacheKey);
+    if (cached) return res.json(cached);
+
+    const data = await saavnFetch(`/podcasts/${id}`);
+    const d = data.data || data;
+    const imgArr = Array.isArray(d.image) ? d.image : [];
+
+    const showInfo = {
+      id: d.id || id,
+      name: d.name || d.title || '',
+      artist: d.header_desc || d.subTitle || d.subtitle || '',
+      thumbnail: imgArr.find(i => i.quality === '500x500')?.url || imgArr[imgArr.length - 1]?.url || '',
+      description: d.description || d.fan_count || '',
+    };
+
+    // Episodes are like songs
+    const episodes = (d.episodes || d.songs || []).map(ep => {
+      const epImg = Array.isArray(ep.image) ? ep.image : [];
+      const epDlUrls = Array.isArray(ep.downloadUrl) ? ep.downloadUrl : [];
+      let audioUrl = '';
+      for (const q of ['320kbps', '160kbps', '96kbps', '48kbps', '12kbps']) {
+        const entry = epDlUrls.find(d => d.quality === q);
+        if (entry && entry.url) { audioUrl = entry.url; break; }
+      }
+      return {
+        id: ep.id,
+        videoId: ep.id,
+        title: ep.name || ep.title || 'Episode',
+        artist: showInfo.name,
+        album: '',
+        duration: parseInt(ep.duration || 0),
+        thumbnail: epImg.find(i => i.quality === '500x500')?.url || epImg[epImg.length - 1]?.url || showInfo.thumbnail,
+        audioUrl,
+        source: 'jiosaavn',
+        type: 'podcast_episode',
+      };
+    });
+
+    const result = { show: showInfo, episodes, source: 'jiosaavn' };
+    cacheSet(cacheKey, result);
+    res.json(result);
+  } catch (err) {
+    console.error('[JioSaavn podcast error]', err.message);
+    next(err);
+  }
+};
+
+// GET /api/youtube/videos?ids=
+exports.videoDetails = async (req, res, next) => {
+  try {
+    const ids = String(req.query.ids || '').trim();
+    if (!ids) return res.status(400).json({ error: 'Missing query parameter: ids' });
+
+    const cacheKey = `saavn_song:${ids}`;
+    const cached = cacheGet(cacheKey);
+    if (cached) return res.json(cached);
+
+    const data = await saavnFetch(`/songs/${ids}`);
+    const results = data.data || data.results || [];
+    const songs = (Array.isArray(results) ? results : [results]).map(parseSong);
+    cacheSet(cacheKey, { items: songs });
+    res.json({ items: songs });
+  } catch (err) {
+    console.error('[JioSaavn videoDetails error]', err.message);
+    next(err);
+  }
+};
+
+// GET /api/youtube/playlist?id=PLAYLIST_ID_OR_URL
+// Supports JioSaavn playlist IDs and URLs
+exports.playlistItems = async (req, res, next) => {
   try {
     const rawId = String(req.query.id || req.query.url || '').trim();
     if (!rawId) return res.status(400).json({ error: 'Missing id or url' });
 
-    const cacheKey = `sc_pl:${rawId}`;
+    // Extract ID from URL if needed: jiosaavn.com/featured/xyz/abc123
+    let plId = rawId;
+    const urlMatch = rawId.match(/\/featured\/[^/]+\/([^/?]+)/);
+    if (urlMatch) plId = urlMatch[1];
+
+    const cacheKey = `saavn_pl:${plId}`;
     const cached = cacheGet(cacheKey);
     if (cached) return res.json(cached);
 
-    // Pass either numeric ID or full URL to the SC service
-    const param = /^\d+$/.test(rawId)
-      ? `id=${encodeURIComponent(rawId)}`
-      : `url=${encodeURIComponent(rawId)}`;
-
-    const data = await scFetch(`/playlist?${param}`);
+    const data = await saavnFetch(`/playlists?id=${encodeURIComponent(plId)}`);
     const d = data.data || data;
-
+    const imgArr = Array.isArray(d.image) ? d.image : [];
     const plInfo = {
-      id: String(d.id || rawId),
-      name: d.title || d.name || 'Playlist',
-      artist: d.user?.username || d.artist || '',
-      thumbnail: d.artwork_url || d.thumbnail || '',
-      trackCount: d.track_count || (d.tracks?.length) || 0,
+      id: d.id || plId,
+      name: d.name || d.title || 'Playlist',
       description: d.description || '',
+      thumbnail: imgArr.find(i => i.quality === '500x500')?.url || imgArr[imgArr.length - 1]?.url || '',
+      songCount: d.songCount || 0,
     };
-    const songs = (d.tracks || d.songs || []).map(parseSCTrack);
-    const result = { playlist: plInfo, songs, source: 'soundcloud' };
+    const songs = (d.songs || []).map(parseSong);
+    const result = { playlist: plInfo, songs, source: 'jiosaavn' };
     cacheSet(cacheKey, result);
     res.json(result);
   } catch (err) {
-    console.error('[SoundCloud playlist error]', err.message);
+    console.error('[JioSaavn playlist error]', err.message);
     next(err);
   }
 };
 
+// GET /api/youtube/stream?id=SONG_ID
 exports.streamProxy = async (req, res, next) => {
-  const trackId = String(req.query.id || '').trim();
-  if (!trackId) return res.status(400).json({ error: 'Missing id' });
+  const songId = String(req.query.id || '').trim();
+  if (!songId) return res.status(400).json({ error: 'Missing id' });
 
   try {
-    const cacheKey = `sc_url:${trackId}`;
+    const cacheKey = `saavn_url:${songId}`;
     const cached = cacheGet(cacheKey);
     if (cached) return res.json(cached);
 
-    const data = await scFetch(`/stream?id=${trackId}`);
-    const url = data.url || data.stream_url || data.audioUrl || '';
-    if (!url) return res.status(502).json({ error: 'No stream URL found' });
+    const data = await saavnFetch(`/songs/${songId}`);
+    const results = data.data || data.results || [];
+    const arr = Array.isArray(results) ? results : [results];
+    const song = parseSong(arr[0] || {});
 
-    const result = { url, mimeType: 'audio/mpeg' };
+    if (!song.audioUrl) return res.status(502).json({ error: 'No stream URL found' });
+
+    const result = { url: song.audioUrl, mimeType: 'audio/mpeg' };
     cacheSet(cacheKey, result);
     res.json(result);
   } catch (e) {
-    console.error('[SoundCloud stream error]', e.message);
+    console.error('[JioSaavn stream error]', e.message);
     next(e);
   }
 };
 
+// GET /api/youtube/audio?id=SONG_ID
 exports.audioProxy = async (req, res, next) => {
-  const trackId = String(req.query.id || '').trim();
-  if (!trackId) return res.status(400).json({ error: 'Missing id' });
+  const songId = String(req.query.id || '').trim();
+  if (!songId) return res.status(400).json({ error: 'Missing id' });
 
   try {
-    const data = await scFetch(`/stream?id=${trackId}`);
-    const url = data.url || data.stream_url || data.audioUrl || '';
-    if (!url) return res.status(502).send('No audio URL');
+    const data = await saavnFetch(`/songs/${songId}`);
+    const results = data.data || data.results || [];
+    const arr = Array.isArray(results) ? results : [results];
+    const song = parseSong(arr[0] || {});
 
-    const audioRes = await fetch(url, { signal: AbortSignal.timeout(60000) });
+    if (!song.audioUrl) return res.status(502).send('No audio URL');
+
+    const audioRes = await fetch(song.audioUrl, { signal: AbortSignal.timeout(60000) });
     if (!audioRes.ok) return res.status(502).send('Upstream failed');
 
     res.setHeader('Content-Type', 'audio/mpeg');
@@ -250,7 +424,7 @@ exports.audioProxy = async (req, res, next) => {
     const buf = await audioRes.arrayBuffer();
     res.send(Buffer.from(buf));
   } catch (e) {
-    console.error('[SoundCloud audio error]', e.message);
+    console.error('[JioSaavn audio error]', e.message);
     next(e);
   }
 };
