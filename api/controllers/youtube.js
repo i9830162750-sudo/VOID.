@@ -109,7 +109,7 @@ function parsePodcast(show) {
 
 // ── Exported controller functions ─────────────────────────────────────────────
 
-// GET /api/youtube/search?q=&type=all|song|artist|album|podcast
+// GET /api/youtube/search?q=&type=all|song|artist|album
 exports.search = async (req, res, next) => {
   try {
     const q = String(req.query.q || '').trim();
@@ -121,12 +121,11 @@ exports.search = async (req, res, next) => {
     if (cached) return res.json({ ...cached, _cached: true });
 
     if (type === 'all') {
-      // Fetch songs + artists + albums in parallel for rich results
-      const [songsData, artistsData, albumsData, podcastData] = await Promise.allSettled([
+      const [songsData, artistsData, albumsData, playlistsData] = await Promise.allSettled([
         saavnFetch(`/search/songs?query=${encodeURIComponent(q)}&page=1&limit=15`),
         saavnFetch(`/search/artists?query=${encodeURIComponent(q)}&page=1&limit=5`),
         saavnFetch(`/search/albums?query=${encodeURIComponent(q)}&page=1&limit=5`),
-        saavnFetch(`/search/podcasts?query=${encodeURIComponent(q)}&page=1&limit=5`),
+        saavnFetch(`/search/playlists?query=${encodeURIComponent(q)}&page=1&limit=10`),
       ]);
 
       const songs = songsData.status === 'fulfilled'
@@ -138,9 +137,13 @@ exports.search = async (req, res, next) => {
       const albums = albumsData.status === 'fulfilled'
         ? (albumsData.value.data?.results || albumsData.value.results || []).map(parseAlbum)
         : [];
-      const podcasts = podcastData.status === 'fulfilled'
-        ? (podcastData.value.data?.results || podcastData.value.results || []).map(parsePodcast)
+      // Playlists with type "show" are podcast shows on JioSaavn
+      const allPlaylists = playlistsData.status === 'fulfilled'
+        ? (playlistsData.value.data?.results || playlistsData.value.results || [])
         : [];
+      const podcasts = allPlaylists
+        .filter(p => p.type === 'show' || p.type === 'podcast')
+        .map(parsePodcast);
 
       const result = { items: songs, artists, albums, podcasts, source: 'jiosaavn' };
       cacheSet(cacheKey, result);
@@ -163,13 +166,6 @@ exports.search = async (req, res, next) => {
       return res.json(result);
     }
 
-    if (type === 'podcast') {
-      const data = await saavnFetch(`/search/podcasts?query=${encodeURIComponent(q)}&page=1&limit=20`);
-      const results = data.data?.results || data.results || [];
-      const result = { items: [], artists: [], albums: [], podcasts: results.map(parsePodcast), source: 'jiosaavn' };
-      cacheSet(cacheKey, result);
-      return res.json(result);
-    }
 
     // Default: songs only
     const data = await saavnFetch(`/search/songs?query=${encodeURIComponent(q)}&page=1&limit=20`);
