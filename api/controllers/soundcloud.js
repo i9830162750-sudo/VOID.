@@ -184,9 +184,12 @@ exports.artistPage = async (req, res, next) => {
     const cached = cacheGet(cacheKey);
     if (cached) return res.json(cached);
 
-    const [userRes, tracksRes] = await Promise.allSettled([
+    // Fetch profile + multiple pages of tracks in parallel
+    const [userRes, tracks0, tracks1, tracks2] = await Promise.allSettled([
       scFetch(`/user?id=${encodeURIComponent(id)}`),
-      scFetch(`/user/tracks?id=${encodeURIComponent(id)}&limit=40`),
+      scFetch(`/user/tracks?id=${encodeURIComponent(id)}&limit=50&offset=0`),
+      scFetch(`/user/tracks?id=${encodeURIComponent(id)}&limit=50&offset=50`),
+      scFetch(`/user/tracks?id=${encodeURIComponent(id)}&limit=50&offset=100`),
     ]);
 
     let artistInfo = { id, name: '', thumbnail: '', followerCount: 0 };
@@ -201,10 +204,14 @@ exports.artistPage = async (req, res, next) => {
       };
     }
 
-    let songs = [];
-    if (tracksRes.status === 'fulfilled') {
-      const d = tracksRes.value;
-      songs = (d.items || d.collection || d.tracks || d.results || []).map(parseSCTrack);
+    const seen = new Set();
+    const songs = [];
+    for (const page of [tracks0, tracks1, tracks2]) {
+      if (page.status !== 'fulfilled') continue;
+      const d = page.value;
+      for (const t of (d.items || d.collection || d.tracks || d.results || []).map(parseSCTrack)) {
+        if (!seen.has(String(t.id))) { seen.add(String(t.id)); songs.push(t); }
+      }
     }
 
     const result = { artist: artistInfo, songs, source: 'soundcloud' };
