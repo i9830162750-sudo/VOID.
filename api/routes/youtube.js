@@ -4,41 +4,33 @@ const express    = require('express');
 const router     = express.Router();
 const controller = require('../controllers/youtube');
 
-// ─────────────────────────────────────────────
-// YouTube search
-// GET /api/youtube/search?q=
-// ─────────────────────────────────────────────
-router.get(
-  '/search',
-  controller.search
-);
+// Search (songs, artists, albums, podcasts)
+// GET /api/youtube/search?q=&type=all|song|artist|album|podcast
+router.get('/search', controller.search);
 
-// ─────────────────────────────────────────────
-// YouTube video metadata
+// Video/song metadata
 // GET /api/youtube/videos?ids=
-// ─────────────────────────────────────────────
-router.get(
-  '/videos',
-  controller.videoDetails
-);
+router.get('/videos', controller.videoDetails);
 
-// ─────────────────────────────────────────────
-// Playlist fetch
-// GET /api/youtube/playlist?id=
-// ─────────────────────────────────────────────
-router.get(
-  '/playlist',
-  controller.playlistItems
-);
+// Artist page (info + top songs)
+// GET /api/youtube/artist?id=
+router.get('/artist', controller.artistPage);
 
-// ─────────────────────────────────────────────
+// Album page (info + songs)
+// GET /api/youtube/album?id=
+router.get('/album', controller.albumPage);
+
+// Podcast show + episodes
+// GET /api/youtube/podcast?id=
+router.get('/podcast', controller.podcastPage);
+
+// JioSaavn playlist import
+// GET /api/youtube/playlist?id=PLAYLIST_ID_OR_URL
+router.get('/playlist', controller.playlistItems);
+
 // Stream proxy
-// GET /api/youtube/stream?id=&title=&artist=
-// ─────────────────────────────────────────────
-router.get(
-  '/stream',
-  controller.streamProxy
-);
+// GET /api/youtube/stream?id=
+router.get('/stream', controller.streamProxy);
 
 router.get('/audio', controller.audioProxy);
 
