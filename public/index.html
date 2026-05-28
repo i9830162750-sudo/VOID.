@@ -1504,6 +1504,25 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   .mini-pl-item .mini-pl-check { color: var(--accent); font-size: 12px; margin-left: auto; }
   .mini-pl-empty { padding: 10px 8px; font-size: 11px; color: var(--text3); text-align: center; }
 
+  /* ── ARTIST / ALBUM / PODCAST PAGE OVERLAYS — match main grid area ── */
+  #artist-page-overlay,
+  #album-page-overlay,
+  #podcast-page-overlay {
+    left: 240px;
+    right: 300px;
+    bottom: 58px;
+    top: 0;
+    background: var(--bg);
+    border-left: 1px solid rgba(255,255,255,0.04);
+    border-right: 1px solid rgba(255,255,255,0.04);
+  }
+  body.sidebar-collapsed #artist-page-overlay,
+  body.sidebar-collapsed #album-page-overlay,
+  body.sidebar-collapsed #podcast-page-overlay { left: 64px; }
+  body.np-collapsed #artist-page-overlay,
+  body.np-collapsed #album-page-overlay,
+  body.np-collapsed #podcast-page-overlay { right: 48px; }
+
   /* ── DESKTOP NOW PLAYING OVERLAY ──
      Slides up over the main content area (grid-area: main), sitting above the playbar.
      Triggered by clicking the track zone in the playbar.
@@ -3561,39 +3580,57 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   </div><!-- /page-stack -->
 
   <!-- ARTIST PAGE OVERLAY -->
-  <div id="artist-page-overlay" style="display:none;position:fixed;inset:0;z-index:800;background:var(--bg1);overflow-y:auto;flex-direction:column;">
-    <div style="display:flex;align-items:center;gap:12px;padding:16px 20px 0;flex-shrink:0">
-      <button onclick="closeArtistPage()" style="background:var(--bg2);border:1px solid var(--border);border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;color:var(--text2);cursor:pointer;flex-shrink:0">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:18px;height:18px"><polyline points="15 18 9 12 15 6"/></svg>
-      </button>
-      <span id="artist-page-source-badge" style="font-size:9px;font-family:'Space Mono',monospace;font-weight:700"></span>
+  <div id="artist-page-overlay" style="display:none;position:fixed;inset:0;z-index:800;flex-direction:column;overflow:hidden;">
+    <!-- Ambient blurred background -->
+    <div id="artist-page-bg" style="position:absolute;inset:0;background-size:cover;background-position:center;filter:blur(60px) saturate(1.4);transform:scale(1.15);opacity:0.35;pointer-events:none;transition:background-image 0.5s ease;z-index:0"></div>
+    <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0.5) 0%,var(--bg) 55%);z-index:1;pointer-events:none"></div>
+    <!-- Content -->
+    <div style="position:relative;z-index:2;display:flex;flex-direction:column;height:100%;overflow-y:auto;">
+      <div style="display:flex;align-items:center;gap:12px;padding:16px 20px 0;flex-shrink:0">
+        <button onclick="closeArtistPage()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;color:var(--text2);cursor:pointer;flex-shrink:0;backdrop-filter:blur(8px)">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:18px;height:18px"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <span id="artist-page-source-badge" style="font-size:9px;font-family:'Space Mono',monospace;font-weight:700"></span>
+      </div>
+      <div id="artist-page-hero" style="padding:20px 20px 0"></div>
+      <!-- Play/Shuffle action row injected by JS -->
+      <div id="artist-page-actions" style="display:none;padding:0 20px 14px;gap:10px;flex-shrink:0"></div>
+      <div id="artist-page-tracks" style="padding:0 20px 120px;flex:1"></div>
     </div>
-    <div id="artist-page-hero" style="padding:20px 20px 0"></div>
-    <div id="artist-page-tracks" style="padding:0 20px 120px"></div>
   </div>
 
   <!-- ALBUM PAGE OVERLAY -->
-  <div id="album-page-overlay" style="display:none;position:fixed;inset:0;z-index:800;background:var(--bg1);overflow-y:auto;flex-direction:column;">
-    <div style="display:flex;align-items:center;gap:12px;padding:16px 20px 0;flex-shrink:0">
-      <button onclick="closeAlbumPage()" style="background:var(--bg2);border:1px solid var(--border);border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;color:var(--text2);cursor:pointer;flex-shrink:0">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:18px;height:18px"><polyline points="15 18 9 12 15 6"/></svg>
-      </button>
-      <span style="font-size:9px;font-family:'Space Mono',monospace;font-weight:700;color:var(--yt)">JIOSAAVN ALBUM</span>
+  <div id="album-page-overlay" style="display:none;position:fixed;inset:0;z-index:800;flex-direction:column;overflow:hidden;">
+    <div id="album-page-bg" style="position:absolute;inset:0;background-size:cover;background-position:center;filter:blur(60px) saturate(1.4);transform:scale(1.15);opacity:0.35;pointer-events:none;transition:background-image 0.5s ease;z-index:0"></div>
+    <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0.5) 0%,var(--bg) 55%);z-index:1;pointer-events:none"></div>
+    <div style="position:relative;z-index:2;display:flex;flex-direction:column;height:100%;overflow-y:auto;">
+      <div style="display:flex;align-items:center;gap:12px;padding:16px 20px 0;flex-shrink:0">
+        <button onclick="closeAlbumPage()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;color:var(--text2);cursor:pointer;flex-shrink:0;backdrop-filter:blur(8px)">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:18px;height:18px"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <span style="font-size:9px;font-family:'Space Mono',monospace;font-weight:700;color:var(--yt)">JIOSAAVN ALBUM</span>
+      </div>
+      <div id="album-page-hero" style="padding:20px 20px 0"></div>
+      <div id="album-page-actions" style="display:none;padding:0 20px 14px;gap:10px;flex-shrink:0"></div>
+      <div id="album-page-tracks" style="padding:0 20px 120px;flex:1"></div>
     </div>
-    <div id="album-page-hero" style="padding:20px 20px 0"></div>
-    <div id="album-page-tracks" style="padding:0 20px 120px"></div>
   </div>
 
   <!-- PODCAST PAGE OVERLAY -->
-  <div id="podcast-page-overlay" style="display:none;position:fixed;inset:0;z-index:800;background:var(--bg1);overflow-y:auto;flex-direction:column;">
-    <div style="display:flex;align-items:center;gap:12px;padding:16px 20px 0;flex-shrink:0">
-      <button onclick="closePodcastPage()" style="background:var(--bg2);border:1px solid var(--border);border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;color:var(--text2);cursor:pointer;flex-shrink:0">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:18px;height:18px"><polyline points="15 18 9 12 15 6"/></svg>
-      </button>
-      <span style="font-size:9px;font-family:'Space Mono',monospace;font-weight:700;color:var(--yt)">PODCAST</span>
+  <div id="podcast-page-overlay" style="display:none;position:fixed;inset:0;z-index:800;flex-direction:column;overflow:hidden;">
+    <div id="podcast-page-bg" style="position:absolute;inset:0;background-size:cover;background-position:center;filter:blur(60px) saturate(1.4);transform:scale(1.15);opacity:0.35;pointer-events:none;transition:background-image 0.5s ease;z-index:0"></div>
+    <div style="position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,0.5) 0%,var(--bg) 55%);z-index:1;pointer-events:none"></div>
+    <div style="position:relative;z-index:2;display:flex;flex-direction:column;height:100%;overflow-y:auto;">
+      <div style="display:flex;align-items:center;gap:12px;padding:16px 20px 0;flex-shrink:0">
+        <button onclick="closePodcastPage()" style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;color:var(--text2);cursor:pointer;flex-shrink:0;backdrop-filter:blur(8px)">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:18px;height:18px"><polyline points="15 18 9 12 15 6"/></svg>
+        </button>
+        <span style="font-size:9px;font-family:'Space Mono',monospace;font-weight:700;color:var(--yt)">PODCAST</span>
+      </div>
+      <div id="podcast-page-hero" style="padding:20px 20px 0"></div>
+      <div id="podcast-page-actions" style="display:none;padding:0 20px 14px;gap:10px;flex-shrink:0"></div>
+      <div id="podcast-page-tracks" style="padding:0 20px 120px;flex:1"></div>
     </div>
-    <div id="podcast-page-hero" style="padding:20px 20px 0"></div>
-    <div id="podcast-page-tracks" style="padding:0 20px 120px"></div>
   </div>
 
   <!-- ONLINE PLAYLIST IMPORT OVERLAY -->
@@ -6790,16 +6827,22 @@ async function openSaavnArtistPage(artistId) {
   const overlay = document.getElementById('artist-page-overlay');
   const hero = document.getElementById('artist-page-hero');
   const tracksEl = document.getElementById('artist-page-tracks');
+  const actionsEl = document.getElementById('artist-page-actions');
   const badge = document.getElementById('artist-page-source-badge');
+  const bgEl = document.getElementById('artist-page-bg');
   badge.textContent = 'JIOSAAVN ARTIST'; badge.style.color = 'var(--yt)';
   hero.innerHTML = `<div style="display:flex;align-items:center;gap:14px;margin-bottom:20px"><div style="width:48px;height:48px;border-radius:50%;background:var(--bg3);flex-shrink:0"></div><div style="height:16px;background:var(--bg3);border-radius:4px;width:150px"></div></div>`;
   tracksEl.innerHTML = `<div class="yt-loading"><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div></div>`;
+  actionsEl.style.display = 'none';
+  if (bgEl) bgEl.style.backgroundImage = 'none';
   overlay.style.display = 'flex';
   try {
     const resp = await fetch(`${VOID_API_BASE}/youtube/artist?id=${encodeURIComponent(artistId)}`, { signal: AbortSignal.timeout(12000) });
     if (!resp.ok) throw new Error('Artist fetch failed');
     const data = await resp.json();
     const a = data.artist || {};
+    // Set ambient background
+    if (bgEl && a.thumbnail) bgEl.style.backgroundImage = `url(${a.thumbnail})`;
     hero.innerHTML = `
       <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
         <div style="width:80px;height:80px;border-radius:50%;overflow:hidden;flex-shrink:0;background:var(--bg3)">
@@ -6813,6 +6856,17 @@ async function openSaavnArtistPage(artistId) {
       <div style="font-size:13px;font-weight:700;margin-bottom:10px;color:var(--text2)">Popular Songs</div>`;
     window._overlayTracks = data.songs || [];
     window._overlaySource = 'jiosaavn';
+    // Show play/shuffle buttons
+    if (actionsEl && (data.songs||[]).length > 0) {
+      actionsEl.style.display = 'flex';
+      actionsEl.innerHTML = `
+        <button onclick="_playOverlayAll()" style="flex:1;background:var(--accent);border:none;border-radius:10px;padding:11px;font-size:13px;font-weight:700;color:#000;cursor:pointer;font-family:'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:7px">
+          <svg fill="currentColor" viewBox="0 0 24 24" style="width:16px;height:16px"><polygon points="5,3 19,12 5,21"/></svg>Play All
+        </button>
+        <button onclick="_shuffleOverlayAll()" style="flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:11px;font-size:13px;font-weight:700;color:var(--text);cursor:pointer;font-family:'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:7px">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:16px;height:16px"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>Shuffle
+        </button>`;
+    }
     _renderTrackListInOverlay(data.songs||[], tracksEl, 'jiosaavn');
   } catch(e) {
     tracksEl.innerHTML=`<div class="yt-empty"><p>Could not load artist. ${esc(e.message)}</p></div>`;
@@ -6823,16 +6877,21 @@ async function openSCArtistPage(userId) {
   const overlay = document.getElementById('artist-page-overlay');
   const hero = document.getElementById('artist-page-hero');
   const tracksEl = document.getElementById('artist-page-tracks');
+  const actionsEl = document.getElementById('artist-page-actions');
   const badge = document.getElementById('artist-page-source-badge');
+  const bgEl = document.getElementById('artist-page-bg');
   badge.textContent = 'SOUNDCLOUD ARTIST'; badge.style.color = '#ff5500';
   hero.innerHTML = `<div style="display:flex;align-items:center;gap:14px;margin-bottom:20px"><div style="width:48px;height:48px;border-radius:50%;background:var(--bg3);flex-shrink:0"></div><div style="height:16px;background:var(--bg3);border-radius:4px;width:150px"></div></div>`;
   tracksEl.innerHTML = `<div class="yt-loading"><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div></div>`;
+  actionsEl.style.display = 'none';
+  if (bgEl) bgEl.style.backgroundImage = 'none';
   overlay.style.display = 'flex';
   try {
     const resp = await fetch(`${VOID_API_BASE}/soundcloud/artist?id=${encodeURIComponent(userId)}`, { signal: AbortSignal.timeout(12000) });
     if (!resp.ok) throw new Error('Artist fetch failed');
     const data = await resp.json();
     const a = data.artist || {};
+    if (bgEl && a.thumbnail) bgEl.style.backgroundImage = `url(${a.thumbnail})`;
     hero.innerHTML = `
       <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
         <div style="width:80px;height:80px;border-radius:50%;overflow:hidden;flex-shrink:0;background:var(--bg3)">
@@ -6847,6 +6906,16 @@ async function openSCArtistPage(userId) {
       <div style="font-size:13px;font-weight:700;margin-bottom:10px;color:var(--text2)">Tracks</div>`;
     window._overlayTracks = data.songs || [];
     window._overlaySource = 'soundcloud';
+    if (actionsEl && (data.songs||[]).length > 0) {
+      actionsEl.style.display = 'flex';
+      actionsEl.innerHTML = `
+        <button onclick="_playOverlayAll()" style="flex:1;background:#ff5500;border:none;border-radius:10px;padding:11px;font-size:13px;font-weight:700;color:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:7px">
+          <svg fill="currentColor" viewBox="0 0 24 24" style="width:16px;height:16px"><polygon points="5,3 19,12 5,21"/></svg>Play All
+        </button>
+        <button onclick="_shuffleOverlayAll()" style="flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:11px;font-size:13px;font-weight:700;color:var(--text);cursor:pointer;font-family:'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:7px">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:16px;height:16px"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>Shuffle
+        </button>`;
+    }
     _renderTrackListInOverlay(data.songs||[], tracksEl, 'soundcloud');
   } catch(e) {
     tracksEl.innerHTML=`<div class="yt-empty"><p>Could not load artist. ${esc(e.message)}</p></div>`;
@@ -6857,18 +6926,74 @@ function closeArtistPage() {
   document.getElementById('artist-page-overlay').style.display='none';
 }
 
+// Play all / Shuffle all tracks in any overlay (artist, album, podcast, playlist)
+function _playOverlayAll() {
+  const songs = window._overlayTracks || [];
+  const source = window._overlaySource || 'jiosaavn';
+  if (!songs.length) return;
+  // Add all tracks to the main track list and queue them up
+  const indices = [];
+  for (const s of songs) {
+    let t;
+    if (source === 'soundcloud') {
+      t = tracks.find(tr => tr.scMeta && tr.scMeta.trackId === String(s.videoId||s.id));
+      if (!t) {
+        const id = 'track_sc_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+        t = { id, blobId:null, title:s.title, artist:s.artist, duration:s.duration, cover:s.thumbnail||null, isFav:false, isOnline:true,
+          scMeta:{ trackId:String(s.videoId||s.id), thumbnail:s.thumbnail, title:s.title }, ytMeta:null, url:null, streamUrl:null };
+        tracks.push(t);
+        dbPut('tracks', { id:t.id,blobId:null,title:t.title,artist:t.artist,duration:t.duration,cover:t.cover,isFav:false,isOnline:true,ytMeta:null,scMeta:t.scMeta });
+      }
+    } else {
+      t = tracks.find(tr => tr.ytMeta && tr.ytMeta.videoId === String(s.videoId||s.id));
+      if (!t) {
+        const id = 'track_saavn_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+        t = { id, blobId:null, title:s.title, artist:s.artist, duration:s.duration, cover:s.thumbnail||null, isFav:false, isOnline:true,
+          ytMeta:{ videoId:String(s.videoId||s.id), thumbnail:s.thumbnail, title:s.title }, url:null, ytStreamUrl:null };
+        tracks.push(t);
+        dbPut('tracks', { id:t.id,blobId:null,title:t.title,artist:t.artist,duration:t.duration,cover:t.cover,isFav:false,isOnline:true,ytMeta:t.ytMeta });
+      }
+    }
+    indices.push(tracks.indexOf(t));
+  }
+  if (indices.length) playTrack(indices[0]);
+  showToast(`▶ Playing ${songs.length} tracks`);
+}
+
+function _shuffleOverlayAll() {
+  const songs = [...(window._overlayTracks || [])];
+  if (!songs.length) return;
+  // Fisher-Yates shuffle
+  for (let i = songs.length-1; i > 0; i--) {
+    const j = Math.floor(Math.random()*(i+1));
+    [songs[i], songs[j]] = [songs[j], songs[i]];
+  }
+  const origTracks = window._overlayTracks;
+  const origSource = window._overlaySource;
+  window._overlayTracks = songs;
+  _playOverlayAll();
+  window._overlayTracks = origTracks;
+  window._overlaySource = origSource;
+  showToast('🔀 Shuffled & playing');
+}
+
 async function openSaavnAlbumPage(albumId) {
   const overlay = document.getElementById('album-page-overlay');
   const hero = document.getElementById('album-page-hero');
   const tracksEl = document.getElementById('album-page-tracks');
+  const actionsEl = document.getElementById('album-page-actions');
+  const bgEl = document.getElementById('album-page-bg');
   hero.innerHTML=`<div class="yt-loading"><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div></div>`;
   tracksEl.innerHTML='';
+  actionsEl.style.display = 'none';
+  if (bgEl) bgEl.style.backgroundImage = 'none';
   overlay.style.display='flex';
   try {
     const resp = await fetch(`${VOID_API_BASE}/youtube/album?id=${encodeURIComponent(albumId)}`, { signal: AbortSignal.timeout(12000) });
     if (!resp.ok) throw new Error('Album fetch failed');
     const data = await resp.json();
     const al = data.album || {};
+    if (bgEl && al.thumbnail) bgEl.style.backgroundImage = `url(${al.thumbnail})`;
     hero.innerHTML=`
       <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
         <div style="width:80px;height:80px;border-radius:12px;overflow:hidden;flex-shrink:0;background:var(--bg3)">
@@ -6882,6 +7007,16 @@ async function openSaavnAlbumPage(albumId) {
       </div>`;
     window._overlayTracks = data.songs || [];
     window._overlaySource = 'jiosaavn';
+    if (actionsEl && (data.songs||[]).length > 0) {
+      actionsEl.style.display = 'flex';
+      actionsEl.innerHTML = `
+        <button onclick="_playOverlayAll()" style="flex:1;background:var(--accent);border:none;border-radius:10px;padding:11px;font-size:13px;font-weight:700;color:#000;cursor:pointer;font-family:'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:7px">
+          <svg fill="currentColor" viewBox="0 0 24 24" style="width:16px;height:16px"><polygon points="5,3 19,12 5,21"/></svg>Play All
+        </button>
+        <button onclick="_shuffleOverlayAll()" style="flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:11px;font-size:13px;font-weight:700;color:var(--text);cursor:pointer;font-family:'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:7px">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:16px;height:16px"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>Shuffle
+        </button>`;
+    }
     _renderTrackListInOverlay(data.songs||[], tracksEl, 'jiosaavn');
   } catch(e) {
     hero.innerHTML=`<div class="yt-empty"><p>Could not load album. ${esc(e.message)}</p></div>`;
@@ -6894,14 +7029,19 @@ async function openSaavnPodcastPage(podcastId) {
   const overlay = document.getElementById('podcast-page-overlay');
   const hero = document.getElementById('podcast-page-hero');
   const tracksEl = document.getElementById('podcast-page-tracks');
+  const actionsEl = document.getElementById('podcast-page-actions');
+  const bgEl = document.getElementById('podcast-page-bg');
   hero.innerHTML=`<div class="yt-loading"><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div></div>`;
   tracksEl.innerHTML='';
+  actionsEl.style.display = 'none';
+  if (bgEl) bgEl.style.backgroundImage = 'none';
   overlay.style.display='flex';
   try {
     const resp = await fetch(`${VOID_API_BASE}/youtube/podcast?id=${encodeURIComponent(podcastId)}`, { signal: AbortSignal.timeout(12000) });
     if (!resp.ok) throw new Error('Podcast fetch failed');
     const data = await resp.json();
     const show = data.show || {};
+    if (bgEl && show.thumbnail) bgEl.style.backgroundImage = `url(${show.thumbnail})`;
     hero.innerHTML=`
       <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
         <div style="width:80px;height:80px;border-radius:12px;overflow:hidden;flex-shrink:0;background:var(--bg3)">
@@ -6916,6 +7056,16 @@ async function openSaavnPodcastPage(podcastId) {
       <div style="font-size:13px;font-weight:700;margin-bottom:10px;color:var(--text2)">Episodes</div>`;
     window._overlayTracks = data.episodes || [];
     window._overlaySource = 'jiosaavn';
+    if (actionsEl && (data.episodes||[]).length > 0) {
+      actionsEl.style.display = 'flex';
+      actionsEl.innerHTML = `
+        <button onclick="_playOverlayAll()" style="flex:1;background:var(--accent);border:none;border-radius:10px;padding:11px;font-size:13px;font-weight:700;color:#000;cursor:pointer;font-family:'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:7px">
+          <svg fill="currentColor" viewBox="0 0 24 24" style="width:16px;height:16px"><polygon points="5,3 19,12 5,21"/></svg>Play All
+        </button>
+        <button onclick="_shuffleOverlayAll()" style="flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:11px;font-size:13px;font-weight:700;color:var(--text);cursor:pointer;font-family:'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:7px">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:16px;height:16px"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>Shuffle
+        </button>`;
+    }
     _renderTrackListInOverlay(data.episodes||[], tracksEl, 'jiosaavn');
   } catch(e) {
     hero.innerHTML=`<div class="yt-empty"><p>Could not load podcast. ${esc(e.message)}</p></div>`;
@@ -7127,9 +7277,44 @@ async function ytDoSearch(query, force=false) {
   }
 }
 
-// ── Smart Search: AI query expansion ─────────────────────────────────────────
-// Cache expanded queries so we don't re-call the API on every keystroke
-// ── Smart Search: local vibe→query enrichment (no external API needed) ──────
+// ── Smart Search Engine ───────────────────────────────────────────────────────
+// Tokenise + normalise helpers
+function _normalise(s) {
+  return (s||'').toLowerCase()
+    .replace(/[''`]/g,"'").replace(/[–—]/g,'-')
+    .replace(/&/g,' and ').replace(/\s+/g,' ').trim();
+}
+function _tokenise(s) {
+  return _normalise(s).split(/[\s\-_,.()\[\]\/]+/).filter(Boolean);
+}
+// Strip common noise words so "songs about love" → ["love"]
+const _STOP = new Set(['a','an','the','of','in','on','by','ft','feat','featuring',
+  'official','audio','video','music','song','songs','track','full','hd','4k',
+  'lyrics','lyric','with','from','and','or','is','are','was','were','be']);
+function _keywords(s) { return _tokenise(s).filter(w=>!_STOP.has(w)); }
+
+// Fuzzy bigram similarity (0-1)
+function _bigrams(s) {
+  const t=_normalise(s); const bg=new Set();
+  for(let i=0;i<t.length-1;i++) bg.add(t.slice(i,i+2));
+  return bg;
+}
+function _similarity(a,b) {
+  if(!a||!b) return 0;
+  if(_normalise(a)===_normalise(b)) return 1;
+  const ba=_bigrams(a), bb=_bigrams(b);
+  let inter=0; ba.forEach(g=>{ if(bb.has(g)) inter++; });
+  return (2*inter)/(ba.size+bb.size||1);
+}
+
+// Detect if query looks like an artist+song "Artist - Song" pattern
+function _parseDashQuery(q) {
+  const m = q.match(/^(.+?)\s*[-–—]\s*(.+)$/);
+  if(m) return { artist: m[1].trim(), song: m[2].trim() };
+  return null;
+}
+
+// Known genre/mood/language patterns → enrich to a useful search query
 const _VIBE_MAP = {
   workout:'workout motivation energy songs', gym:'gym pump up energy songs',
   running:'running cardio energy songs', cardio:'cardio workout pump songs',
@@ -7155,20 +7340,82 @@ const _VIBE_MAP = {
   vibe:'chill vibes smooth songs', mood:'mood songs emotional hits',
   energy:'energy pump up hype songs', jazz:'jazz smooth instrumental songs',
   classical:'classical instrumental piano songs', instrumental:'instrumental background music',
+  bollywood:'bollywood hindi songs hits', punjabi:'punjabi songs hits', hindi:'hindi songs hits',
+  tamil:'tamil songs hits', telugu:'telugu songs hits', bengali:'bengali songs hits',
+  marathi:'marathi songs hits', malayalam:'malayalam songs hits', kannada:'kannada songs hits',
+  rap:'rap hip hop songs', hiphop:'hip hop rap songs', rnb:'r&b soul songs',
+  pop:'pop songs hits', rock:'rock songs hits', metal:'metal songs', edm:'edm dance songs',
+  acoustic:'acoustic guitar songs', piano:'piano songs instrumental', indie:'indie songs hits',
+  'feel good':'feel good happy upbeat songs', 'break up':'breakup sad emotional songs',
+  'work out':'workout motivation energy songs', 'night out':'party night out songs',
+  chill:'chill relaxing smooth songs', trending:'trending songs 2024', latest:'latest songs 2024',
+  new:'new songs 2024', best:'best songs hits', top:'top songs hits',
 };
 
-// Enrich a vibe/mood query using the map; pass through artist/song names unchanged
 function _enrichQuery(q) {
   const lower = q.toLowerCase().trim();
-  for (const [key, enriched] of Object.entries(_VIBE_MAP)) {
-    if (lower === key || lower.includes(key)) return enriched;
+  // Multi-word vibe keys first (longest match wins)
+  const keys = Object.keys(_VIBE_MAP).sort((a,b)=>b.length-a.length);
+  for (const key of keys) {
+    if (lower === key || lower.startsWith(key+' ') || lower.endsWith(' '+key) || lower.includes(' '+key+' ')) {
+      return _VIBE_MAP[key];
+    }
   }
-  // 1-2 word all-lowercase query with no digits/ft/feat → likely a vibe, append "songs"
-  const words = lower.split(/\s+/);
-  if (words.length <= 2 && lower === lower.toLowerCase() && !/[0-9]/.test(lower) && !lower.includes('ft') && !lower.includes('feat') && lower.length > 2) {
-    return `${q} songs`;
-  }
+  // Detect "Artist - Song" pattern → search as-is (most specific)
+  if (_parseDashQuery(q)) return q;
+  // Detect "songs by X" / "music by X" → artist search
+  const byMatch = lower.match(/^(?:songs?|music|tracks?)\s+by\s+(.+)$/);
+  if (byMatch) return byMatch[1].trim();
+  // Detect "X songs" / "X music" where X is artist/genre
+  const songsOfMatch = lower.match(/^(.+?)\s+(?:songs?|music|tracks?)$/);
+  if (songsOfMatch && songsOfMatch[1].split(' ').length <= 3) return songsOfMatch[1].trim();
+  // Short pure-lowercase query with no numbers → might be a vibe, leave raw
   return q;
+}
+
+// Score a search result against the user's raw query (for client-side re-ranking)
+function _scoreResult(item, rawQuery) {
+  const q = _normalise(rawQuery);
+  const title = _normalise(item.title||'');
+  const artist = _normalise(item.artist||'');
+  const album = _normalise(item.album||'');
+  let score = 0;
+
+  // Exact title match = highest
+  if (title === q) score += 100;
+  // Title starts with query
+  else if (title.startsWith(q)) score += 70;
+  // Query starts with title (user typed partial)
+  else if (q.startsWith(title)) score += 60;
+  // Title contains query as substring
+  else if (title.includes(q)) score += 50;
+  // Artist match
+  if (artist === q) score += 80;
+  else if (artist.includes(q) || q.includes(artist)) score += 40;
+  // Album match
+  if (album.includes(q)) score += 20;
+
+  // Token overlap bonus
+  const qKw = _keywords(rawQuery);
+  const tKw = _keywords(item.title||'');
+  const aKw = _keywords(item.artist||'');
+  const allKw = [...tKw, ...aKw];
+  const hits = qKw.filter(w => allKw.some(k => k.startsWith(w) || w.startsWith(k)));
+  score += hits.length * 8;
+
+  // Bigram similarity bonus
+  score += _similarity(rawQuery, item.title||'') * 30;
+  score += _similarity(rawQuery, item.artist||'') * 20;
+
+  // "Artist - Song" pattern: reward if both sides match
+  const dash = _parseDashQuery(rawQuery);
+  if (dash) {
+    if (_similarity(dash.artist, item.artist||'') > 0.6 && _similarity(dash.song, item.title||'') > 0.6) score += 60;
+    if (_similarity(dash.artist, item.artist||'') > 0.6) score += 20;
+    if (_similarity(dash.song, item.title||'') > 0.6) score += 20;
+  }
+
+  return score;
 }
 
 async function ytFetchResults(query) {
@@ -7179,9 +7426,20 @@ async function ytFetchResults(query) {
   const typeMap = { all: 'all', song: 'song', artist: 'artist', album: 'album', playlist: 'album', podcast: 'podcast' };
   const apiType = typeMap[ytActiveFilter] || 'all';
   try {
-    const resp = await fetch(`${VOID_API_BASE}/youtube/search?q=${encodeURIComponent(enriched)}&type=${apiType}&max=15`, { signal: AbortSignal.timeout(12000) });
-    if (resp.ok) {
-      const data = await resp.json();
+    // For a specific song/artist query also fire a parallel broad search for better coverage
+    const dash = _parseDashQuery(query);
+    const fetchPromises = [
+      fetch(`${VOID_API_BASE}/youtube/search?q=${encodeURIComponent(enriched)}&type=${apiType}&limit=20`, { signal: AbortSignal.timeout(12000) }),
+    ];
+    // If "Artist - Song" pattern, also search the artist name alone for artist results
+    if (dash && apiType === 'all') {
+      fetchPromises.push(
+        fetch(`${VOID_API_BASE}/youtube/search?q=${encodeURIComponent(dash.artist)}&type=artist&limit=5`, { signal: AbortSignal.timeout(10000) })
+      );
+    }
+    const [resp, artistResp] = await Promise.allSettled(fetchPromises);
+    if (resp.status === 'fulfilled' && resp.value.ok) {
+      const data = await resp.value.json();
       const items = data.items || [];
       ytResults = items.map(item => ({
         videoId: item.id,
@@ -7192,10 +7450,21 @@ async function ytFetchResults(query) {
         thumbnail: item.thumbnail || null,
         audioUrl: item.audioUrl || null,
         localMatch: ytFindExactLocalMatch(item.title || '', item.artist || ''),
+        _score: _scoreResult(item, query),
       }));
+      // Re-rank by score
+      ytResults.sort((a,b) => (b._score||0) - (a._score||0));
       ytArtists = (data.artists || []);
       ytAlbums = (data.albums || []);
       ytPodcasts = (data.podcasts || []);
+    }
+    // Merge extra artist results from dash query
+    if (artistResp && artistResp.status === 'fulfilled' && artistResp.value.ok) {
+      const ad = await artistResp.value.json();
+      const extraArtists = ad.artists || ad.items || [];
+      // De-dupe by id
+      const existingIds = new Set(ytArtists.map(a=>String(a.id)));
+      for (const a of extraArtists) { if (!existingIds.has(String(a.id))) ytArtists.push(a); }
     }
   } catch(e) { console.warn('[VOID saavn search]', e.message); }
   return { ytResults, ytPlaylistResults, ytArtists, ytAlbums, ytPodcasts, localMatches, source: 'jiosaavn' };
@@ -7226,17 +7495,41 @@ async function scDoSearch(query, force=false) {
     const enriched = _enrichQuery(query);
     const scTypeMap = { all: 'all', song: 'song', artist: 'artist', playlist: 'playlist' };
     const scApiType = scTypeMap[scActiveFilter] || 'all';
-    const resp = await fetch(`${VOID_API_BASE}/soundcloud/search?q=${encodeURIComponent(enriched)}&type=${scApiType}&max=15`, { signal: AbortSignal.timeout(12000) });
-    if (!resp.ok) throw new Error(`SC search HTTP ${resp.status}`);
-    const data = await resp.json();
-    const scResults = (data.items || []).map(item => ({
+    // Fire parallel: enriched query + if "Artist - Song" pattern also search bare query
+    const dash = _parseDashQuery(query);
+    const fetches = [
+      fetch(`${VOID_API_BASE}/soundcloud/search?q=${encodeURIComponent(enriched)}&type=${scApiType}&limit=20`, { signal: AbortSignal.timeout(12000) }),
+    ];
+    if (dash && enriched !== query) {
+      fetches.push(fetch(`${VOID_API_BASE}/soundcloud/search?q=${encodeURIComponent(query)}&type=${scApiType}&limit=10`, { signal: AbortSignal.timeout(10000) }));
+    }
+    const [resp, resp2] = await Promise.allSettled(fetches);
+    if (!resp || resp.status !== 'fulfilled' || !resp.value.ok) throw new Error(`SC search HTTP ${resp?.value?.status||'fail'}`);
+    const data = await resp.value.json();
+    let scResults = (data.items || []).map(item => ({
       videoId:   String(item.id || item.videoId),
       title:     item.title  || 'Unknown',
       artist:    item.artist || '',
       duration:  item.duration || 0,
       thumbnail: item.thumbnail || item.artwork_url || null,
       audioUrl:  item.audioUrl  || item.stream_url  || null,
+      _score:    _scoreResult(item, query),
     }));
+    // Merge results from bare query if available
+    if (resp2 && resp2.status === 'fulfilled' && resp2.value.ok) {
+      const d2 = await resp2.value.json();
+      const existIds = new Set(scResults.map(r=>r.videoId));
+      for (const item of (d2.items||[])) {
+        const vid = String(item.id||item.videoId);
+        if (!existIds.has(vid)) {
+          scResults.push({ videoId:vid, title:item.title||'Unknown', artist:item.artist||'',
+            duration:item.duration||0, thumbnail:item.thumbnail||item.artwork_url||null,
+            audioUrl:item.audioUrl||item.stream_url||null, _score:_scoreResult(item, query) });
+        }
+      }
+    }
+    // Re-rank by score
+    scResults.sort((a,b) => (b._score||0) - (a._score||0));
     const scArtists = data.artists || [];
     const scPlaylists = data.playlists || [];
     renderSCResults(scResults, query, scArtists, scPlaylists);
@@ -7357,16 +7650,39 @@ function ytIso8601ToDur(iso) {
 }
 
 function ytFindLocalMatches(query) {
-  const q=query.toLowerCase();
-  return tracks.filter(t=>t.title.toLowerCase().includes(q)||t.artist.toLowerCase().includes(q)).slice(0,5);
+  if (!query) return [];
+  const q = _normalise(query);
+  const qKw = _keywords(query);
+  const scored = tracks.map(t => {
+    let score = 0;
+    const tt = _normalise(t.title), ta = _normalise(t.artist);
+    if (tt === q || ta === q) score = 100;
+    else if (tt.startsWith(q) || ta.startsWith(q)) score = 80;
+    else if (tt.includes(q) || ta.includes(q)) score = 60;
+    else {
+      const tkw = _keywords(t.title), akw = _keywords(t.artist);
+      const hits = qKw.filter(w => [...tkw,...akw].some(k=>k.startsWith(w)||w.startsWith(k)));
+      score = hits.length * 12;
+      score += _similarity(query, t.title) * 25;
+      score += _similarity(query, t.artist) * 15;
+    }
+    return { t, score };
+  }).filter(x=>x.score>15).sort((a,b)=>b.score-a.score).slice(0,5);
+  return scored.map(x=>x.t);
 }
 
 function ytFindExactLocalMatch(title,artist) {
-  const t=(title||'').toLowerCase(); const a=(artist||'').toLowerCase();
-  return tracks.find(tr=>{
-    const tt=tr.title.toLowerCase(); const ta=tr.artist.toLowerCase();
-    return (tt===t||t.includes(tt)||tt.includes(t.split('-')[0].trim().substring(0,20)))||(a&&ta&&ta.includes(a.substring(0,12)));
-  })||null;
+  const tq = _normalise(title), aq = _normalise(artist);
+  // Score all and return best
+  let best = null, bestScore = 0;
+  for (const tr of tracks) {
+    const tt = _normalise(tr.title), ta = _normalise(tr.artist);
+    let score = _similarity(tq, tt) * 60 + _similarity(aq, ta) * 40;
+    if (tq && tt === tq) score += 50;
+    if (aq && ta === aq) score += 30;
+    if (score > bestScore && score > 50) { bestScore = score; best = tr; }
+  }
+  return best;
 }
 
 // ==============================
