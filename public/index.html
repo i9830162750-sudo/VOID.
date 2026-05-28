@@ -2067,6 +2067,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   .see-all-overlay { left:240px; right:300px; max-width:none; width:auto; bottom:58px; transform:none; }
   .ctx-overlay { left:240px; right:300px; transform:none; max-width:none; width:auto; }
   .modal-overlay { left:240px; right:300px; transform:none; max-width:none; width:auto; }
+  .detail-overlay { left:240px; right:300px; bottom:58px; }
   .pwa-banner { display:none !important; }
 }
 
@@ -3431,7 +3432,6 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
           <button class="yt-filter-btn" data-filter="song" onclick="ytSetFilter('song')">Songs</button>
           <button class="yt-filter-btn" data-filter="artist" onclick="ytSetFilter('artist')">Artists</button>
           <button class="yt-filter-btn" data-filter="album" onclick="ytSetFilter('album')">Albums</button>
-          <button class="yt-filter-btn" data-filter="podcast" onclick="ytSetFilter('podcast')">Podcasts</button>
         </div>
       </div>
       <!-- SC filter row: shown in SC mode -->
@@ -3490,7 +3490,6 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
         <button class="yt-filter-btn" data-filter="song" onclick="ytSetFilter('song')">Songs</button>
         <button class="yt-filter-btn" data-filter="artist" onclick="ytSetFilter('artist')">Artists</button>
         <button class="yt-filter-btn" data-filter="album" onclick="ytSetFilter('album')">Albums</button>
-        <button class="yt-filter-btn" data-filter="podcast" onclick="ytSetFilter('podcast')">Podcasts</button>
       </div>
 
       <div class="yt-search-bar">
@@ -3561,40 +3560,49 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   </div><!-- /page-stack -->
 
   <!-- ARTIST PAGE OVERLAY -->
-  <div id="artist-page-overlay" style="display:none;position:fixed;inset:0;z-index:800;background:var(--bg1);overflow-y:auto;flex-direction:column;">
+  <div id="artist-page-overlay" class="detail-overlay" style="display:none;position:fixed;inset:0;z-index:800;background:var(--bg);overflow-y:auto;flex-direction:column;">
     <div style="display:flex;align-items:center;gap:12px;padding:16px 20px 0;flex-shrink:0">
       <button onclick="closeArtistPage()" style="background:var(--bg2);border:1px solid var(--border);border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;color:var(--text2);cursor:pointer;flex-shrink:0">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:18px;height:18px"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
       <span id="artist-page-source-badge" style="font-size:9px;font-family:'Space Mono',monospace;font-weight:700"></span>
+      <div style="display:flex;gap:8px;margin-left:auto">
+        <button class="pl-shuffle-btn" onclick="_shuffleOverlay()" title="Shuffle">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>
+          Shuffle
+        </button>
+        <button class="pl-play-all-btn" onclick="_playAllOverlay()" title="Play All">
+          <svg fill="currentColor" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+          Play All
+        </button>
+      </div>
     </div>
     <div id="artist-page-hero" style="padding:20px 20px 0"></div>
     <div id="artist-page-tracks" style="padding:0 20px 120px"></div>
   </div>
 
   <!-- ALBUM PAGE OVERLAY -->
-  <div id="album-page-overlay" style="display:none;position:fixed;inset:0;z-index:800;background:var(--bg1);overflow-y:auto;flex-direction:column;">
+  <div id="album-page-overlay" class="detail-overlay" style="display:none;position:fixed;inset:0;z-index:800;background:var(--bg);overflow-y:auto;flex-direction:column;">
     <div style="display:flex;align-items:center;gap:12px;padding:16px 20px 0;flex-shrink:0">
       <button onclick="closeAlbumPage()" style="background:var(--bg2);border:1px solid var(--border);border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;color:var(--text2);cursor:pointer;flex-shrink:0">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:18px;height:18px"><polyline points="15 18 9 12 15 6"/></svg>
       </button>
       <span style="font-size:9px;font-family:'Space Mono',monospace;font-weight:700;color:var(--yt)">JIOSAAVN ALBUM</span>
+      <div style="display:flex;gap:8px;margin-left:auto">
+        <button class="pl-shuffle-btn" onclick="_shuffleOverlay()" title="Shuffle">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>
+          Shuffle
+        </button>
+        <button class="pl-play-all-btn" onclick="_playAllOverlay()" title="Play All">
+          <svg fill="currentColor" viewBox="0 0 24 24"><polygon points="5,3 19,12 5,21"/></svg>
+          Play All
+        </button>
+      </div>
     </div>
     <div id="album-page-hero" style="padding:20px 20px 0"></div>
     <div id="album-page-tracks" style="padding:0 20px 120px"></div>
   </div>
 
-  <!-- PODCAST PAGE OVERLAY -->
-  <div id="podcast-page-overlay" style="display:none;position:fixed;inset:0;z-index:800;background:var(--bg1);overflow-y:auto;flex-direction:column;">
-    <div style="display:flex;align-items:center;gap:12px;padding:16px 20px 0;flex-shrink:0">
-      <button onclick="closePodcastPage()" style="background:var(--bg2);border:1px solid var(--border);border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;color:var(--text2);cursor:pointer;flex-shrink:0">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:18px;height:18px"><polyline points="15 18 9 12 15 6"/></svg>
-      </button>
-      <span style="font-size:9px;font-family:'Space Mono',monospace;font-weight:700;color:var(--yt)">PODCAST</span>
-    </div>
-    <div id="podcast-page-hero" style="padding:20px 20px 0"></div>
-    <div id="podcast-page-tracks" style="padding:0 20px 120px"></div>
-  </div>
 
   <!-- ONLINE PLAYLIST IMPORT OVERLAY -->
   <div id="online-pl-overlay" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:flex-end;justify-content:center">
@@ -6729,7 +6737,7 @@ function scSetFilter(filter) {
   if (q.length>1) { scLastQuery=''; scDoSearch(q,true); }
 }
 
-// ── Artist / Album / Podcast page overlay functions ──────────────────────────
+// ── Artist / Album page overlay functions ──────────────────────────
 
 function _renderTrackListInOverlay(songs, containerEl, source) {
   if (!songs.length) { containerEl.innerHTML=`<div class="yt-empty"><p>No tracks found</p></div>`; return; }
@@ -6784,6 +6792,56 @@ function _playOnlineTrack(idx, source) {
     }
     playTrack(tIdx);
   }
+}
+
+// Play all / shuffle for artist & album overlays
+// Reuses _overlayTracks + _overlaySource set by openSaavnArtistPage / openSaavnAlbumPage
+function _playAllOverlay() {
+  const songs = window._overlayTracks || [];
+  const source = window._overlaySource || 'jiosaavn';
+  if (!songs.length) { showToast('No tracks to play'); return; }
+  // Ensure all tracks exist in tracks[] and collect their indices
+  const idxs = songs.map((s, i) => {
+    if (source === 'soundcloud') {
+      let t = tracks.find(tr => tr.scMeta && tr.scMeta.trackId === String(s.videoId || s.id));
+      if (!t) {
+        const id = 'track_sc_' + Date.now() + '_' + i + '_' + Math.random().toString(36).slice(2);
+        t = { id, blobId:null, title:s.title, artist:s.artist, duration:s.duration, cover:s.thumbnail||null, isFav:false, isOnline:true,
+          scMeta:{ trackId:String(s.videoId||s.id), thumbnail:s.thumbnail, title:s.title }, ytMeta:null, url:null, streamUrl:null };
+        tracks.push(t);
+        dbPut('tracks', { id:t.id,blobId:null,title:t.title,artist:t.artist,duration:t.duration,cover:t.cover,isFav:false,isOnline:true,ytMeta:null,scMeta:t.scMeta });
+      }
+      return tracks.indexOf(t);
+    } else {
+      let t = tracks.find(tr => tr.ytMeta && tr.ytMeta.videoId === String(s.videoId || s.id));
+      if (!t) {
+        const id = 'track_saavn_' + Date.now() + '_' + i + '_' + Math.random().toString(36).slice(2);
+        t = { id, blobId:null, title:s.title, artist:s.artist, duration:s.duration, cover:s.thumbnail||null, isFav:false, isOnline:true,
+          ytMeta:{ videoId:String(s.videoId||s.id), thumbnail:s.thumbnail, title:s.title }, url:null, ytStreamUrl:null };
+        tracks.push(t);
+        dbPut('tracks', { id:t.id,blobId:null,title:t.title,artist:t.artist,duration:t.duration,cover:t.cover,isFav:false,isOnline:true,ytMeta:t.ytMeta });
+      }
+      return tracks.indexOf(t);
+    }
+  }).filter(i => i >= 0);
+  if (!idxs.length) return;
+  queue.future = idxs.slice(1);
+  queue.manual = [];
+  playTrack(idxs[0], true);
+  openNowPlaying();
+}
+
+function _shuffleOverlay() {
+  const songs = window._overlayTracks || [];
+  if (!songs.length) { showToast('No tracks to shuffle'); return; }
+  // Shuffle a copy of the indices array then play
+  const arr = [...songs.keys()];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  window._overlayTracks = arr.map(i => songs[i]);
+  _playAllOverlay();
 }
 
 async function openSaavnArtistPage(artistId) {
@@ -6890,39 +6948,6 @@ async function openSaavnAlbumPage(albumId) {
 
 function closeAlbumPage() { document.getElementById('album-page-overlay').style.display='none'; }
 
-async function openSaavnPodcastPage(podcastId) {
-  const overlay = document.getElementById('podcast-page-overlay');
-  const hero = document.getElementById('podcast-page-hero');
-  const tracksEl = document.getElementById('podcast-page-tracks');
-  hero.innerHTML=`<div class="yt-loading"><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div></div>`;
-  tracksEl.innerHTML='';
-  overlay.style.display='flex';
-  try {
-    const resp = await fetch(`${VOID_API_BASE}/youtube/podcast?id=${encodeURIComponent(podcastId)}`, { signal: AbortSignal.timeout(12000) });
-    if (!resp.ok) throw new Error('Podcast fetch failed');
-    const data = await resp.json();
-    const show = data.show || {};
-    hero.innerHTML=`
-      <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
-        <div style="width:80px;height:80px;border-radius:12px;overflow:hidden;flex-shrink:0;background:var(--bg3)">
-          ${show.thumbnail?`<img src="${esc(show.thumbnail)}" alt="" style="width:100%;height:100%;object-fit:cover">`:`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:32px;height:32px;color:var(--yt)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg></div>`}
-        </div>
-        <div>
-          <div style="font-size:9px;font-family:'Space Mono',monospace;font-weight:700;color:var(--yt);margin-bottom:4px">PODCAST</div>
-          <div style="font-size:18px;font-weight:800;margin-bottom:4px">${esc(show.name||'Podcast')}</div>
-          <div style="font-size:13px;color:var(--text2)">${esc(show.artist||'')}</div>
-        </div>
-      </div>
-      <div style="font-size:13px;font-weight:700;margin-bottom:10px;color:var(--text2)">Episodes</div>`;
-    window._overlayTracks = data.episodes || [];
-    window._overlaySource = 'jiosaavn';
-    _renderTrackListInOverlay(data.episodes||[], tracksEl, 'jiosaavn');
-  } catch(e) {
-    hero.innerHTML=`<div class="yt-empty"><p>Could not load podcast. ${esc(e.message)}</p></div>`;
-  }
-}
-
-function closePodcastPage() { document.getElementById('podcast-page-overlay').style.display='none'; }
 
 // ── Online Playlist Import (JioSaavn + SoundCloud) ───────────────────────────
 
@@ -7108,7 +7133,6 @@ function ytFilterToQuery(baseQ) {
     case 'artist':   return baseQ+' artist topic';
     case 'album':    return baseQ+' full album';
     case 'playlist': return baseQ+' playlist mix';
-    case 'podcast':  return baseQ+' podcast';
     default:         return baseQ;
   }
 }
@@ -7173,16 +7197,15 @@ function _enrichQuery(q) {
 
 async function ytFetchResults(query) {
   const localMatches = ytFindLocalMatches(query);
-  let ytResults = [], ytPlaylistResults = [], ytArtists = [], ytAlbums = [], ytPodcasts = [];
-  // Map filter to API type — podcast/podcastEpisode/show all route to the JioSaavn podcast endpoint
-  const typeMap = { all: 'all', song: 'song', artist: 'artist', album: 'album', playlist: 'album', podcast: 'podcast', podcastEpisode: 'podcast', show: 'podcast' };
+  let ytResults = [], ytPlaylistResults = [], ytArtists = [], ytAlbums = [];
+  // Map filter to API type
+  const typeMap = { all: 'all', song: 'song', artist: 'artist', album: 'album', playlist: 'album' };
   const apiType = typeMap[ytActiveFilter] || 'all';
-  // Skip vibe-map enrichment for podcast searches — raw query is what JioSaavn needs
-  const enriched = (apiType === 'podcast') ? query : _enrichQuery(query);
+  const enriched = _enrichQuery(query);
   try {
     const resp = await fetch(`${VOID_API_BASE}/youtube/search?q=${encodeURIComponent(enriched)}&type=${apiType}&max=15`, { signal: AbortSignal.timeout(12000) });
     // Always parse JSON — backend now returns graceful empty payload instead of 500
-    const data = resp.ok ? await resp.json() : { items: [], artists: [], albums: [], podcasts: [] };
+    const data = resp.ok ? await resp.json() : { items: [], artists: [], albums: [] };
     const items = data.items || [];
     ytResults = items.map(item => ({
       videoId: item.id,
@@ -7196,9 +7219,8 @@ async function ytFetchResults(query) {
     }));
     ytArtists = (data.artists || []);
     ytAlbums = (data.albums || []);
-    ytPodcasts = (data.podcasts || []);
   } catch(e) { console.warn('[VOID saavn search]', e.message); }
-  return { ytResults, ytPlaylistResults, ytArtists, ytAlbums, ytPodcasts, localMatches, source: 'jiosaavn' };
+  return { ytResults, ytPlaylistResults, ytArtists, ytAlbums, localMatches, source: 'jiosaavn' };
 }
 
 // ==============================
@@ -7373,7 +7395,7 @@ function ytFindExactLocalMatch(title,artist) {
 // YOUTUBE — RENDER RESULTS
 // ==============================
 function renderYTResults(data, query) {
-  const {ytResults, ytPlaylistResults, ytArtists, ytAlbums, ytPodcasts, localMatches, source, smartLabel}=data;
+  const {ytResults, ytPlaylistResults, ytArtists, ytAlbums, localMatches, source, smartLabel}=data;
   const results=document.getElementById('lib-yt-results');
   if (!results) return;
   let html='';
@@ -7419,113 +7441,7 @@ function renderYTResults(data, query) {
         <div style="font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:64px">${esc(a.name)}</div>
       </div>`).join('');
     html+=`</div>`;
-  }
-
-  if (ytPodcasts&&ytPodcasts.length) {
-    html+=`<div class="yt-section-hdr">Podcasts</div>`;
-    html+=ytPodcasts.map(pc=>`
-      <div class="yt-result-item" onclick="openSaavnPodcastPage('${esc(pc.id)}')" style="cursor:pointer">
-        <div class="yt-thumb" style="border-radius:10px">
-          ${pc.thumbnail?`<img src="${esc(pc.thumbnail)}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">`:`<div class="yt-thumb-placeholder"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:20px;height:20px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg></div>`}
-        </div>
-        <div class="yt-result-info">
-          <div class="yt-result-title">${esc(pc.name)}</div>
-          <div class="yt-result-artist">${esc(pc.artist)}</div>
-          <div class="yt-result-dur" style="color:var(--yt)">PODCAST</div>
-        </div>
-        <div class="yt-result-actions">
-          <button class="yt-result-btn" onclick="event.stopPropagation();openSaavnPodcastPage('${esc(pc.id)}')" title="View podcast">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg>
-          </button>
-        </div>
-      </div>`).join('');
-  }
-
-  if (ytAlbums&&ytAlbums.length) {
-    html+=`<div class="yt-section-hdr">Albums</div>`;
-    html+=ytAlbums.map(al=>`
-      <div class="yt-result-item" onclick="openSaavnAlbumPage('${esc(al.id)}')" style="cursor:pointer">
-        <div class="yt-thumb" style="border-radius:10px">
-          ${al.thumbnail?`<img src="${esc(al.thumbnail)}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">`:`<div class="yt-thumb-placeholder"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:20px;height:20px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="3"/></svg></div>`}
-        </div>
-        <div class="yt-result-info">
-          <div class="yt-result-title">${esc(al.name)}</div>
-          <div class="yt-result-artist">${esc(al.artist)}</div>
-          <div class="yt-result-dur">${al.year?al.year+' · ':''} Album</div>
-        </div>
-        <div class="yt-result-actions">
-          <button class="yt-result-btn" onclick="event.stopPropagation();openSaavnAlbumPage('${esc(al.id)}')" title="View album">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg>
-          </button>
-        </div>
-      </div>`).join('');
-  }
-
-  if (ytPlaylistResults&&ytPlaylistResults.length) {
-    html+=`<div class="yt-section-hdr">YouTube Playlists${srcBadge}</div>`;
-    html+=ytPlaylistResults.map(p=>{
-      if (!p.playlistId) return '';
-      return `<div class="yt-result-item yt-result-playlist">
-        <div class="yt-thumb" style="position:relative">
-          ${p.thumbnail?`<img src="${p.thumbnail}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">`:`<div class="yt-thumb-placeholder"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:20px;height:20px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></div>`}
-          ${p.videoCount?`<div class="yt-pl-count-badge">${p.videoCount}</div>`:''}
-        </div>
-        <div class="yt-result-info">
-          <div class="yt-result-title">${esc(p.title)}</div>
-          <div class="yt-result-artist">${esc(p.artist)}</div>
-          ${p.videoCount?`<div class="yt-result-dur">${p.videoCount} videos</div>`:''}
-        </div>
-        <div class="yt-result-actions">
-          <button class="yt-result-btn" onclick="ytImportPlaylistById('${esc(p.playlistId)}','${esc(p.title)}')" title="Import playlist">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.26"/></svg>
-          </button>
-        </div>
-      </div>`;
-    }).join('');
-  }
-
-  if (ytResults.length) {
-    html+=`<div class="yt-section-hdr">YouTube Results${srcBadge}</div>`;
-    html+=ytResults.map((v,vi)=>{
-      if (!v.videoId) return '';
-      const localT=v.localMatch;
-      const isMatched=!!(localT&&localT.ytMeta&&localT.ytMeta.videoId===v.videoId);
-      const dlId='dl_'+v.videoId;
-      const isCached = !!(localT && localT.url && !localT.isOnline);
-      return `<div class="yt-result-item" style="cursor:pointer" onclick="ytAddAndStream(${vi})">
-        <div class="yt-thumb" style="position:relative">
-          ${v.thumbnail?`<img src="${v.thumbnail}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">`:`<div class="yt-thumb-placeholder"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:var(--yt);width:22px;height:22px"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16" fill="var(--yt)" stroke="none"/></svg></div>`}
-          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.3);border-radius:inherit;opacity:0;transition:opacity 0.15s" class="yt-hover-play"><svg fill="var(--accent)" viewBox="0 0 24 24" style="width:22px;height:22px"><polygon points="5,3 19,12 5,21"/></svg></div>
-        </div>
-        <div class="yt-result-info">
-          <div class="yt-result-title">${esc(v.title)}</div>
-          <div class="yt-result-artist">${esc(v.artist)}</div>
-          <div class="yt-result-dur">${v.duration?fmtTime(v.duration):''}</div>
-        </div>
-        <div class="yt-result-actions">
-          ${localT
-            ?`<button class="yt-result-btn${isMatched?' matched':''}" onclick="event.stopPropagation();ytMatchToTrack(${tracks.indexOf(localT)},${vi},'${esc(query)}')" title="${isMatched?'Matched — unmatch':'Match to library track'}">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"${isMatched?' fill="var(--accent)"':''}/></svg>
-              </button>`
-            :`<button class="yt-result-btn" onclick="event.stopPropagation();ytOpenMatchPicker(${vi},'${esc(query)}')" title="Match to library track">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              </button>`}
-          <button class="yt-result-btn${isCached?' dl-done':''}" id="${dlId}" onclick="event.stopPropagation();ytDownloadTrack(${vi},'${dlId}')" title="${isCached?'Cached ✓':'Download & cache'}">
-            ${isCached
-              ? `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>`
-              : `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`}
-            <div class="yt-dl-progress" style="width:0%"></div>
-          </button>
-        </div>
-      </div>`;
-    }).join('');
-
-    const relatedTerms=ytResults.slice(0,6).map(v=>v.artist).filter((a,i,arr)=>a&&arr.indexOf(a)===i).slice(0,5);
-    if (relatedTerms.length>1) {
-      html+=`<div class="yt-section-hdr">Related Artists</div>
-        <div style="padding:0 0 4px"><div class="yt-related-row">${relatedTerms.map(a=>`<div class="yt-related-chip" onclick="ytSearchArtist('${esc(a)}')">${esc(a)}</div>`).join('')}</div></div>`;
-    }
-  } else if (!localMatches.length&&!(ytPlaylistResults&&ytPlaylistResults.length)&&!(ytArtists&&ytArtists.length)&&!(ytAlbums&&ytAlbums.length)&&!(ytPodcasts&&ytPodcasts.length)) {
+  } else if (!localMatches.length&&!(ytPlaylistResults&&ytPlaylistResults.length)&&!(ytArtists&&ytArtists.length)&&!(ytAlbums&&ytAlbums.length)) {
     html=`<div class="yt-empty"><p>No results for "<strong>${esc(query)}</strong>"<br><span style="font-size:11px">Try a different search term</span></p></div>`;
   }
 
