@@ -7353,23 +7353,6 @@ const _VIBE_MAP = {
 };
 
 function _enrichQuery(q) {
-  const lower = q.toLowerCase().trim();
-  // Multi-word vibe keys first (longest match wins)
-  const keys = Object.keys(_VIBE_MAP).sort((a,b)=>b.length-a.length);
-  for (const key of keys) {
-    if (lower === key || lower.startsWith(key+' ') || lower.endsWith(' '+key) || lower.includes(' '+key+' ')) {
-      return _VIBE_MAP[key];
-    }
-  }
-  // Detect "Artist - Song" pattern → search as-is (most specific)
-  if (_parseDashQuery(q)) return q;
-  // Detect "songs by X" / "music by X" → artist search
-  const byMatch = lower.match(/^(?:songs?|music|tracks?)\s+by\s+(.+)$/);
-  if (byMatch) return byMatch[1].trim();
-  // Detect "X songs" / "X music" where X is artist/genre
-  const songsOfMatch = lower.match(/^(.+?)\s+(?:songs?|music|tracks?)$/);
-  if (songsOfMatch && songsOfMatch[1].split(' ').length <= 3) return songsOfMatch[1].trim();
-  // Short pure-lowercase query with no numbers → might be a vibe, leave raw
   return q;
 }
 
