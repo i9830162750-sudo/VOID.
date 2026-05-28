@@ -806,6 +806,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
 .yt-filter-row::-webkit-scrollbar { display:none; }
 .yt-filter-btn { white-space:nowrap; background:var(--bg2); border:1px solid var(--border2); color:var(--text3); font-size:11px; padding:6px 13px; border-radius:20px; cursor:pointer; font-family:'DM Sans',sans-serif; font-weight:600; transition:all 0.18s; flex-shrink:0; }
 .yt-filter-btn.active { background:rgba(255,68,68,0.12); border-color:rgba(255,68,68,0.3); color:var(--yt); }
+.sc-filter-btn { white-space:nowrap; background:var(--bg2); border:1px solid var(--border2); color:var(--text3); font-size:11px; padding:6px 13px; border-radius:20px; cursor:pointer; font-family:'DM Sans',sans-serif; font-weight:600; transition:all 0.18s; flex-shrink:0; }
 
 .yt-results { padding:0 20px; }
 .yt-section-hdr { font-size:11px; text-transform:uppercase; letter-spacing:1.5px; color:var(--text3); font-weight:600; padding:14px 0 8px; font-family:'Space Mono',monospace; }
@@ -3429,6 +3430,17 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
           <button class="yt-filter-btn active" data-filter="all" onclick="ytSetFilter('all')">All</button>
           <button class="yt-filter-btn" data-filter="song" onclick="ytSetFilter('song')">Songs</button>
           <button class="yt-filter-btn" data-filter="artist" onclick="ytSetFilter('artist')">Artists</button>
+          <button class="yt-filter-btn" data-filter="album" onclick="ytSetFilter('album')">Albums</button>
+          <button class="yt-filter-btn" data-filter="podcast" onclick="ytSetFilter('podcast')">Podcasts</button>
+        </div>
+      </div>
+      <!-- SC filter row: shown in SC mode -->
+      <div id="lib-sc-filters-row" style="display:none">
+        <div class="lib-yt-filters">
+          <button class="sc-filter-btn active" data-scfilter="all" onclick="scSetFilter('all')" style="border-color:rgba(255,85,0,0.3);color:#ff5500;background:rgba(255,85,0,0.12)">All</button>
+          <button class="sc-filter-btn" data-scfilter="song" onclick="scSetFilter('song')">Tracks</button>
+          <button class="sc-filter-btn" data-scfilter="artist" onclick="scSetFilter('artist')">Artists</button>
+          <button class="sc-filter-btn" data-scfilter="playlist" onclick="scSetFilter('playlist')">Playlists</button>
         </div>
       </div>
       <!-- YT results section -->
@@ -3477,6 +3489,8 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
         <button class="yt-filter-btn active" data-filter="all" onclick="ytSetFilter('all')">All</button>
         <button class="yt-filter-btn" data-filter="song" onclick="ytSetFilter('song')">Songs</button>
         <button class="yt-filter-btn" data-filter="artist" onclick="ytSetFilter('artist')">Artists</button>
+        <button class="yt-filter-btn" data-filter="album" onclick="ytSetFilter('album')">Albums</button>
+        <button class="yt-filter-btn" data-filter="podcast" onclick="ytSetFilter('podcast')">Podcasts</button>
       </div>
 
       <div class="yt-search-bar">
@@ -3502,6 +3516,10 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
       <button class="new-pl-btn" onclick="createPlaylist()">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         New Playlist
+      </button>
+      <button class="new-pl-btn" onclick="showOnlinePlOverlay()" style="background:var(--bg2);color:var(--text2);border:1px solid var(--border);margin-top:6px">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polyline points="8 12 12 16 16 12"/><line x1="12" y1="8" x2="12" y2="16"/></svg>
+        Import Online Playlist
       </button>
       <div class="pl-list" id="pl-list"></div>
     </div>
@@ -3542,7 +3560,59 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
 
   </div><!-- /page-stack -->
 
-  <!-- MINI PLAYER -->
+  <!-- ARTIST PAGE OVERLAY -->
+  <div id="artist-page-overlay" style="display:none;position:fixed;inset:0;z-index:800;background:var(--bg1);overflow-y:auto;flex-direction:column;">
+    <div style="display:flex;align-items:center;gap:12px;padding:16px 20px 0;flex-shrink:0">
+      <button onclick="closeArtistPage()" style="background:var(--bg2);border:1px solid var(--border);border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;color:var(--text2);cursor:pointer;flex-shrink:0">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:18px;height:18px"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <span id="artist-page-source-badge" style="font-size:9px;font-family:'Space Mono',monospace;font-weight:700"></span>
+    </div>
+    <div id="artist-page-hero" style="padding:20px 20px 0"></div>
+    <div id="artist-page-tracks" style="padding:0 20px 120px"></div>
+  </div>
+
+  <!-- ALBUM PAGE OVERLAY -->
+  <div id="album-page-overlay" style="display:none;position:fixed;inset:0;z-index:800;background:var(--bg1);overflow-y:auto;flex-direction:column;">
+    <div style="display:flex;align-items:center;gap:12px;padding:16px 20px 0;flex-shrink:0">
+      <button onclick="closeAlbumPage()" style="background:var(--bg2);border:1px solid var(--border);border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;color:var(--text2);cursor:pointer;flex-shrink:0">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:18px;height:18px"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <span style="font-size:9px;font-family:'Space Mono',monospace;font-weight:700;color:var(--yt)">JIOSAAVN ALBUM</span>
+    </div>
+    <div id="album-page-hero" style="padding:20px 20px 0"></div>
+    <div id="album-page-tracks" style="padding:0 20px 120px"></div>
+  </div>
+
+  <!-- PODCAST PAGE OVERLAY -->
+  <div id="podcast-page-overlay" style="display:none;position:fixed;inset:0;z-index:800;background:var(--bg1);overflow-y:auto;flex-direction:column;">
+    <div style="display:flex;align-items:center;gap:12px;padding:16px 20px 0;flex-shrink:0">
+      <button onclick="closePodcastPage()" style="background:var(--bg2);border:1px solid var(--border);border-radius:50%;width:36px;height:36px;display:flex;align-items:center;justify-content:center;color:var(--text2);cursor:pointer;flex-shrink:0">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:18px;height:18px"><polyline points="15 18 9 12 15 6"/></svg>
+      </button>
+      <span style="font-size:9px;font-family:'Space Mono',monospace;font-weight:700;color:var(--yt)">PODCAST</span>
+    </div>
+    <div id="podcast-page-hero" style="padding:20px 20px 0"></div>
+    <div id="podcast-page-tracks" style="padding:0 20px 120px"></div>
+  </div>
+
+  <!-- ONLINE PLAYLIST IMPORT OVERLAY -->
+  <div id="online-pl-overlay" style="display:none;position:fixed;inset:0;z-index:800;background:rgba(0,0,0,0.6);align-items:flex-end;justify-content:center">
+    <div style="background:var(--bg1);border-radius:20px 20px 0 0;padding:24px 20px 40px;width:100%;max-width:600px;box-sizing:border-box">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div style="font-size:15px;font-weight:700">Import Online Playlist</div>
+        <button onclick="closeOnlinePlOverlay()" style="background:none;border:none;color:var(--text3);cursor:pointer;padding:4px">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:20px;height:20px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:12px">Paste a JioSaavn or SoundCloud playlist URL</div>
+      <input id="online-pl-url-input" type="text" placeholder="https://jiosaavn.com/featured/… or soundcloud.com/…/sets/…"
+        style="width:100%;box-sizing:border-box;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--text);font-size:14px;font-family:'DM Sans',sans-serif;outline:none;margin-bottom:12px">
+      <button onclick="importOnlinePlaylist()" style="width:100%;background:var(--accent);border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;color:#000;cursor:pointer;font-family:'DM Sans',sans-serif">Import Playlist</button>
+    </div>
+  </div>
+
+
   <div class="mini-bar" id="mini-bar" onclick="if(!isDesktop())openNowPlaying()">
     <div class="mini-bg"></div>
     <!-- Zone 1: cover + info + fav (single grid cell) -->
@@ -6645,6 +6715,306 @@ function ytSetFilter(filter) {
   if (q.length>1) { ytLastQuery=''; ytDoSearch(q,true); }
 }
 
+let scActiveFilter = 'all';
+function scSetFilter(filter) {
+  scActiveFilter = filter;
+  document.querySelectorAll('.sc-filter-btn').forEach(b=>{
+    const active = b.dataset.scfilter === filter;
+    b.classList.toggle('active', active);
+    b.style.background = active ? 'rgba(255,85,0,0.12)' : '';
+    b.style.borderColor = active ? 'rgba(255,85,0,0.3)' : '';
+    b.style.color = active ? '#ff5500' : '';
+  });
+  const q = document.getElementById('search-input').value.trim();
+  if (q.length>1) { scLastQuery=''; scDoSearch(q,true); }
+}
+
+// ── Artist / Album / Podcast page overlay functions ──────────────────────────
+
+function _renderTrackListInOverlay(songs, containerEl, source) {
+  if (!songs.length) { containerEl.innerHTML=`<div class="yt-empty"><p>No tracks found</p></div>`; return; }
+  containerEl.innerHTML = songs.map((s,i)=>`
+    <div class="yt-result-item" onclick="_playOnlineTrack(${i},'${source}')" style="cursor:pointer">
+      <div class="yt-thumb" style="border-radius:8px">
+        ${s.thumbnail?`<img src="${esc(s.thumbnail)}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">`:`<div class="yt-thumb-placeholder"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:18px;height:18px"><path d="M9 18V5l12-2v13"/></svg></div>`}
+        <div class="yt-hover-play" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.3);border-radius:inherit;opacity:0;transition:opacity 0.15s"><svg fill="${source==='soundcloud'?'#ff5500':'var(--yt)'}" viewBox="0 0 24 24" style="width:20px;height:20px"><polygon points="5,3 19,12 5,21"/></svg></div>
+      </div>
+      <div class="yt-result-info">
+        <div class="yt-result-title">${esc(s.title)}</div>
+        <div class="yt-result-artist">${esc(s.artist||'')}</div>
+        <div class="yt-result-dur">${s.duration?fmtTime(s.duration):''}</div>
+      </div>
+      <div class="yt-result-actions">
+        <button class="yt-result-btn" onclick="event.stopPropagation();_playOnlineTrack(${i},'${source}')" title="Play" style="${source==='soundcloud'?'color:#ff5500;border-color:rgba(255,85,0,0.3)':''}">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polygon points="5,3 19,12 5,21" fill="${source==='soundcloud'?'#ff5500':'var(--yt)'}" stroke="none"/></svg>
+        </button>
+      </div>
+    </div>`).join('');
+}
+
+window._overlayTracks = [];
+window._overlaySource = '';
+
+function _playOnlineTrack(idx, source) {
+  const s = window._overlayTracks[idx]; if (!s) return;
+  if (source === 'soundcloud') {
+    // Use scAddAndStream pattern
+    let t = tracks.find(tr => tr.scMeta && tr.scMeta.trackId === String(s.videoId || s.id));
+    let tIdx;
+    if (t) { tIdx = tracks.indexOf(t); }
+    else {
+      const id = 'track_sc_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+      t = { id, blobId:null, title:s.title, artist:s.artist, duration:s.duration, cover:s.thumbnail||null, isFav:false, isOnline:true,
+        scMeta:{ trackId:String(s.videoId||s.id), thumbnail:s.thumbnail, title:s.title }, ytMeta:null, url:null, streamUrl:null };
+      tracks.push(t); tIdx = tracks.length-1;
+      dbPut('tracks', { id:t.id,blobId:null,title:t.title,artist:t.artist,duration:t.duration,cover:t.cover,isFav:false,isOnline:true,ytMeta:null,scMeta:t.scMeta });
+    }
+    playTrack(tIdx);
+  } else {
+    // JioSaavn
+    let t = tracks.find(tr => tr.ytMeta && tr.ytMeta.videoId === String(s.videoId||s.id));
+    let tIdx;
+    if (t) { tIdx = tracks.indexOf(t); }
+    else {
+      const id = 'track_saavn_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+      t = { id, blobId:null, title:s.title, artist:s.artist, duration:s.duration, cover:s.thumbnail||null, isFav:false, isOnline:true,
+        ytMeta:{ videoId:String(s.videoId||s.id), thumbnail:s.thumbnail, title:s.title }, url:null, ytStreamUrl:null };
+      tracks.push(t); tIdx = tracks.length-1;
+      dbPut('tracks', { id:t.id,blobId:null,title:t.title,artist:t.artist,duration:t.duration,cover:t.cover,isFav:false,isOnline:true,ytMeta:t.ytMeta });
+    }
+    playTrack(tIdx);
+  }
+}
+
+async function openSaavnArtistPage(artistId) {
+  const overlay = document.getElementById('artist-page-overlay');
+  const hero = document.getElementById('artist-page-hero');
+  const tracksEl = document.getElementById('artist-page-tracks');
+  const badge = document.getElementById('artist-page-source-badge');
+  badge.textContent = 'JIOSAAVN ARTIST'; badge.style.color = 'var(--yt)';
+  hero.innerHTML = `<div style="display:flex;align-items:center;gap:14px;margin-bottom:20px"><div style="width:48px;height:48px;border-radius:50%;background:var(--bg3);flex-shrink:0"></div><div style="height:16px;background:var(--bg3);border-radius:4px;width:150px"></div></div>`;
+  tracksEl.innerHTML = `<div class="yt-loading"><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div></div>`;
+  overlay.style.display = 'flex';
+  try {
+    const resp = await fetch(`${VOID_API_BASE}/youtube/artist?id=${encodeURIComponent(artistId)}`, { signal: AbortSignal.timeout(12000) });
+    if (!resp.ok) throw new Error('Artist fetch failed');
+    const data = await resp.json();
+    const a = data.artist || {};
+    hero.innerHTML = `
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
+        <div style="width:80px;height:80px;border-radius:50%;overflow:hidden;flex-shrink:0;background:var(--bg3)">
+          ${a.thumbnail?`<img src="${esc(a.thumbnail)}" alt="" style="width:100%;height:100%;object-fit:cover">`:`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:32px;height:32px;color:var(--text3)"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>`}
+        </div>
+        <div>
+          <div style="font-size:20px;font-weight:800;margin-bottom:4px">${esc(a.name||'Artist')}</div>
+          ${a.followerCount?`<div style="font-size:12px;color:var(--text3)">${Number(a.followerCount).toLocaleString()} followers</div>`:''}
+        </div>
+      </div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:10px;color:var(--text2)">Popular Songs</div>`;
+    window._overlayTracks = data.songs || [];
+    window._overlaySource = 'jiosaavn';
+    _renderTrackListInOverlay(data.songs||[], tracksEl, 'jiosaavn');
+  } catch(e) {
+    tracksEl.innerHTML=`<div class="yt-empty"><p>Could not load artist. ${esc(e.message)}</p></div>`;
+  }
+}
+
+async function openSCArtistPage(userId) {
+  const overlay = document.getElementById('artist-page-overlay');
+  const hero = document.getElementById('artist-page-hero');
+  const tracksEl = document.getElementById('artist-page-tracks');
+  const badge = document.getElementById('artist-page-source-badge');
+  badge.textContent = 'SOUNDCLOUD ARTIST'; badge.style.color = '#ff5500';
+  hero.innerHTML = `<div style="display:flex;align-items:center;gap:14px;margin-bottom:20px"><div style="width:48px;height:48px;border-radius:50%;background:var(--bg3);flex-shrink:0"></div><div style="height:16px;background:var(--bg3);border-radius:4px;width:150px"></div></div>`;
+  tracksEl.innerHTML = `<div class="yt-loading"><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div></div>`;
+  overlay.style.display = 'flex';
+  try {
+    const resp = await fetch(`${VOID_API_BASE}/soundcloud/artist?id=${encodeURIComponent(userId)}`, { signal: AbortSignal.timeout(12000) });
+    if (!resp.ok) throw new Error('Artist fetch failed');
+    const data = await resp.json();
+    const a = data.artist || {};
+    hero.innerHTML = `
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
+        <div style="width:80px;height:80px;border-radius:50%;overflow:hidden;flex-shrink:0;background:var(--bg3)">
+          ${a.thumbnail?`<img src="${esc(a.thumbnail)}" alt="" style="width:100%;height:100%;object-fit:cover">`:`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:32px;height:32px;color:#ff5500"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>`}
+        </div>
+        <div>
+          <div style="font-size:20px;font-weight:800;margin-bottom:4px">${esc(a.name||'Artist')}</div>
+          ${a.followerCount?`<div style="font-size:12px;color:var(--text3)">${Number(a.followerCount).toLocaleString()} followers</div>`:''}
+          ${a.description?`<div style="font-size:11px;color:var(--text3);margin-top:4px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical">${esc(a.description)}</div>`:''}
+        </div>
+      </div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:10px;color:var(--text2)">Tracks</div>`;
+    window._overlayTracks = data.songs || [];
+    window._overlaySource = 'soundcloud';
+    _renderTrackListInOverlay(data.songs||[], tracksEl, 'soundcloud');
+  } catch(e) {
+    tracksEl.innerHTML=`<div class="yt-empty"><p>Could not load artist. ${esc(e.message)}</p></div>`;
+  }
+}
+
+function closeArtistPage() {
+  document.getElementById('artist-page-overlay').style.display='none';
+}
+
+async function openSaavnAlbumPage(albumId) {
+  const overlay = document.getElementById('album-page-overlay');
+  const hero = document.getElementById('album-page-hero');
+  const tracksEl = document.getElementById('album-page-tracks');
+  hero.innerHTML=`<div class="yt-loading"><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div></div>`;
+  tracksEl.innerHTML='';
+  overlay.style.display='flex';
+  try {
+    const resp = await fetch(`${VOID_API_BASE}/youtube/album?id=${encodeURIComponent(albumId)}`, { signal: AbortSignal.timeout(12000) });
+    if (!resp.ok) throw new Error('Album fetch failed');
+    const data = await resp.json();
+    const al = data.album || {};
+    hero.innerHTML=`
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
+        <div style="width:80px;height:80px;border-radius:12px;overflow:hidden;flex-shrink:0;background:var(--bg3)">
+          ${al.thumbnail?`<img src="${esc(al.thumbnail)}" alt="" style="width:100%;height:100%;object-fit:cover">`:`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:32px;height:32px;color:var(--text3)"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="3"/></svg></div>`}
+        </div>
+        <div>
+          <div style="font-size:18px;font-weight:800;margin-bottom:4px">${esc(al.name||'Album')}</div>
+          <div style="font-size:13px;color:var(--text2)">${esc(al.artist||'')}</div>
+          ${al.year?`<div style="font-size:11px;color:var(--text3);margin-top:2px">${al.year}</div>`:''}
+        </div>
+      </div>`;
+    window._overlayTracks = data.songs || [];
+    window._overlaySource = 'jiosaavn';
+    _renderTrackListInOverlay(data.songs||[], tracksEl, 'jiosaavn');
+  } catch(e) {
+    hero.innerHTML=`<div class="yt-empty"><p>Could not load album. ${esc(e.message)}</p></div>`;
+  }
+}
+
+function closeAlbumPage() { document.getElementById('album-page-overlay').style.display='none'; }
+
+async function openSaavnPodcastPage(podcastId) {
+  const overlay = document.getElementById('podcast-page-overlay');
+  const hero = document.getElementById('podcast-page-hero');
+  const tracksEl = document.getElementById('podcast-page-tracks');
+  hero.innerHTML=`<div class="yt-loading"><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div></div>`;
+  tracksEl.innerHTML='';
+  overlay.style.display='flex';
+  try {
+    const resp = await fetch(`${VOID_API_BASE}/youtube/podcast?id=${encodeURIComponent(podcastId)}`, { signal: AbortSignal.timeout(12000) });
+    if (!resp.ok) throw new Error('Podcast fetch failed');
+    const data = await resp.json();
+    const show = data.show || {};
+    hero.innerHTML=`
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
+        <div style="width:80px;height:80px;border-radius:12px;overflow:hidden;flex-shrink:0;background:var(--bg3)">
+          ${show.thumbnail?`<img src="${esc(show.thumbnail)}" alt="" style="width:100%;height:100%;object-fit:cover">`:`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:32px;height:32px;color:var(--yt)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg></div>`}
+        </div>
+        <div>
+          <div style="font-size:9px;font-family:'Space Mono',monospace;font-weight:700;color:var(--yt);margin-bottom:4px">PODCAST</div>
+          <div style="font-size:18px;font-weight:800;margin-bottom:4px">${esc(show.name||'Podcast')}</div>
+          <div style="font-size:13px;color:var(--text2)">${esc(show.artist||'')}</div>
+        </div>
+      </div>
+      <div style="font-size:13px;font-weight:700;margin-bottom:10px;color:var(--text2)">Episodes</div>`;
+    window._overlayTracks = data.episodes || [];
+    window._overlaySource = 'jiosaavn';
+    _renderTrackListInOverlay(data.episodes||[], tracksEl, 'jiosaavn');
+  } catch(e) {
+    hero.innerHTML=`<div class="yt-empty"><p>Could not load podcast. ${esc(e.message)}</p></div>`;
+  }
+}
+
+function closePodcastPage() { document.getElementById('podcast-page-overlay').style.display='none'; }
+
+// ── Online Playlist Import (JioSaavn + SoundCloud) ───────────────────────────
+
+function showOnlinePlOverlay() {
+  const el = document.getElementById('online-pl-overlay');
+  el.style.display='flex';
+  setTimeout(()=>document.getElementById('online-pl-url-input').focus(),100);
+}
+function closeOnlinePlOverlay() {
+  document.getElementById('online-pl-overlay').style.display='none';
+}
+
+async function importOnlinePlaylist() {
+  const input = document.getElementById('online-pl-url-input');
+  const val = (input.value||'').trim();
+  if (!val) { showToast('Paste a playlist URL first'); return; }
+  closeOnlinePlOverlay();
+  const isSC = val.includes('soundcloud.com');
+  if (isSC) {
+    await importSCPlaylist(val);
+  } else {
+    // Try JioSaavn
+    await importSaavnPlaylist(val);
+  }
+}
+
+async function importSaavnPlaylist(idOrUrl) {
+  showToast('Fetching JioSaavn playlist…');
+  try {
+    const resp = await fetch(`${VOID_API_BASE}/youtube/playlist?id=${encodeURIComponent(idOrUrl)}`, { signal: AbortSignal.timeout(15000) });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    const plInfo = data.playlist || {};
+    const songs = data.songs || [];
+    if (!songs.length) throw new Error('No songs in playlist');
+
+    const plId = 'pl_saavn_'+Date.now();
+    const newPl = { id: plId, name: plInfo.name||'JioSaavn Playlist', trackIds: [], source: 'jiosaavn' };
+    let added = 0;
+    for (const s of songs) {
+      if (!s.videoId) continue;
+      const existing = tracks.find(tr=>tr.ytMeta&&tr.ytMeta.videoId===s.videoId);
+      if (existing) { if (!newPl.trackIds.includes(existing.id)) newPl.trackIds.push(existing.id); continue; }
+      const id='track_saavn_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+      const t = { id,blobId:null,title:s.title,artist:s.artist,duration:s.duration,cover:s.thumbnail||null,isFav:false,isOnline:true,
+        ytMeta:{videoId:s.videoId,thumbnail:s.thumbnail,title:s.title},url:null,ytStreamUrl:null };
+      tracks.push(t); newPl.trackIds.push(id);
+      await dbPut('tracks',{id:t.id,blobId:null,title:t.title,artist:t.artist,duration:t.duration,cover:t.cover,isFav:false,isOnline:true,ytMeta:t.ytMeta});
+      added++;
+    }
+    playlists.push(newPl); savePlaylists(); renderAll(); saveSettings();
+    showToast(`✓ "${newPl.name}" — ${added} tracks added`);
+    setTimeout(()=>showPage('playlists'),800);
+  } catch(e) {
+    showToast('Import failed: '+(e.message||'Try another URL'));
+  }
+}
+
+async function importSCPlaylist(idOrUrl) {
+  showToast('Fetching SoundCloud playlist…');
+  try {
+    const resp = await fetch(`${VOID_API_BASE}/soundcloud/playlist?id=${encodeURIComponent(idOrUrl)}`, { signal: AbortSignal.timeout(15000) });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    const plInfo = data.playlist || {};
+    const songs = data.songs || [];
+    if (!songs.length) throw new Error('No tracks in playlist');
+
+    const plId = 'pl_sc_'+Date.now();
+    const newPl = { id: plId, name: plInfo.name||'SoundCloud Playlist', trackIds: [], source: 'soundcloud' };
+    let added = 0;
+    for (const s of songs) {
+      if (!s.videoId) continue;
+      const existing = tracks.find(tr=>tr.scMeta&&tr.scMeta.trackId===String(s.videoId));
+      if (existing) { if (!newPl.trackIds.includes(existing.id)) newPl.trackIds.push(existing.id); continue; }
+      const id='track_sc_'+Date.now()+'_'+Math.random().toString(36).slice(2);
+      const t = { id,blobId:null,title:s.title,artist:s.artist,duration:s.duration,cover:s.thumbnail||null,isFav:false,isOnline:true,
+        scMeta:{trackId:String(s.videoId),thumbnail:s.thumbnail,title:s.title},ytMeta:null,url:null,streamUrl:null };
+      tracks.push(t); newPl.trackIds.push(id);
+      await dbPut('tracks',{id:t.id,blobId:null,title:t.title,artist:t.artist,duration:t.duration,cover:t.cover,isFav:false,isOnline:true,ytMeta:null,scMeta:t.scMeta});
+      added++;
+    }
+    playlists.push(newPl); savePlaylists(); renderAll(); saveSettings();
+    showToast(`✓ "${newPl.name}" — ${added} tracks added`);
+    setTimeout(()=>showPage('playlists'),800);
+  } catch(e) {
+    showToast('Import failed: '+(e.message||'Try another URL'));
+  }
+}
+
+
+
 let libSearchMode = 'local';
 
 function setLibSearchMode(mode) {
@@ -6675,7 +7045,8 @@ function setLibSearchMode(mode) {
   const scBtn = document.getElementById('lib-mode-sc');
   if (scBtn) { scBtn.classList.toggle('active', mode==='sc'); scBtn.classList.toggle('sc-mode', true); }
   document.getElementById('lib-yt-section').style.display = mode==='yt' ? '' : 'none';
-  document.getElementById('lib-yt-filters-row').style.display = mode==='yt' ? '' : 'none';
+  const scFilters = document.getElementById('lib-sc-filters-row');
+  if (scFilters) scFilters.style.display = mode==='sc' ? '' : 'none';
   const scSec = document.getElementById('lib-sc-section');
   if (scSec) scSec.style.display = mode==='sc' ? '' : 'none';
   document.getElementById('lib-local-section').style.display = mode==='local' ? '' : 'none';
@@ -6737,6 +7108,7 @@ function ytFilterToQuery(baseQ) {
     case 'artist':   return baseQ+' artist topic';
     case 'album':    return baseQ+' full album';
     case 'playlist': return baseQ+' playlist mix';
+    case 'podcast':  return baseQ+' podcast';
     default:         return baseQ;
   }
 }
@@ -6801,11 +7173,13 @@ function _enrichQuery(q) {
 
 async function ytFetchResults(query) {
   const localMatches = ytFindLocalMatches(query);
-  let ytResults = [], ytPlaylistResults = [];
-  // Silently enrich vibe/mood queries before hitting the API
+  let ytResults = [], ytPlaylistResults = [], ytArtists = [], ytAlbums = [], ytPodcasts = [];
   const enriched = _enrichQuery(query);
+  // Map filter to API type
+  const typeMap = { all: 'all', song: 'song', artist: 'artist', album: 'album', playlist: 'album', podcast: 'podcast' };
+  const apiType = typeMap[ytActiveFilter] || 'all';
   try {
-    const resp = await fetch(`${VOID_API_BASE}/youtube/search?q=${encodeURIComponent(enriched)}&max=15`, { signal: AbortSignal.timeout(12000) });
+    const resp = await fetch(`${VOID_API_BASE}/youtube/search?q=${encodeURIComponent(enriched)}&type=${apiType}&max=15`, { signal: AbortSignal.timeout(12000) });
     if (resp.ok) {
       const data = await resp.json();
       const items = data.items || [];
@@ -6819,9 +7193,12 @@ async function ytFetchResults(query) {
         audioUrl: item.audioUrl || null,
         localMatch: ytFindExactLocalMatch(item.title || '', item.artist || ''),
       }));
+      ytArtists = (data.artists || []);
+      ytAlbums = (data.albums || []);
+      ytPodcasts = (data.podcasts || []);
     }
   } catch(e) { console.warn('[VOID saavn search]', e.message); }
-  return { ytResults, ytPlaylistResults, localMatches, source: 'jiosaavn' };
+  return { ytResults, ytPlaylistResults, ytArtists, ytAlbums, ytPodcasts, localMatches, source: 'jiosaavn' };
 }
 
 // ==============================
@@ -6846,9 +7223,10 @@ async function scDoSearch(query, force=false) {
   if (!results) return;
   results.innerHTML=`<div class="yt-loading"><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div></div>`;
   try {
-    // Silently enrich vibe/mood queries before hitting the API
     const enriched = _enrichQuery(query);
-    const resp = await fetch(`${VOID_API_BASE}/soundcloud/search?q=${encodeURIComponent(enriched)}&max=15`, { signal: AbortSignal.timeout(12000) });
+    const scTypeMap = { all: 'all', song: 'song', artist: 'artist', playlist: 'playlist' };
+    const scApiType = scTypeMap[scActiveFilter] || 'all';
+    const resp = await fetch(`${VOID_API_BASE}/soundcloud/search?q=${encodeURIComponent(enriched)}&type=${scApiType}&max=15`, { signal: AbortSignal.timeout(12000) });
     if (!resp.ok) throw new Error(`SC search HTTP ${resp.status}`);
     const data = await resp.json();
     const scResults = (data.items || []).map(item => ({
@@ -6859,17 +7237,22 @@ async function scDoSearch(query, force=false) {
       thumbnail: item.thumbnail || item.artwork_url || null,
       audioUrl:  item.audioUrl  || item.stream_url  || null,
     }));
-    renderSCResults(scResults, query);
+    const scArtists = data.artists || [];
+    const scPlaylists = data.playlists || [];
+    renderSCResults(scResults, query, scArtists, scPlaylists);
     window._scLastResults = scResults;
+    window._scLastArtists = scArtists;
+    window._scLastPlaylists = scPlaylists;
   } catch(e) {
     results.innerHTML=`<div class="yt-empty"><p>SoundCloud search unavailable.<br><span style="font-size:11px">${esc(e.message||'Check connection.')}</span></p></div>`;
   }
 }
 
-function renderSCResults(scResults, query) {
+function renderSCResults(scResults, query, scArtists, scPlaylists) {
   const el = document.getElementById('lib-sc-results');
   if (!el) return;
-  if (!scResults.length) {
+  scArtists = scArtists || []; scPlaylists = scPlaylists || [];
+  if (!scResults.length && !scArtists.length && !scPlaylists.length) {
     el.innerHTML=`<div class="yt-empty"><p>No results for "<strong>${esc(query)}</strong>"</p></div>`; return;
   }
   const localMatches = ytFindLocalMatches(query);
@@ -6886,11 +7269,44 @@ function renderSCResults(scResults, query) {
       </div>`;
     }).join('');
   }
-  html+=`<div class="yt-section-hdr">SoundCloud Results <span style="font-size:9px;color:#ff5500;font-family:'Space Mono',monospace;margin-left:6px">● SC</span></div>`;
-  html+=scResults.map((v,vi)=>{
-    return `<div class="yt-result-item" onclick="scAddAndStream(${vi})" style="cursor:pointer">
+  if (scArtists.length) {
+    html+=`<div class="yt-section-hdr">Artists <span style="font-size:9px;color:#ff5500;font-family:'Space Mono',monospace;margin-left:6px">● SC</span></div>`;
+    html+=`<div style="display:flex;gap:14px;padding:4px 0 12px;overflow-x:auto;scrollbar-width:none">`;
+    html+=scArtists.map(a=>`
+      <div onclick="openSCArtistPage('${esc(a.id)}')" style="cursor:pointer;text-align:center;flex-shrink:0;width:72px">
+        <div style="width:64px;height:64px;border-radius:50%;overflow:hidden;margin:0 auto 6px;background:var(--bg3)">
+          ${a.thumbnail?`<img src="${esc(a.thumbnail)}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">`:`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:22px;height:22px;color:var(--text3)"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>`}
+        </div>
+        <div style="font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:64px">${esc(a.name)}</div>
+      </div>`).join('');
+    html+=`</div>`;
+  }
+  if (scPlaylists.length) {
+    html+=`<div class="yt-section-hdr">Playlists <span style="font-size:9px;color:#ff5500;font-family:'Space Mono',monospace;margin-left:6px">● SC</span></div>`;
+    html+=scPlaylists.map(pl=>`
+      <div class="yt-result-item" onclick="importSCPlaylist('${esc(pl.id)}')" style="cursor:pointer">
+        <div class="yt-thumb" style="border-radius:8px">
+          ${pl.thumbnail?`<img src="${esc(pl.thumbnail)}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">`:`<div class="yt-thumb-placeholder"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:#ff5500;width:20px;height:20px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></div>`}
+        </div>
+        <div class="yt-result-info">
+          <div class="yt-result-title">${esc(pl.name)}</div>
+          <div class="yt-result-artist">${esc(pl.artist)}</div>
+          ${pl.trackCount?`<div class="yt-result-dur">${pl.trackCount} tracks</div>`:''}
+        </div>
+        <div class="yt-result-actions">
+          <button class="yt-result-btn" onclick="event.stopPropagation();importSCPlaylist('${esc(pl.id)}')" title="Import playlist" style="color:#ff5500;border-color:rgba(255,85,0,0.3)">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.26"/></svg>
+          </button>
+        </div>
+      </div>`).join('');
+  }
+  if (scResults.length) {
+    html+=`<div class="yt-section-hdr">Tracks <span style="font-size:9px;color:#ff5500;font-family:'Space Mono',monospace;margin-left:6px">● SC</span></div>`;
+    html+=scResults.map((v,vi)=>{
+      return `<div class="yt-result-item" onclick="scAddAndStream(${vi})" style="cursor:pointer">
       <div class="yt-thumb" style="cursor:pointer">
         ${v.thumbnail?`<img src="${v.thumbnail}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">`:`<div class="yt-thumb-placeholder"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:#ff5500;width:22px;height:22px"><path d="M2 16.5C2 16.5 2 18 3.5 18s1.5-1.5 1.5-1.5V10s0-6 5-6 5 6 5 6v1s0 1.5 1.5 1.5S18 10 18 10" stroke="#ff5500" stroke-width="2"/><circle cx="3.5" cy="16.5" r="1.5" fill="#ff5500"/></svg></div>`}
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.3);border-radius:inherit;opacity:0;transition:opacity 0.15s" class="yt-hover-play"><svg fill="#ff5500" viewBox="0 0 24 24" style="width:20px;height:20px"><polygon points="5,3 19,12 5,21"/></svg></div>
       </div>
       <div class="yt-result-info">
         <div class="yt-result-title">${esc(v.title)}</div>
@@ -6898,12 +7314,13 @@ function renderSCResults(scResults, query) {
         <div class="yt-result-dur">${v.duration?fmtTime(v.duration):''}</div>
       </div>
       <div class="yt-result-actions">
-        <button class="yt-result-btn" onclick="event.stopPropagation();scAddAndStream(${vi})" title="Stream">
+        <button class="yt-result-btn" onclick="event.stopPropagation();scAddAndStream(${vi})" title="Stream" style="color:#ff5500;border-color:rgba(255,85,0,0.3)">
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polygon points="5,3 19,12 5,21" fill="#ff5500" stroke="none"/></svg>
         </button>
       </div>
     </div>`;
-  }).join('');
+    }).join('');
+  }
   el.innerHTML = html;
 }
 
@@ -6956,12 +7373,11 @@ function ytFindExactLocalMatch(title,artist) {
 // YOUTUBE — RENDER RESULTS
 // ==============================
 function renderYTResults(data, query) {
-  const {ytResults, ytPlaylistResults, localMatches, source, smartLabel}=data;
+  const {ytResults, ytPlaylistResults, ytArtists, ytAlbums, ytPodcasts, localMatches, source, smartLabel}=data;
   const results=document.getElementById('lib-yt-results');
   if (!results) return;
   let html='';
 
-  // Smart search banner
   if (smartLabel) {
     html+=`<div style="display:flex;align-items:center;gap:8px;padding:10px 14px 6px;margin-bottom:2px">
       <span style="font-size:10px;letter-spacing:.08em;font-family:'Space Mono',monospace;color:var(--accent)">✦ SMART</span>
@@ -6990,6 +7406,59 @@ function renderYTResults(data, query) {
         </div>
       </div>`;
     }).join('');
+  }
+
+  if (ytArtists&&ytArtists.length) {
+    html+=`<div class="yt-section-hdr">Artists</div>`;
+    html+=`<div style="display:flex;gap:14px;padding:4px 0 12px;overflow-x:auto;scrollbar-width:none">`;
+    html+=ytArtists.map(a=>`
+      <div onclick="openSaavnArtistPage('${esc(a.id)}')" style="cursor:pointer;text-align:center;flex-shrink:0;width:72px">
+        <div style="width:64px;height:64px;border-radius:50%;overflow:hidden;margin:0 auto 6px;background:var(--bg3)">
+          ${a.thumbnail?`<img src="${esc(a.thumbnail)}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">`:`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:22px;height:22px;color:var(--text3)"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>`}
+        </div>
+        <div style="font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:64px">${esc(a.name)}</div>
+      </div>`).join('');
+    html+=`</div>`;
+  }
+
+  if (ytPodcasts&&ytPodcasts.length) {
+    html+=`<div class="yt-section-hdr">Podcasts</div>`;
+    html+=ytPodcasts.map(pc=>`
+      <div class="yt-result-item" onclick="openSaavnPodcastPage('${esc(pc.id)}')" style="cursor:pointer">
+        <div class="yt-thumb" style="border-radius:10px">
+          ${pc.thumbnail?`<img src="${esc(pc.thumbnail)}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">`:`<div class="yt-thumb-placeholder"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:20px;height:20px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg></div>`}
+        </div>
+        <div class="yt-result-info">
+          <div class="yt-result-title">${esc(pc.name)}</div>
+          <div class="yt-result-artist">${esc(pc.artist)}</div>
+          <div class="yt-result-dur" style="color:var(--yt)">PODCAST</div>
+        </div>
+        <div class="yt-result-actions">
+          <button class="yt-result-btn" onclick="event.stopPropagation();openSaavnPodcastPage('${esc(pc.id)}')" title="View podcast">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+      </div>`).join('');
+  }
+
+  if (ytAlbums&&ytAlbums.length) {
+    html+=`<div class="yt-section-hdr">Albums</div>`;
+    html+=ytAlbums.map(al=>`
+      <div class="yt-result-item" onclick="openSaavnAlbumPage('${esc(al.id)}')" style="cursor:pointer">
+        <div class="yt-thumb" style="border-radius:10px">
+          ${al.thumbnail?`<img src="${esc(al.thumbnail)}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">`:`<div class="yt-thumb-placeholder"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:20px;height:20px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="3"/></svg></div>`}
+        </div>
+        <div class="yt-result-info">
+          <div class="yt-result-title">${esc(al.name)}</div>
+          <div class="yt-result-artist">${esc(al.artist)}</div>
+          <div class="yt-result-dur">${al.year?al.year+' · ':''} Album</div>
+        </div>
+        <div class="yt-result-actions">
+          <button class="yt-result-btn" onclick="event.stopPropagation();openSaavnAlbumPage('${esc(al.id)}')" title="View album">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg>
+          </button>
+        </div>
+      </div>`).join('');
   }
 
   if (ytPlaylistResults&&ytPlaylistResults.length) {
@@ -7054,9 +7523,9 @@ function renderYTResults(data, query) {
     const relatedTerms=ytResults.slice(0,6).map(v=>v.artist).filter((a,i,arr)=>a&&arr.indexOf(a)===i).slice(0,5);
     if (relatedTerms.length>1) {
       html+=`<div class="yt-section-hdr">Related Artists</div>
-        <div style="padding:0 0 4px"><div class="yt-related-row">${relatedTerms.map(a=>`<div class="yt-related-chip" onclick="ytQuickSearch('${esc(a)}')">${esc(a)}</div>`).join('')}</div></div>`;
+        <div style="padding:0 0 4px"><div class="yt-related-row">${relatedTerms.map(a=>`<div class="yt-related-chip" onclick="ytSearchArtist('${esc(a)}')">${esc(a)}</div>`).join('')}</div></div>`;
     }
-  } else if (!localMatches.length&&!(ytPlaylistResults&&ytPlaylistResults.length)) {
+  } else if (!localMatches.length&&!(ytPlaylistResults&&ytPlaylistResults.length)&&!(ytArtists&&ytArtists.length)&&!(ytAlbums&&ytAlbums.length)&&!(ytPodcasts&&ytPodcasts.length)) {
     html=`<div class="yt-empty"><p>No results for "<strong>${esc(query)}</strong>"<br><span style="font-size:11px">Try a different search term</span></p></div>`;
   }
 
@@ -7071,6 +7540,16 @@ function ytQuickSearch(term) {
   const clearBtn=document.getElementById('lib-yt-clear-btn');
   if(clearBtn) clearBtn.style.display='flex';
   ytLastQuery=''; ytDoSearch(term,true);
+}
+
+function ytSearchArtist(artistName) {
+  showPage('library');
+  setLibSearchMode('yt');
+  ytSetFilter('artist');
+  document.getElementById('search-input').value=artistName;
+  const clearBtn=document.getElementById('lib-yt-clear-btn');
+  if(clearBtn) clearBtn.style.display='flex';
+  ytLastQuery=''; ytDoSearch(artistName,true);
 }
 
 // ==============================
