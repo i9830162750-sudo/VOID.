@@ -63,9 +63,44 @@ function parseSCPlaylist(pl) {
   };
 }
 
+// Merge track arrays, dedup by id
+function mergeTracks(arrays) {
+  const seen = new Set();
+  const out = [];
+  for (const arr of arrays) {
+    for (const t of arr) {
+      const key = String(t.id);
+      if (!seen.has(key)) { seen.add(key); out.push(t); }
+    }
+  }
+  return out;
+}
+
+// Fetch tracks from the top playlist result for a query.
+// SoundCloud has tons of user-curated mood/vibe playlists so
+// "sad songs" → finds "Sad Songs 💔" playlist → returns its tracks.
+async function fetchPlaylistTracksForQuery(q) {
+  try {
+    const data = await scFetch(`/search?q=${encodeURIComponent(q)}&type=playlists&limit=3`);
+    const playlists = data.items || data.collection || data.results || data.playlists || [];
+    if (!playlists.length) return [];
+
+    const topPlaylist = playlists[0];
+    const plId = String(topPlaylist.id || '');
+    if (!plId) return [];
+
+    const plData = await scFetch(`/playlist?id=${encodeURIComponent(plId)}`);
+    const d = plData.data || plData;
+    return (d.tracks || d.songs || []).map(parseSCTrack);
+  } catch (e) {
+    console.warn('[SC playlist tracks fetch]', e.message);
+    return [];
+  }
+}
+
 // ── Exported controller functions ─────────────────────────────────────────────
 
-// GET /api/soundcloud/search?q=&type=all|song|artist|playlist|podcast
+// GET /api/soundcloud/search?q=&type=all|song|artist|playlist
 exports.search = async (req, res, next) => {
   try {
     const q = String(req.query.q || '').trim();
@@ -77,16 +112,20 @@ exports.search = async (req, res, next) => {
     if (cached) return res.json({ ...cached, _cached: true });
 
     if (type === 'all') {
-      // Fetch tracks + users + playlists in parallel
-      const [tracksData, usersData, playlistsData] = await Promise.allSettled([
+      // Fetch tracks + users + playlists + playlist-tracks all in parallel
+      const [tracksData, usersData, playlistsData, playlistTracks] = await Promise.allSettled([
         scFetch(`/search?q=${encodeURIComponent(q)}&type=tracks&limit=15`),
         scFetch(`/search?q=${encodeURIComponent(q)}&type=users&limit=5`),
         scFetch(`/search?q=${encodeURIComponent(q)}&type=playlists&limit=5`),
+        fetchPlaylistTracksForQuery(q),
       ]);
 
-      const tracks = tracksData.status === 'fulfilled'
+      const directTracks = tracksData.status === 'fulfilled'
         ? (tracksData.value.items || tracksData.value.collection || tracksData.value.results || tracksData.value.tracks || []).map(parseSCTrack)
         : [];
+      const fromPlaylist = playlistTracks.status === 'fulfilled' ? playlistTracks.value : [];
+      const tracks = mergeTracks([directTracks, fromPlaylist]);
+
       const artists = usersData.status === 'fulfilled'
         ? (usersData.value.items || usersData.value.collection || usersData.value.results || usersData.value.users || []).map(parseSCUser)
         : [];
@@ -115,11 +154,18 @@ exports.search = async (req, res, next) => {
       return res.json(result);
     }
 
-    // Default: tracks
-    const data = await scFetch(`/search?q=${encodeURIComponent(q)}&limit=20`);
-    const results = data.items || data.results || data.tracks || data || [];
-    const songs = (Array.isArray(results) ? results : []).map(parseSCTrack);
-    const result = { items: songs, artists: [], playlists: [], source: 'soundcloud' };
+    // Default: tracks + playlist tracks merged
+    const [tracksData, playlistTracks] = await Promise.allSettled([
+      scFetch(`/search?q=${encodeURIComponent(q)}&limit=20`),
+      fetchPlaylistTracksForQuery(q),
+    ]);
+    const direct = tracksData.status === 'fulfilled'
+      ? (tracksData.value.items || tracksData.value.results || tracksData.value.tracks || tracksData.value || []).map(t => parseSCTrack(t))
+      : [];
+    const fromPlaylist = playlistTracks.status === 'fulfilled' ? playlistTracks.value : [];
+    const tracks = mergeTracks([direct, fromPlaylist]);
+
+    const result = { items: tracks, artists: [], playlists: [], source: 'soundcloud' };
     cacheSet(cacheKey, result);
     res.json(result);
   } catch (err) {
@@ -129,7 +175,6 @@ exports.search = async (req, res, next) => {
 };
 
 // GET /api/soundcloud/artist?id=USER_ID
-// Returns user profile + tracks
 exports.artistPage = async (req, res, next) => {
   try {
     const id = String(req.query.id || '').trim();
@@ -172,7 +217,6 @@ exports.artistPage = async (req, res, next) => {
 };
 
 // GET /api/soundcloud/playlist?id=PLAYLIST_ID_OR_URL
-// Supports SoundCloud playlist/set URLs
 exports.playlistPage = async (req, res, next) => {
   try {
     const rawId = String(req.query.id || req.query.url || '').trim();
@@ -182,7 +226,6 @@ exports.playlistPage = async (req, res, next) => {
     const cached = cacheGet(cacheKey);
     if (cached) return res.json(cached);
 
-    // Pass either numeric ID or full URL to the SC service
     const param = /^\d+$/.test(rawId)
       ? `id=${encodeURIComponent(rawId)}`
       : `url=${encodeURIComponent(rawId)}`;
