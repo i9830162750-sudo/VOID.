@@ -179,7 +179,9 @@ exports.search = async (req, res, next) => {
     res.json(result);
   } catch (err) {
     console.error('[JioSaavn search error]', err.message);
-    next(err);
+    // Graceful fallback: never surface a 500 to the frontend for search failures.
+    // Return an empty result set so the UI can show "no results" instead of crashing.
+    return res.json({ items: [], artists: [], albums: [], podcasts: [], source: 'jiosaavn', _error: err.message });
   }
 };
 
