@@ -241,9 +241,14 @@ exports.artistPage = async (req, res, next) => {
     const cached = cacheGet(cacheKey);
     if (cached) return res.json(cached);
 
-    const [infoData, songsData] = await Promise.allSettled([
+    // Fetch artist info + first 3 pages of songs (popular + latest) all in parallel
+    const [infoData, pop0, pop1, pop2, lat0, lat1] = await Promise.allSettled([
       saavnFetch(`/artists/${id}`),
-      saavnFetch(`/artists/${id}/songs?page=1&songCount=40`),
+      saavnFetch(`/artists/${id}/songs?page=0&sortBy=popularity&sortOrder=desc&songCount=50`),
+      saavnFetch(`/artists/${id}/songs?page=1&sortBy=popularity&sortOrder=desc&songCount=50`),
+      saavnFetch(`/artists/${id}/songs?page=2&sortBy=popularity&sortOrder=desc&songCount=50`),
+      saavnFetch(`/artists/${id}/songs?page=0&sortBy=latest&sortOrder=desc&songCount=50`),
+      saavnFetch(`/artists/${id}/songs?page=1&sortBy=latest&sortOrder=desc&songCount=50`),
     ]);
 
     let artistInfo = {};
@@ -260,13 +265,27 @@ exports.artistPage = async (req, res, next) => {
       };
     }
 
-    let songs = [];
-    if (songsData.status === 'fulfilled') {
-      const d = songsData.value.data || songsData.value;
-      songs = (d.songs || d.results || []).map(parseSong);
+    // Merge popular pages deduped
+    const seenPop = new Set(), seenLat = new Set();
+    const popularSongs = [], latestSongs = [];
+    for (const page of [pop0, pop1, pop2]) {
+      if (page.status !== 'fulfilled') continue;
+      const d = page.value.data || page.value;
+      for (const s of (d.songs || d.results || []).map(parseSong)) {
+        if (!seenPop.has(s.id)) { seenPop.add(s.id); popularSongs.push(s); }
+      }
     }
+    for (const page of [lat0, lat1]) {
+      if (page.status !== 'fulfilled') continue;
+      const d = page.value.data || page.value;
+      for (const s of (d.songs || d.results || []).map(parseSong)) {
+        if (!seenLat.has(s.id)) { seenLat.add(s.id); latestSongs.push(s); }
+      }
+    }
+    // songs = popular (backwards compat), also expose latestSongs
+    const songs = popularSongs;
 
-    const result = { artist: artistInfo, songs, source: 'jiosaavn' };
+    const result = { artist: artistInfo, songs, latestSongs, source: 'jiosaavn' };
     cacheSet(cacheKey, result);
     res.json(result);
   } catch (err) {
