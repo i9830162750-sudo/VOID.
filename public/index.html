@@ -7174,29 +7174,29 @@ function _enrichQuery(q) {
 async function ytFetchResults(query) {
   const localMatches = ytFindLocalMatches(query);
   let ytResults = [], ytPlaylistResults = [], ytArtists = [], ytAlbums = [], ytPodcasts = [];
-  const enriched = _enrichQuery(query);
-  // Map filter to API type
-  const typeMap = { all: 'all', song: 'song', artist: 'artist', album: 'album', playlist: 'album', podcast: 'podcast' };
+  // Map filter to API type — podcast/podcastEpisode/show all route to the JioSaavn podcast endpoint
+  const typeMap = { all: 'all', song: 'song', artist: 'artist', album: 'album', playlist: 'album', podcast: 'podcast', podcastEpisode: 'podcast', show: 'podcast' };
   const apiType = typeMap[ytActiveFilter] || 'all';
+  // Skip vibe-map enrichment for podcast searches — raw query is what JioSaavn needs
+  const enriched = (apiType === 'podcast') ? query : _enrichQuery(query);
   try {
     const resp = await fetch(`${VOID_API_BASE}/youtube/search?q=${encodeURIComponent(enriched)}&type=${apiType}&max=15`, { signal: AbortSignal.timeout(12000) });
-    if (resp.ok) {
-      const data = await resp.json();
-      const items = data.items || [];
-      ytResults = items.map(item => ({
-        videoId: item.id,
-        title: item.title || 'Unknown',
-        artist: item.artist || '',
-        album: item.album || '',
-        duration: item.duration || 0,
-        thumbnail: item.thumbnail || null,
-        audioUrl: item.audioUrl || null,
-        localMatch: ytFindExactLocalMatch(item.title || '', item.artist || ''),
-      }));
-      ytArtists = (data.artists || []);
-      ytAlbums = (data.albums || []);
-      ytPodcasts = (data.podcasts || []);
-    }
+    // Always parse JSON — backend now returns graceful empty payload instead of 500
+    const data = resp.ok ? await resp.json() : { items: [], artists: [], albums: [], podcasts: [] };
+    const items = data.items || [];
+    ytResults = items.map(item => ({
+      videoId: item.id,
+      title: item.title || 'Unknown',
+      artist: item.artist || '',
+      album: item.album || '',
+      duration: item.duration || 0,
+      thumbnail: item.thumbnail || null,
+      audioUrl: item.audioUrl || null,
+      localMatch: ytFindExactLocalMatch(item.title || '', item.artist || ''),
+    }));
+    ytArtists = (data.artists || []);
+    ytAlbums = (data.albums || []);
+    ytPodcasts = (data.podcasts || []);
   } catch(e) { console.warn('[VOID saavn search]', e.message); }
   return { ytResults, ytPlaylistResults, ytArtists, ytAlbums, ytPodcasts, localMatches, source: 'jiosaavn' };
 }
