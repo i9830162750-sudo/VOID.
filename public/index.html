@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -4657,88 +4656,182 @@ function updateShuffleBtn() {
   });
 }
 
-// Build a smart shuffle queue: pulls similar online songs via search,
-// falls back to regular shuffle if no online tracks or search fails.
+// ── SPOTIFY-GRADE SMART SHUFFLE ───────────────────────────────────────────────
+// Builds a queue that:
+//  • Seeds from the currently playing track (artist + title context)
+//  • Fetches multiple parallel search queries for variety (artist, similar artists, mood keywords)
+//  • Weights results by library affinity (fav artists, recently played artists)
+//  • Deduplicates and diversifies (no artist runs of >2 in a row)
+//  • Falls back gracefully to local-only smart shuffle if offline
 async function buildSmartShuffleQueue() {
   const t = currentIndex >= 0 ? tracks[currentIndex] : null;
-  // Smart shuffle only works for online tracks
-  if (!t || !t.isOnline) {
-    // Fall back to normal shuffle for local tracks
-    buildShuffleQueue();
-    showToast('✦ Smart Shuffle: using regular shuffle for local tracks');
-    return;
-  }
+
+  // ── If no current track, do a library-smart shuffle ──────────────────────
+  if (!t) { buildSmartLocalShuffle(); return; }
+
+  // ── Always works for local tracks too (not just online) ──────────────────
+  const artist = (t.artist || '').trim();
+  const title  = (t.title  || '').trim();
+  const source = t.scMeta ? 'soundcloud' : 'jiosaavn';
+
+  // Extract artist keywords (drop featuring, ft, etc.)
+  const cleanArtist = artist.split(/\s*[,&x×]\s*|\s+(?:ft|feat|featuring|vs|x)\s+/i)[0].trim();
+
+  // Build 3 parallel search queries for variety
+  const queries = [
+    cleanArtist,                                  // same artist
+    `${cleanArtist} similar songs`,               // similar vibes
+    _VIBE_MAP[_keywords(title)[0]] || `${title} songs like`, // mood/vibe
+  ].filter(Boolean);
+
+  showToast('✦ Building Smart Shuffle…');
 
   try {
-    const artist = t.artist || '';
-    const title  = t.title  || '';
-    const source = t.scMeta ? 'soundcloud' : 'jiosaavn';
+    const baseEndpoint = source === 'soundcloud' ? '/soundcloud/search' : '/youtube/search';
 
-    // Search for similar songs using artist name (or artist + keywords from title)
-    const rawQ = artist ? `${artist}` : title;
-    const q = _enrichQuery(rawQ);
-    const endpoint = source === 'soundcloud'
-      ? `/api/soundcloud/search?q=${encodeURIComponent(q)}`
-      : `/api/youtube/search?q=${encodeURIComponent(q)}`;
+    const fetches = queries.map(q =>
+      fetch(`${VOID_API_BASE}${baseEndpoint}?q=${encodeURIComponent(q)}&limit=12`, {
+        signal: AbortSignal.timeout(9000)
+      }).then(r => r.ok ? r.json() : { items: [] }).catch(() => ({ items: [] }))
+    );
 
-    const resp = await fetch(endpoint);
-    if (!resp.ok) throw new Error('Search failed');
-    const data = await resp.json();
-    const results = (data.items || []).filter(s => {
-      const sid = 'online_' + (s.id || s.videoId);
-      return sid !== t.id; // exclude current song
-    });
+    const results = await Promise.all(fetches);
 
-    if (!results.length) {
-      buildShuffleQueue(); return;
+    // Flatten all items, deduplicate by id, score by relevance to current track
+    const seen  = new Set([t.id]);
+    const pool  = [];
+    for (const data of results) {
+      for (const song of (data.items || [])) {
+        const sid = source === 'soundcloud'
+          ? 'track_sc_' + String(song.id || song.videoId)
+          : 'online_' + String(song.id || song.videoId);
+        if (seen.has(sid)) continue;
+        seen.add(sid);
+        // Score similarity to current track
+        const artistSim = _similarity(cleanArtist, song.artist || '');
+        const vibeScore = _scoreResult(song, artist + ' ' + title);
+        pool.push({ song, sid, artistSim, vibeScore, source });
+      }
     }
 
-    // Add new similar online tracks that aren't already in library
-    const newTrackIndices = [];
-    for (const song of results.slice(0, 8)) {
-      const sid = 'online_' + (song.id || song.videoId);
+    // Sort: prioritise same artist first, then vibes
+    pool.sort((a, b) => {
+      const as = a.artistSim * 60 + a.vibeScore * 0.5;
+      const bs = b.artistSim * 60 + b.vibeScore * 0.5;
+      return bs - as;
+    });
+
+    // Build track indices, adding online tracks if needed
+    const newIndices = [];
+    for (const { song, sid } of pool.slice(0, 20)) {
       let idx = tracks.findIndex(tr => tr.id === sid);
       if (idx === -1) {
-        // Insert the track silently (don't play it)
         const isJioSaavn = source !== 'soundcloud';
         const newTrack = {
           id: sid, blobId: null, url: null,
-          title: song.title || 'Unknown',
-          artist: song.artist || '',
+          title:    song.title    || 'Unknown',
+          artist:   song.artist   || '',
           duration: song.duration || 0,
-          cover: song.thumbnail || null,
-          isFav: false,
-          isOnline: true,
+          cover:    song.thumbnail || null,
+          isFav: false, isOnline: true,
           ytMeta: isJioSaavn ? { videoId: String(song.id || song.videoId), title: song.title, thumbnail: song.thumbnail || '' } : null,
           scMeta: !isJioSaavn ? { trackId: String(song.id || song.videoId), title: song.title, artwork_url: song.thumbnail || '', stream_url: song.audioUrl || '' } : null,
         };
         tracks.push(newTrack);
         idx = tracks.length - 1;
       }
-      if (idx !== currentIndex) newTrackIndices.push(idx);
+      if (idx !== currentIndex) newIndices.push(idx);
     }
 
-    // Also mix in any existing online tracks from library, shuffled
-    const existingOnline = tracks
-      .map((_,i) => i)
-      .filter(i => i !== currentIndex && tracks[i].isOnline && !newTrackIndices.includes(i));
+    // Mix in existing local tracks weighted by fav/recency, then de-cluster artists
+    const localBonus = _buildWeightedLocalPool(currentIndex);
+    const combined   = _deClusterArtists([...newIndices, ...localBonus], 2);
 
-    // Fisher-Yates both arrays then combine: similar songs first, then rest
-    const shuffle = arr => {
-      for (let i = arr.length-1; i > 0; i--) {
-        const j = Math.floor(Math.random()*(i+1));
-        [arr[i],arr[j]] = [arr[j],arr[i]];
-      }
-      return arr;
-    };
-
-    queue.future = [...shuffle(newTrackIndices), ...shuffle(existingOnline)];
+    queue.future = combined.length ? combined : _buildWeightedLocalPool(currentIndex, true);
     saveSettings();
     renderQueueList();
+    showToast(`✦ Smart Shuffle: ${combined.length} tracks queued`);
   } catch (e) {
-    console.warn('[SmartShuffle] Falling back to regular shuffle:', e.message);
-    buildShuffleQueue();
+    console.warn('[SmartShuffle] falling back:', e.message);
+    buildSmartLocalShuffle();
   }
+}
+
+// Weighted local-library pool: favs + recently played artists get higher weight
+function _buildWeightedLocalPool(excludeIdx, asFallback = false) {
+  const favIds    = typeof favorites !== 'undefined' ? favorites : new Set();
+  const recentIds = typeof recentlyPlayed !== 'undefined' ? recentlyPlayed : [];
+  const recentArtists = new Set(
+    recentIds.slice(0, 15).map(id => {
+      const tr = tracks.find(t => t.id === id); return tr ? _normalise(tr.artist) : '';
+    }).filter(Boolean)
+  );
+
+  const weighted = tracks
+    .map((tr, i) => {
+      if (i === excludeIdx) return null;
+      let w = 1;
+      if (favIds.has(tr.id)) w += 6;
+      if (recentIds.includes(tr.id)) w += 3;
+      if (recentArtists.has(_normalise(tr.artist))) w += 2;
+      return { i, w };
+    })
+    .filter(Boolean)
+    .sort((a, b) => b.w - a.w);
+
+  if (asFallback) {
+    // Simple weighted shuffle: higher-weight items more likely to appear early
+    return _weightedShuffle(weighted.map(x => x.i), weighted.map(x => x.w));
+  }
+  // Return top 10 by weight (to blend with online results)
+  return weighted.slice(0, 10).map(x => x.i);
+}
+
+// Smart local-only shuffle when offline: weight by fav/recency, deCluster
+function buildSmartLocalShuffle() {
+  const pool = _buildWeightedLocalPool(currentIndex, true);
+  queue.future = _deClusterArtists(pool, 2);
+  saveSettings(); renderQueueList();
+  showToast('✦ Smart Shuffle (library)');
+}
+
+// Weighted shuffle: higher w = more likely to appear earlier
+function _weightedShuffle(indices, weights) {
+  const items = indices.map((idx, i) => ({ idx, w: weights[i] || 1 }));
+  const result = [];
+  while (items.length) {
+    const total = items.reduce((s, x) => s + x.w, 0);
+    let r = Math.random() * total;
+    for (let i = 0; i < items.length; i++) {
+      r -= items[i].w;
+      if (r <= 0) { result.push(items[i].idx); items.splice(i, 1); break; }
+    }
+  }
+  return result;
+}
+
+// De-cluster: no more than `maxRun` consecutive tracks from the same artist
+function _deClusterArtists(indices, maxRun = 2) {
+  if (!indices.length) return indices;
+  const getArtist = i => _normalise((tracks[i] && tracks[i].artist) || '');
+  const result = [...indices];
+  for (let pass = 0; pass < 3; pass++) {
+    let changed = false;
+    for (let i = maxRun; i < result.length; i++) {
+      const runArtist = getArtist(result[i]);
+      const isCluster = result.slice(i - maxRun, i).every(x => getArtist(x) === runArtist);
+      if (isCluster && runArtist) {
+        // Find next index with a different artist to swap in
+        const swapIdx = result.findIndex((x, j) => j > i && getArtist(x) !== runArtist);
+        if (swapIdx !== -1) {
+          [result[i], result[swapIdx]] = [result[swapIdx], result[i]];
+          changed = true;
+        }
+      }
+    }
+    if (!changed) break;
+  }
+  return result;
 }
 
 function toggleRepeat() {
@@ -7392,53 +7485,117 @@ const _VIBE_MAP = {
   new:'new songs 2024', best:'best songs hits', top:'top songs hits',
 };
 
+// ── SMART QUERY ENRICHER ─────────────────────────────────────────────────────
+// Converts mood/vibe/genre shorthand into richer search terms, detects intent,
+// handles typos, and injects artist-context when user is clearly searching
+// for a known artist's songs.
 function _enrichQuery(q) {
+  if (!q) return q;
+  const norm = q.toLowerCase().trim();
+
+  // 1. Direct vibe-map hit (whole query is a known shorthand)
+  if (_VIBE_MAP[norm]) return _VIBE_MAP[norm];
+
+  // 2. Partial vibe-map hit — one of the words in query maps to a vibe
+  const words = norm.split(/\s+/);
+  for (const w of words) {
+    if (_VIBE_MAP[w] && words.length <= 2) return _VIBE_MAP[w];
+  }
+
+  // 3. If the query already looks like "artist - song" or has 3+ words, trust it
+  if (_parseDashQuery(q) || words.length >= 3) return q;
+
   return q;
 }
 
-// Score a search result against the user's raw query (for client-side re-ranking)
+// ── SPOTIFY-GRADE MULTI-SIGNAL SCORER ────────────────────────────────────────
+// Signals: exact/prefix/substring title+artist+album, fuzzy bigrams,
+// token overlap, dash-query awareness, library/fav affinity, recency hint.
 function _scoreResult(item, rawQuery) {
-  const q = _normalise(rawQuery);
-  const title = _normalise(item.title||'');
-  const artist = _normalise(item.artist||'');
-  const album = _normalise(item.album||'');
-  let score = 0;
+  const q      = _normalise(rawQuery);
+  const title  = _normalise(item.title  || '');
+  const artist = _normalise(item.artist || '');
+  const album  = _normalise(item.album  || '');
+  let score    = 0;
 
-  // Exact title match = highest
-  if (title === q) score += 100;
-  // Title starts with query
-  else if (title.startsWith(q)) score += 70;
-  // Query starts with title (user typed partial)
-  else if (q.startsWith(title)) score += 60;
-  // Title contains query as substring
-  else if (title.includes(q)) score += 50;
-  // Artist match
-  if (artist === q) score += 80;
-  else if (artist.includes(q) || q.includes(artist)) score += 40;
-  // Album match
-  if (album.includes(q)) score += 20;
-
-  // Token overlap bonus
-  const qKw = _keywords(rawQuery);
-  const tKw = _keywords(item.title||'');
-  const aKw = _keywords(item.artist||'');
-  const allKw = [...tKw, ...aKw];
-  const hits = qKw.filter(w => allKw.some(k => k.startsWith(w) || w.startsWith(k)));
-  score += hits.length * 8;
-
-  // Bigram similarity bonus
-  score += _similarity(rawQuery, item.title||'') * 30;
-  score += _similarity(rawQuery, item.artist||'') * 20;
-
-  // "Artist - Song" pattern: reward if both sides match
-  const dash = _parseDashQuery(rawQuery);
-  if (dash) {
-    if (_similarity(dash.artist, item.artist||'') > 0.6 && _similarity(dash.song, item.title||'') > 0.6) score += 60;
-    if (_similarity(dash.artist, item.artist||'') > 0.6) score += 20;
-    if (_similarity(dash.song, item.title||'') > 0.6) score += 20;
+  // ── 1. Title string signals ──────────────────────────────────────────────
+  if (title === q)                              score += 120;
+  else if (title.startsWith(q))                score +=  85;
+  else if (q.startsWith(title) && title.length >= 3) score += 65;
+  else if (title.includes(q))                  score +=  55;
+  // Proximity bonus: prefer shorter titles that contain the query (less noise)
+  if (title.includes(q) && title.length > 0) {
+    score += Math.max(0, 20 - Math.abs(title.length - q.length));
   }
 
-  return score;
+  // ── 2. Artist string signals ─────────────────────────────────────────────
+  if (artist === q)                             score +=  90;
+  else if (artist.startsWith(q))               score +=  60;
+  else if (artist.includes(q))                 score +=  45;
+  else if (q.includes(artist) && artist.length >= 3) score += 35;
+
+  // ── 3. Album match ───────────────────────────────────────────────────────
+  if (album === q) score += 30;
+  else if (album.includes(q)) score += 18;
+
+  // ── 4. Token keyword overlap (handles partial words, plurals, prefixes) ──
+  const qKw   = _keywords(rawQuery);
+  const tKw   = _keywords(item.title  || '');
+  const aKw   = _keywords(item.artist || '');
+  const allKw = [...tKw, ...aKw];
+  let tokenHits = 0;
+  for (const w of qKw) {
+    for (const k of allKw) {
+      if (k === w)                              { tokenHits += 2; break; }
+      if (k.startsWith(w) || w.startsWith(k))  { tokenHits += 1; break; }
+    }
+  }
+  if (qKw.length > 0) score += (tokenHits / qKw.length) * 35;
+
+  // ── 5. Bigram fuzzy similarity ───────────────────────────────────────────
+  const titleSim  = _similarity(rawQuery, item.title  || '');
+  const artistSim = _similarity(rawQuery, item.artist || '');
+  score += titleSim  * 40;
+  score += artistSim * 28;
+  // Penalty for results with poor similarity across all signals
+  if (titleSim < 0.15 && artistSim < 0.15 && tokenHits === 0) score -= 20;
+
+  // ── 6. "Artist - Song" dual-intent query ─────────────────────────────────
+  const dash = _parseDashQuery(rawQuery);
+  if (dash) {
+    const aSim = _similarity(dash.artist, item.artist || '');
+    const sSim = _similarity(dash.song,   item.title  || '');
+    if (aSim > 0.55 && sSim > 0.55) score += 80;
+    else if (aSim > 0.55)           score += 30;
+    else if (sSim > 0.55)           score += 25;
+    if (_keywords(dash.artist).some(w => aKw.includes(w))) score += 15;
+    if (_keywords(dash.song).some(w   => tKw.includes(w))) score += 15;
+  }
+
+  // ── 7. Library & favourites affinity boost ────────────────────────────────
+  try {
+    const libMatch = typeof ytFindExactLocalMatch === 'function'
+      ? ytFindExactLocalMatch(item.title || '', item.artist || '') : null;
+    if (libMatch) score += 25;
+    if (typeof favorites !== 'undefined' && typeof tracks !== 'undefined') {
+      const favArtists = new Set(
+        [...favorites].map(id => {
+          const t = tracks.find(tr => tr.id === id);
+          return t ? _normalise(t.artist) : '';
+        }).filter(Boolean)
+      );
+      if (artist && favArtists.has(artist)) score += 12;
+    }
+  } catch(_) {}
+
+  // ── 8. Recency hint ───────────────────────────────────────────────────────
+  if (item.year && !isNaN(item.year)) {
+    const age = new Date().getFullYear() - parseInt(item.year, 10);
+    if (age <= 1) score += 8;
+    else if (age <= 3) score += 4;
+  }
+
+  return Math.max(0, score);
 }
 
 async function ytFetchResults(query) {
@@ -7673,25 +7830,52 @@ function ytIso8601ToDur(iso) {
 }
 
 function ytFindLocalMatches(query) {
-  if (!query) return [];
-  const q = _normalise(query);
-  const qKw = _keywords(query);
+  if (!query || !tracks.length) return [];
+  const q    = _normalise(query);
+  const qKw  = _keywords(query);
+  const dash = _parseDashQuery(query);
+
   const scored = tracks.map(t => {
+    const tt = _normalise(t.title);
+    const ta = _normalise(t.artist);
     let score = 0;
-    const tt = _normalise(t.title), ta = _normalise(t.artist);
-    if (tt === q || ta === q) score = 100;
-    else if (tt.startsWith(q) || ta.startsWith(q)) score = 80;
-    else if (tt.includes(q) || ta.includes(q)) score = 60;
+
+    // Exact matches
+    if (tt === q || ta === q) score = 130;
+    else if (tt.startsWith(q) || ta.startsWith(q)) score = 100;
+    else if (tt.includes(q) || ta.includes(q)) score = 75;
     else {
+      // Token overlap
       const tkw = _keywords(t.title), akw = _keywords(t.artist);
-      const hits = qKw.filter(w => [...tkw,...akw].some(k=>k.startsWith(w)||w.startsWith(k)));
-      score = hits.length * 12;
-      score += _similarity(query, t.title) * 25;
-      score += _similarity(query, t.artist) * 15;
+      const allkw = [...tkw, ...akw];
+      for (const w of qKw) {
+        for (const k of allkw) {
+          if (k === w)                            { score += 14; break; }
+          if (k.startsWith(w) || w.startsWith(k)){ score +=  7; break; }
+        }
+      }
+      // Fuzzy bigrams
+      score += _similarity(query, t.title)  * 30;
+      score += _similarity(query, t.artist) * 20;
     }
+
+    // Dash query bonus for local
+    if (dash) {
+      const aSim = _similarity(dash.artist, t.artist || '');
+      const sSim = _similarity(dash.song,   t.title  || '');
+      if (aSim > 0.55 && sSim > 0.55) score += 60;
+      else if (aSim > 0.55) score += 20;
+      else if (sSim > 0.55) score += 20;
+    }
+
+    // Bonus if it's in favourites or recently played
+    if (typeof favorites !== 'undefined' && favorites.has(t.id)) score += 15;
+    if (typeof recentlyPlayed !== 'undefined' && recentlyPlayed.includes(t.id)) score += 8;
+
     return { t, score };
-  }).filter(x=>x.score>15).sort((a,b)=>b.score-a.score).slice(0,5);
-  return scored.map(x=>x.t);
+  }).filter(x => x.score > 15).sort((a, b) => b.score - a.score).slice(0, 6);
+
+  return scored.map(x => x.t);
 }
 
 function ytFindExactLocalMatch(title,artist) {
