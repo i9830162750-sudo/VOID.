@@ -9191,7 +9191,7 @@ function isDesktop() { return window.matchMedia('(min-width:1025px)').matches; }
   // Maps page name → render function (called when page becomes active)
   const PAGE_RENDERERS = {
     home:      () => { renderHomeRecent(); renderHomePlaylists(); updateHomeCard(); loadUnifiedFeed(); },
-    library:   () => renderTrackList(document.getElementById('search-input')?.value || ''),
+    library:   () => { renderTrackList(document.getElementById('search-input')?.value || ''); renderPlaylistsPage(); },
     queue:     () => renderQueueList(),
     playlists: () => renderPlaylistsPage(),
     settings:  () => { buildSettingsPage(); setTimeout(() => ytCheckApiStatus(), 50); },
@@ -9235,6 +9235,8 @@ function isDesktop() { return window.matchMedia('(min-width:1025px)').matches; }
   // Override showPage to add unload/reload logic
   const _origShowPage = window.showPage || function(){};
   window.showPage = function(name) {
+    // Playlists tab is merged into Library — redirect
+    if (name === 'playlists') name = 'library';
     if (name === _currentPage) {
       // Already on page — still call original for any refresh logic
       _origShowPage(name);
