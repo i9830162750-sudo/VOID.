@@ -4409,51 +4409,65 @@ function initAudioContext() {
   // Expose globally so studio panel can access
   window._voidAudio = { compNode, panNode, analyserNode, reverbNode, reverbGainNode, dryGainNode, gainNode, audioCtx };
 
-  // Apply saved studio state now that real nodes exist
-  // (slider values are already in the DOM from restoreSavedStudioState or defaults)
+  // ── Apply saved studio state to freshly created nodes ────────────────────
+  // _savedStudioState is set by loadAll() and kept alive until here
+  const _st = window._savedStudioState;
   const _slv = id => { const el = document.getElementById(id); return el ? parseFloat(el.value) : null; };
 
-  // EQ — eqValues/eqEnabled are already set from loadAll(); eqNodes were built above using them.
-  // Just ensure compressor params match current slider positions.
-  const thresh  = _slv('studio-comp-thresh');  if (thresh  !== null) compNode.threshold.value = thresh;
-  const ratio   = _slv('studio-comp-ratio');   if (ratio   !== null) compNode.ratio.value     = ratio;
-  const attack  = _slv('studio-comp-attack');  if (attack  !== null) compNode.attack.value    = attack;
-  const release = _slv('studio-comp-release'); if (release !== null) compNode.release.value   = release;
-  const knee    = _slv('studio-knee') || _slv('studio-comp-knee'); if (knee !== null) compNode.knee.value = knee;
+  // EQ — already baked into eqNodes at creation time via eqValues/eqEnabled
 
-  // Check if compressor button says OFF — bypass it
-  const compBtn = document.getElementById('studio-comp-btn');
-  if (compBtn && !compBtn.classList.contains('on')) {
+  // Compressor params — use saved state if available, else read current sliders
+  const _thresh  = _st ? _st.compThresh  : _slv('studio-comp-thresh');
+  const _ratio   = _st ? _st.compRatio   : _slv('studio-comp-ratio');
+  const _attack  = _st ? _st.compAttack  : _slv('studio-comp-attack');
+  const _release = _st ? _st.compRelease : _slv('studio-comp-release');
+  const _knee    = _st ? _st.compKnee    : _slv('studio-comp-knee');
+  const _compOn  = _st ? _st.compOn      : (document.getElementById('studio-comp-btn') || {}).classList && document.getElementById('studio-comp-btn').classList.contains('on');
+
+  if (_compOn) {
+    if (_thresh  !== null) compNode.threshold.value = _thresh;
+    if (_ratio   !== null) compNode.ratio.value     = _ratio;
+    if (_attack  !== null) compNode.attack.value    = _attack;
+    if (_release !== null) compNode.release.value   = _release;
+    if (_knee    !== null) compNode.knee.value       = _knee;
+  } else {
+    // Bypassed — flatten compressor
     compNode.ratio.value = 1; compNode.threshold.value = 0; compNode.knee.value = 0;
   }
 
-  // Reverb — apply wet/dry based on reverb button state
-  const reverbBtn = document.getElementById('studio-reverb-btn');
-  if (reverbBtn && reverbBtn.classList.contains('on')) {
-    const wet  = _slv('studio-reverb-wet');
-    const size = _slv('studio-reverb-size');
-    const damp = _slv('studio-reverb-damp');
-    if (wet !== null) { reverbGainNode.gain.value = wet; dryGainNode.gain.value = 1 - wet * 0.5; }
-    if (reverbNode && size !== null) {
-      const sr  = audioCtx.sampleRate;
-      const len = Math.floor(sr * Math.max(0.1, size));
-      const buf = audioCtx.createBuffer(2, len, sr);
-      const dampVal = damp !== null ? damp : 0.5;
-      for (let c = 0; c < 2; c++) {
-        const ch = buf.getChannelData(c);
-        for (let i = 0; i < len; i++) { ch[i] = (Math.random()*2-1) * Math.pow(1-i/len, 2+dampVal*4); }
-      }
-      reverbNode.buffer = buf;
+  // Reverb
+  const _reverbOn   = _st ? _st.reverbOn   : false;
+  const _reverbWet  = _st ? _st.reverbWet  : _slv('studio-reverb-wet');
+  const _reverbSize = _st ? _st.reverbSize : _slv('studio-reverb-size');
+  const _reverbDamp = _st ? _st.reverbDamp : _slv('studio-reverb-damp');
+  if (_reverbOn && _reverbWet !== null) {
+    reverbGainNode.gain.value = _reverbWet;
+    dryGainNode.gain.value    = 1 - _reverbWet * 0.5;
+    const sr  = audioCtx.sampleRate;
+    const sz  = Math.max(0.1, _reverbSize || 1);
+    const dmp = _reverbDamp !== null ? _reverbDamp : 0.5;
+    const len = Math.floor(sr * sz);
+    const buf = audioCtx.createBuffer(2, len, sr);
+    for (let c = 0; c < 2; c++) {
+      const ch = buf.getChannelData(c);
+      for (let i = 0; i < len; i++) ch[i] = (Math.random()*2-1) * Math.pow(1-i/len, 2+dmp*4);
     }
+    reverbNode.buffer = buf;
   }
 
   // Pan
-  if (panNode) { const pan = _slv('studio-pan-slider'); if (pan !== null) panNode.pan.value = pan; }
+  if (panNode) {
+    const _pan = _st ? _st.pan : _slv('studio-pan-slider');
+    if (_pan !== null) panNode.pan.value = _pan;
+  }
 
-  // Master gain (combine with volume)
-  const gainDb  = _slv('studio-gain-slider');
-  const volPct  = parseFloat((document.getElementById('vol-slider') || {}).value || 80);
-  if (gainDb !== null) gainNode.gain.value = (volPct / 100) * Math.pow(10, gainDb / 20);
+  // Master gain (combine volume slider with studio gain offset)
+  const _gainDb = _st ? _st.gain : _slv('studio-gain-slider');
+  const _volPct = parseFloat((document.getElementById('vol-slider') || {}).value || 80);
+  if (_gainDb !== null) gainNode.gain.value = (_volPct / 100) * Math.pow(10, _gainDb / 20);
+
+  // Done — clear saved state
+  delete window._savedStudioState;
 }
 
 let _savePosTick = 0;
@@ -10301,12 +10315,16 @@ function toggleNPPanel() {
   (function restoreSavedStudioState() {
     const st = window._savedStudioState;
     if (!st) return;
-    // Helper: set slider value and fire input event so wire() callbacks apply
+    // Helper: set slider value and fire input event so wire() label/style callbacks apply
+    // BUT suppress the audio-node onChange callbacks since nodes don't exist yet
     function setSlider(id, val) {
       if (val === null || val === undefined) return;
       const el = document.getElementById(id);
       if (!el) return;
       el.value = val;
+      // Dispatch 'input' so wire() updates the displayed value label/style only
+      // The onChange inside wire() will try to touch nodes — that's fine, they'll
+      // just be no-ops if compNode/reverbNode are null at this point
       el.dispatchEvent(new Event('input'));
     }
     setSlider('studio-gain-slider',  st.gain);
@@ -10319,13 +10337,22 @@ function toggleNPPanel() {
     setSlider('studio-reverb-wet',   st.reverbWet);
     setSlider('studio-reverb-size',  st.reverbSize);
     setSlider('studio-reverb-damp',  st.reverbDamp);
-    // Sync compressor toggle (default is ON; toggle off if saved state is off)
-    if (!st.compOn && enabled.compressor) window.studioToggleFx('compressor');
-    if (st.compOn  && !enabled.compressor) window.studioToggleFx('compressor');
-    // Sync reverb toggle (default is OFF; toggle on if saved state is on)
-    if (st.reverbOn  && !enabled.reverb) window.studioToggleFx('reverb');
-    if (!st.reverbOn && enabled.reverb)  window.studioToggleFx('reverb');
-    delete window._savedStudioState;
+    // Sync toggle button UI only (don't call studioToggleFx — nodes are null)
+    const compBtn   = document.getElementById('studio-comp-btn');
+    const reverbBtn = document.getElementById('studio-reverb-btn');
+    if (compBtn) {
+      const on = !!st.compOn;
+      enabled.compressor = on;
+      compBtn.classList.toggle('on', on);
+      compBtn.textContent = on ? 'ON' : 'OFF';
+    }
+    if (reverbBtn) {
+      const on = !!st.reverbOn;
+      enabled.reverb = on;
+      reverbBtn.classList.toggle('on', on);
+      reverbBtn.textContent = on ? 'ON' : 'OFF';
+    }
+    // Keep _savedStudioState alive — initAudioContext will consume it when nodes exist
   })();
 })();
 
