@@ -5473,7 +5473,7 @@ async function voidSearch(query, force = false) {
   const localMatches = ytFindLocalMatches(query);
 
   // Parallel fetch: JioSaavn + SoundCloud
-  const enriched = _enrichQuery(query);
+  const enriched = await _enrichQuery(query);
   const [saavnRes, scRes] = await Promise.allSettled([
     fetch(`${VOID_API_BASE}/youtube/search?q=${encodeURIComponent(enriched)}&type=all&limit=15`, { signal: AbortSignal.timeout(10000) }),
     fetch(`${VOID_API_BASE}/soundcloud/search?q=${encodeURIComponent(enriched)}&type=all&limit=10`, { signal: AbortSignal.timeout(10000) }),
@@ -7448,64 +7448,184 @@ function _parseDashQuery(q) {
 }
 
 // Known genre/mood/language patterns → enrich to a useful search query
+// ── VIBE WORD LOOKUP TABLE ────────────────────────────────────────────────────
+// Every word maps to the search phrase that actually finds those songs.
+// Multi-word phrases (keys with spaces) are checked first as whole phrases.
 const _VIBE_MAP = {
-  workout:'workout motivation energy songs', gym:'gym pump up energy songs',
-  running:'running cardio energy songs', cardio:'cardio workout pump songs',
-  yoga:'yoga meditation calm music', meditation:'meditation peaceful calm music',
-  focus:'focus study concentration music', study:'study music lofi concentration',
-  coding:'coding focus lofi instrumental', concentration:'concentration study calm music',
+  // ── Moods / feelings ──────────────────────────────────────────────────────
   sad:'sad emotional heartbreak songs', happy:'happy feel good upbeat songs',
   heartbreak:'heartbreak sad breakup songs', breakup:'breakup sad emotional songs',
   angry:'angry intense energy songs', anger:'angry intense energy songs',
-  cry:'emotional crying sad songs', chill:'chill relaxing smooth songs',
-  relax:'relaxing calm soothing songs', sleep:'sleep calm peaceful music',
-  lofi:'lofi chill beats instrumental', party:'party dance hits songs',
-  club:'club dance electronic songs', hype:'hype energy bangers songs',
-  dance:'dance hits upbeat songs', morning:'morning fresh uplifting songs',
-  night:'night vibes late chill songs', 'night drive':'night drive chill ambient songs',
-  summer:'summer hits feel good songs', winter:'winter cozy warm songs',
-  rain:'rainy day sad chill songs', romantic:'romantic love songs soft',
-  love:'love songs romantic hits', date:'romantic date night songs',
-  'road trip':'road trip driving songs', driving:'driving road trip energy songs',
-  travel:'travel adventure feel good songs', nostalgia:'nostalgia throwback classic hits',
-  throwback:'throwback classic retro hits', groove:'groove funk soul songs',
-  hustle:'hustle grind motivation songs', motivation:'motivation inspiring energy songs',
-  vibe:'chill vibes smooth songs', mood:'mood songs emotional hits',
-  energy:'energy pump up hype songs', jazz:'jazz smooth instrumental songs',
-  classical:'classical instrumental piano songs', instrumental:'instrumental background music',
-  bollywood:'bollywood hindi songs hits', punjabi:'punjabi songs hits', hindi:'hindi songs hits',
-  tamil:'tamil songs hits', telugu:'telugu songs hits', bengali:'bengali songs hits',
-  marathi:'marathi songs hits', malayalam:'malayalam songs hits', kannada:'kannada songs hits',
-  rap:'rap hip hop songs', hiphop:'hip hop rap songs', rnb:'r&b soul songs',
-  pop:'pop songs hits', rock:'rock songs hits', metal:'metal songs', edm:'edm dance songs',
-  acoustic:'acoustic guitar songs', piano:'piano songs instrumental', indie:'indie songs hits',
-  'feel good':'feel good happy upbeat songs', 'break up':'breakup sad emotional songs',
-  'work out':'workout motivation energy songs', 'night out':'party night out songs',
-  chill:'chill relaxing smooth songs', trending:'trending songs 2024', latest:'latest songs 2024',
-  new:'new songs 2024', best:'best songs hits', top:'top songs hits',
+  cry:'emotional sad crying songs', crying:'emotional sad crying songs',
+  depressed:'sad depressed dark emotional songs', melancholy:'melancholy sad bittersweet songs',
+  lonely:'lonely sad introspective songs', nostalgia:'nostalgia throwback nostalgic songs',
+  throwback:'throwback retro classic hits', memories:'nostalgic emotional memories songs',
+  bittersweet:'bittersweet emotional sad happy songs', hopeful:'hopeful uplifting inspiring songs',
+  euphoric:'euphoric ecstatic peak energy songs', dark:'dark moody atmospheric songs',
+  mysterious:'mysterious dark atmospheric songs', dreamy:'dreamy ethereal ambient songs',
+  romantic:'romantic love soft R&B songs', love:'romantic love songs hits',
+  sentimental:'sentimental emotional touching songs', peaceful:'peaceful calm serene music',
+  anxious:'anxious dark tense songs', empowered:'empowered confident strong songs',
+  confident:'confident bold empowered songs', heartfelt:'heartfelt emotional sincere songs',
+
+  // ── Energy levels ─────────────────────────────────────────────────────────
+  hype:'hype energy bangers songs', energy:'energy pump up hype songs',
+  energetic:'energetic high energy pump up songs', hypnotic:'hypnotic groovy trance songs',
+  intense:'intense powerful energy songs', powerful:'powerful intense anthems',
+  calm:'calm peaceful relaxing music', mellow:'mellow soft smooth songs',
+  lowkey:'lowkey chill mellow soft songs', low:'lowkey chill mellow songs',
+  slow:'slow emotional soft ballads', fast:'fast upbeat high energy songs',
+  mid:'mid tempo smooth groove songs',
+
+  // ── Vibe descriptors ──────────────────────────────────────────────────────
+  cool:'cool smooth chill vibes songs', smooth:'smooth chill R&B soul songs',
+  vibe:'chill smooth vibes songs', vibes:'chill smooth vibes songs',
+  groovy:'groovy funk soul dance songs', groove:'groove funk soul songs',
+  slick:'slick smooth cool R&B songs', fresh:'fresh new cool hip hop songs',
+  fire:'fire hot bangers hip hop songs', lit:'lit hype party songs',
+  banger:'bangers high energy party songs', bangers:'bangers high energy songs',
+  slay:'confident bold empowered pop songs', iconic:'iconic classic anthems',
+  aesthetic:'aesthetic indie chill lofi songs', cozy:'cozy warm comfort songs',
+  breezy:'breezy light carefree songs', airy:'airy light breezy indie songs',
+  lush:'lush rich atmospheric songs', raw:'raw emotional honest songs',
+  gritty:'gritty raw hip hop soul songs', moody:'moody dark atmospheric R&B songs',
+  trippy:'trippy psychedelic alternative songs', wavy:'wavy smooth hip hop R&B songs',
+  bouncy:'bouncy upbeat fun pop songs', punchy:'punchy energetic pop songs',
+  tender:'tender soft emotional songs', warm:'warm cozy soft acoustic songs',
+  icy:'icy cold drill trap songs', drill:'UK drill trap dark songs',
+  crisp:'crisp clean modern pop songs', deep:'deep soulful emotional music',
+  sultry:'sultry sensual R&B songs', sensual:'sensual R&B smooth songs',
+
+  // ── Activity / context ────────────────────────────────────────────────────
+  workout:'workout motivation energy songs', gym:'gym pump up training songs',
+  running:'running cardio energy songs', cardio:'cardio high energy workout songs',
+  yoga:'yoga meditation calm music', meditation:'meditation peaceful calm music',
+  focus:'focus study concentration music', study:'study music lofi concentration',
+  coding:'coding focus lofi instrumental', concentration:'concentration study calm music',
+  sleep:'sleep calm peaceful music', insomnia:'late night calm quiet music',
+  party:'party dance hits banger songs', club:'club dance electronic banger songs',
+  pregame:'pregame hype party songs', afters:'late night chill afters songs',
+  date:'romantic date night R&B songs', dinner:'dinner smooth jazz R&B songs',
+  driving:'driving road trip energy songs', 'road trip':'road trip driving songs',
+  commute:'commute chill headphone songs', travel:'travel feel good adventure songs',
+  morning:'morning fresh uplifting songs', wakeup:'uplifting morning energy songs',
+  night:'night vibes late chill songs', 'night drive':'night drive chill atmospheric songs',
+  midnight:'midnight dark late chill songs', late:'late night chill dark songs',
+  afternoon:'afternoon chill smooth songs', evening:'evening chill wind down songs',
+  summer:'summer feel good hits songs', winter:'winter cozy warm songs',
+  rain:'rainy day chill sad songs', spring:'spring fresh happy songs',
+  beach:'beach summer chill songs', sunset:'sunset chill atmospheric songs',
+  sunrise:'sunrise calm peaceful uplifting songs',
+
+  // ── Genres ────────────────────────────────────────────────────────────────
+  lofi:'lofi chill hip hop beats', jazz:'jazz smooth instrumental songs',
+  classical:'classical instrumental orchestral songs', instrumental:'instrumental background music',
+  rap:'rap hip hop songs', hiphop:'hip hop rap songs', 'hip hop':'hip hop rap songs',
+  rnb:'R&B soul smooth songs', soul:'soul R&B emotional songs',
+  pop:'pop hits songs', rock:'rock songs hits', metal:'metal heavy songs',
+  edm:'EDM dance electronic songs', house:'house electronic dance songs',
+  techno:'techno electronic dance songs', trance:'trance electronic euphoric songs',
+  trap:'trap hip hop dark songs', drill:'UK drill trap gritty songs',
+  afrobeats:'afrobeats afro pop songs', reggae:'reggae dancehall songs',
+  acoustic:'acoustic guitar soft songs', indie:'indie alternative songs',
+  piano:'piano instrumental songs', folk:'folk acoustic indie songs',
+  funk:'funk groove dance songs', blues:'blues soul emotional songs',
+  phonk:'phonk drift dark hip hop', hyperpop:'hyperpop electronic glitchy songs',
+  ambient:'ambient atmospheric instrumental music', synthwave:'synthwave retro 80s electronic',
+  kpop:'K-pop Korean pop songs', jpop:'J-pop Japanese pop songs',
+
+  // ── Indian languages ──────────────────────────────────────────────────────
+  bollywood:'bollywood hindi songs hits', punjabi:'punjabi songs hits',
+  hindi:'hindi songs hits', tamil:'tamil songs hits',
+  telugu:'telugu songs hits', bengali:'bengali songs hits',
+  marathi:'marathi songs hits', malayalam:'malayalam songs hits',
+  kannada:'kannada songs hits', gujarati:'gujarati songs hits',
+  bhojpuri:'bhojpuri songs', haryanvi:'haryanvi songs',
+
+  // ── Trend / recency ───────────────────────────────────────────────────────
+  trending:'trending popular songs 2025', viral:'viral trending songs 2025',
+  latest:'latest new songs 2025', new:'new songs 2025',
+  best:'best songs all time hits', top:'top songs charts hits',
+  classic:'classic timeless songs hits', underground:'underground indie underground hits',
+
+  // ── Multi-word phrases (checked before individual words) ─────────────────
+  'cool vibe':'cool smooth chill vibes R&B songs',
+  'cool vibes':'cool smooth chill vibes R&B songs',
+  'good vibe':'good vibes upbeat feel good songs',
+  'good vibes':'good vibes upbeat feel good songs',
+  'feel good':'feel good happy upbeat songs',
+  'night out':'party night out songs',
+  'break up':'breakup sad emotional songs',
+  'work out':'workout motivation energy songs',
+  'laid back':'laid back chill smooth songs',
+  'chill vibes':'chill smooth relaxed songs',
+  'dark vibes':'dark moody atmospheric songs',
+  'sad vibes':'sad emotional melancholy songs',
+  'hype songs':'hype energy bangers songs',
+  'late night':'late night chill dark atmospheric songs',
+  'good mood':'happy upbeat feel good songs',
+  'bad mood':'sad emotional dark songs',
+  'sunday morning':'sunday morning chill acoustic songs',
+  'rainy day':'rainy day sad chill songs',
+  'road trip':'road trip driving feel good songs',
+  'night drive':'night drive chill atmospheric songs',
+  'pump up':'pump up hype energy songs',
+  'slow burn':'slow build emotional songs',
+  'deep focus':'deep focus concentration lofi instrumental',
+  'mind off':'mindless fun party banger songs',
 };
 
-// ── SMART QUERY ENRICHER ─────────────────────────────────────────────────────
-// Converts mood/vibe/genre shorthand into richer search terms, detects intent,
-// handles typos, and injects artist-context when user is clearly searching
-// for a known artist's songs.
-function _enrichQuery(q) {
+// ── SMART QUERY ENRICHER ──────────────────────────────────────────────────────
+// Hits /api/suggest (Google Autocomplete proxy) to understand what the user
+// actually means. "cool vibe songs" → Google knows → top suggestion used.
+// Falls back to the vibe map instantly if the network call fails or is slow.
+// Always async — callers must await it.
+const _suggestCache = new Map();
+
+async function _enrichQuery(q) {
   if (!q) return q;
   const norm = q.toLowerCase().trim();
 
-  // 1. Direct vibe-map hit (whole query is a known shorthand)
+  // ── Instant path: exact vibe-map hit (no network needed) ─────────────────
   if (_VIBE_MAP[norm]) return _VIBE_MAP[norm];
 
-  // 2. Partial vibe-map hit — one of the words in query maps to a vibe
-  const words = norm.split(/\s+/);
-  for (const w of words) {
-    if (_VIBE_MAP[w] && words.length <= 2) return _VIBE_MAP[w];
+  // ── Check in-memory suggest cache ────────────────────────────────────────
+  if (_suggestCache.has(norm)) return _suggestCache.get(norm);
+
+  // ── Skip Google for clear artist/song queries (has a dash, or known artist)
+  if (_parseDashQuery(q)) return q;
+
+  try {
+    const res = await fetch(
+      `${VOID_API_BASE}/suggest?q=${encodeURIComponent(q)}`,
+      { signal: AbortSignal.timeout(3000) }
+    );
+    if (!res.ok) throw new Error('suggest failed');
+    const data        = await res.json();
+    const suggestions = data.suggestions || [];
+
+    // Pick the best suggestion: prefer ones that contain music-related words
+    const musicWords = /song|music|playlist|mix|hits|beat|track|album|remix|official/i;
+    const best = suggestions.find(s => musicWords.test(s)) || suggestions[0] || q;
+
+    // Don't use a suggestion that's longer than 6 words (too specific, likely wrong)
+    const enriched = best.split(/\s+/).length <= 6 ? best : q;
+
+    _suggestCache.set(norm, enriched);
+    return enriched;
+  } catch (_) {
+    // ── Offline / failed: fall back to vibe-map word merging ─────────────
+    const words    = norm.split(/\s+/);
+    const vibeHits = words.filter(w => _VIBE_MAP[w]);
+    const nonVibe  = words.filter(w => !_VIBE_MAP[w] && !_STOP.has(w));
+    if (vibeHits.length > 0) {
+      const seen = new Set();
+      const merged = vibeHits.flatMap(w => _VIBE_MAP[w].split(/\s+/))
+        .filter(t => { if (seen.has(t)) return false; seen.add(t); return true; });
+      return [...merged, ...nonVibe.filter(w => !seen.has(w))].join(' ');
+    }
+    return q;
   }
-
-  // 3. If the query already looks like "artist - song" or has 3+ words, trust it
-  if (_parseDashQuery(q) || words.length >= 3) return q;
-
-  return q;
 }
 
 // ── SPOTIFY-GRADE MULTI-SIGNAL SCORER ────────────────────────────────────────
@@ -7601,7 +7721,7 @@ function _scoreResult(item, rawQuery) {
 async function ytFetchResults(query) {
   const localMatches = ytFindLocalMatches(query);
   let ytResults = [], ytPlaylistResults = [], ytArtists = [], ytAlbums = [], ytPodcasts = [];
-  const enriched = _enrichQuery(query);
+  const enriched = await _enrichQuery(query);
   // Map filter to API type
   const typeMap = { all: 'all', song: 'song', artist: 'artist', album: 'album', playlist: 'album', podcast: 'podcast' };
   const apiType = typeMap[ytActiveFilter] || 'all';
@@ -7672,7 +7792,7 @@ async function scDoSearch(query, force=false) {
   if (!results) return;
   results.innerHTML=`<div class="yt-loading"><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div></div>`;
   try {
-    const enriched = _enrichQuery(query);
+    const enriched = await _enrichQuery(query);
     const scTypeMap = { all: 'all', song: 'song', artist: 'artist', playlist: 'playlist' };
     const scApiType = scTypeMap[scActiveFilter] || 'all';
     // Fire parallel: enriched query + if "Artist - Song" pattern also search bare query
