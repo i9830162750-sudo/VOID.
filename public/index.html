@@ -4408,6 +4408,52 @@ function initAudioContext() {
 
   // Expose globally so studio panel can access
   window._voidAudio = { compNode, panNode, analyserNode, reverbNode, reverbGainNode, dryGainNode, gainNode, audioCtx };
+
+  // Apply saved studio state now that real nodes exist
+  // (slider values are already in the DOM from restoreSavedStudioState or defaults)
+  const _slv = id => { const el = document.getElementById(id); return el ? parseFloat(el.value) : null; };
+
+  // EQ — eqValues/eqEnabled are already set from loadAll(); eqNodes were built above using them.
+  // Just ensure compressor params match current slider positions.
+  const thresh  = _slv('studio-comp-thresh');  if (thresh  !== null) compNode.threshold.value = thresh;
+  const ratio   = _slv('studio-comp-ratio');   if (ratio   !== null) compNode.ratio.value     = ratio;
+  const attack  = _slv('studio-comp-attack');  if (attack  !== null) compNode.attack.value    = attack;
+  const release = _slv('studio-comp-release'); if (release !== null) compNode.release.value   = release;
+  const knee    = _slv('studio-knee') || _slv('studio-comp-knee'); if (knee !== null) compNode.knee.value = knee;
+
+  // Check if compressor button says OFF — bypass it
+  const compBtn = document.getElementById('studio-comp-btn');
+  if (compBtn && !compBtn.classList.contains('on')) {
+    compNode.ratio.value = 1; compNode.threshold.value = 0; compNode.knee.value = 0;
+  }
+
+  // Reverb — apply wet/dry based on reverb button state
+  const reverbBtn = document.getElementById('studio-reverb-btn');
+  if (reverbBtn && reverbBtn.classList.contains('on')) {
+    const wet  = _slv('studio-reverb-wet');
+    const size = _slv('studio-reverb-size');
+    const damp = _slv('studio-reverb-damp');
+    if (wet !== null) { reverbGainNode.gain.value = wet; dryGainNode.gain.value = 1 - wet * 0.5; }
+    if (reverbNode && size !== null) {
+      const sr  = audioCtx.sampleRate;
+      const len = Math.floor(sr * Math.max(0.1, size));
+      const buf = audioCtx.createBuffer(2, len, sr);
+      const dampVal = damp !== null ? damp : 0.5;
+      for (let c = 0; c < 2; c++) {
+        const ch = buf.getChannelData(c);
+        for (let i = 0; i < len; i++) { ch[i] = (Math.random()*2-1) * Math.pow(1-i/len, 2+dampVal*4); }
+      }
+      reverbNode.buffer = buf;
+    }
+  }
+
+  // Pan
+  if (panNode) { const pan = _slv('studio-pan-slider'); if (pan !== null) panNode.pan.value = pan; }
+
+  // Master gain (combine with volume)
+  const gainDb  = _slv('studio-gain-slider');
+  const volPct  = parseFloat((document.getElementById('vol-slider') || {}).value || 80);
+  if (gainDb !== null) gainNode.gain.value = (volPct / 100) * Math.pow(10, gainDb / 20);
 }
 
 let _savePosTick = 0;
@@ -5781,7 +5827,7 @@ function _renderVoidResults({ localMatches, songs, artists, playlists, scTracks,
   if (scPlaylists.length) {
     html += `<div class="yt-section-hdr">Playlists <span style="font-size:9px;color:#ff5500;font-family:'Space Mono',monospace;margin-left:4px">● SC</span></div>`;
     html += scPlaylists.slice(0, 4).map(pl => `
-      <div class="yt-result-item" onclick="importSCPlaylist('${esc(pl.id)}')" style="cursor:pointer">
+      <div class="yt-result-item" onclick="openSCPlaylistPage('${esc(pl.id)}')" style="cursor:pointer">
         <div class="yt-thumb" style="border-radius:8px">
           ${pl.thumbnail ? `<img src="${esc(pl.thumbnail)}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">` : `<div class="yt-thumb-placeholder"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:#ff5500;width:20px;height:20px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></div>`}
         </div>
@@ -5791,8 +5837,8 @@ function _renderVoidResults({ localMatches, songs, artists, playlists, scTracks,
           ${pl.trackCount ? `<div class="yt-result-dur">${pl.trackCount} tracks</div>` : ''}
         </div>
         <div class="yt-result-actions">
-          <button class="yt-result-btn" onclick="event.stopPropagation();importSCPlaylist('${esc(pl.id)}')" title="Import" style="color:#ff5500;border-color:rgba(255,85,0,0.3)">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.26"/></svg>
+          <button class="yt-result-btn" onclick="event.stopPropagation();openSCPlaylistPage('${esc(pl.id)}')" title="Open playlist" style="color:#ff5500;border-color:rgba(255,85,0,0.3)">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg>
           </button>
         </div>
       </div>`).join('');
@@ -7492,6 +7538,74 @@ async function openSaavnAlbumPage(albumId) {
 
 function closeAlbumPage() { document.getElementById('album-page-overlay').style.display='none'; }
 
+// ── SoundCloud Playlist Page (opens overlay like JioSaavn albums) ─────────
+async function openSCPlaylistPage(idOrUrl) {
+  const overlay   = document.getElementById('album-page-overlay');
+  const hero      = document.getElementById('album-page-hero');
+  const tracksEl  = document.getElementById('album-page-tracks');
+  const actionsEl = document.getElementById('album-page-actions');
+  const bgEl      = document.getElementById('album-page-bg');
+
+  // Show overlay immediately with a loading state
+  hero.innerHTML = `<div style="display:flex;align-items:center;gap:14px;margin-bottom:20px"><div style="width:80px;height:80px;border-radius:12px;background:var(--bg3);flex-shrink:0"></div><div><div style="height:16px;background:var(--bg3);border-radius:4px;width:160px;margin-bottom:8px"></div><div style="height:12px;background:var(--bg3);border-radius:4px;width:100px"></div></div></div>`;
+  tracksEl.innerHTML = `<div class="yt-loading"><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div></div>`;
+  actionsEl.style.display = 'none';
+  if (bgEl) bgEl.style.backgroundImage = 'none';
+  overlay.style.display = 'flex';
+  window.history.pushState({ voidOverlay: 'album' }, '', window.location.pathname + window.location.search);
+
+  try {
+    const resp = await fetch(`${VOID_API_BASE}/soundcloud/playlist?id=${encodeURIComponent(idOrUrl)}`, { signal: AbortSignal.timeout(30000) });
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    const pl   = data.playlist || {};
+    const songs = data.songs || [];
+
+    if (bgEl && pl.thumbnail) bgEl.style.backgroundImage = `url(${pl.thumbnail})`;
+
+    hero.innerHTML = `
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:20px">
+        <div style="width:80px;height:80px;border-radius:12px;overflow:hidden;flex-shrink:0;background:var(--bg3)">
+          ${pl.thumbnail ? `<img src="${esc(pl.thumbnail)}" alt="" style="width:100%;height:100%;object-fit:cover">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:32px;height:32px;color:#ff5500"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></div>`}
+        </div>
+        <div>
+          <div style="font-size:18px;font-weight:800;margin-bottom:4px">${esc(pl.name || 'SoundCloud Playlist')}</div>
+          <div style="font-size:13px;color:var(--text2)">${esc(pl.artist || '')}</div>
+          <div style="font-size:11px;color:#ff5500;margin-top:4px;font-family:'Space Mono',monospace;font-weight:700">● SOUNDCLOUD</div>
+        </div>
+      </div>`;
+
+    window._overlayTracks = songs;
+    window._overlaySource = 'soundcloud';
+    // Store playlist info for import button
+    window._scOverlayPlaylistId = idOrUrl;
+    window._scOverlayPlaylistName = pl.name || 'SoundCloud Playlist';
+
+    if (actionsEl && songs.length > 0) {
+      actionsEl.style.display = 'flex';
+      actionsEl.innerHTML = `
+        <button onclick="_playOverlayAll()" style="flex:1;background:#ff5500;border:none;border-radius:10px;padding:11px;font-size:13px;font-weight:700;color:#fff;cursor:pointer;font-family:'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:7px">
+          <svg fill="currentColor" viewBox="0 0 24 24" style="width:16px;height:16px"><polygon points="5,3 19,12 5,21"/></svg>Play All
+        </button>
+        <button onclick="_shuffleOverlayAll()" style="flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:11px;font-size:13px;font-weight:700;color:var(--text);cursor:pointer;font-family:'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:7px">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:16px;height:16px"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="15" y1="15" x2="21" y2="21"/></svg>Shuffle
+        </button>
+        <button onclick="importSCPlaylist(window._scOverlayPlaylistId)" style="background:var(--bg3);border:1px solid rgba(255,85,0,0.4);border-radius:10px;padding:11px 14px;font-size:13px;font-weight:700;color:#ff5500;cursor:pointer;font-family:'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;gap:6px" title="Save to Library">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:15px;height:15px"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.26"/></svg>
+        </button>`;
+    }
+
+    if (!songs.length) {
+      tracksEl.innerHTML = `<div class="yt-empty"><p>No playable tracks found — playlist may be private or empty</p></div>`;
+    } else {
+      _renderTrackListInOverlay(songs, tracksEl, 'soundcloud');
+    }
+  } catch(e) {
+    hero.innerHTML = `<div class="yt-empty"><p>Could not load playlist. ${esc(e.message)}</p></div>`;
+    tracksEl.innerHTML = '';
+  }
+}
+
 
 // ── Online Playlist Import (JioSaavn + SoundCloud) ───────────────────────────
 
@@ -8057,7 +8171,7 @@ function renderSCResults(scResults, query, scArtists, scPlaylists) {
   if (scPlaylists.length) {
     html+=`<div class="yt-section-hdr">Playlists <span style="font-size:9px;color:#ff5500;font-family:'Space Mono',monospace;margin-left:6px">● SC</span></div>`;
     html+=scPlaylists.map(pl=>`
-      <div class="yt-result-item" onclick="importSCPlaylist('${esc(pl.id)}')" style="cursor:pointer">
+      <div class="yt-result-item" onclick="openSCPlaylistPage('${esc(pl.id)}')" style="cursor:pointer">
         <div class="yt-thumb" style="border-radius:8px">
           ${pl.thumbnail?`<img src="${esc(pl.thumbnail)}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">`:`<div class="yt-thumb-placeholder"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:#ff5500;width:20px;height:20px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></div>`}
         </div>
@@ -8067,8 +8181,8 @@ function renderSCResults(scResults, query, scArtists, scPlaylists) {
           ${pl.trackCount?`<div class="yt-result-dur">${pl.trackCount} tracks</div>`:''}
         </div>
         <div class="yt-result-actions">
-          <button class="yt-result-btn" onclick="event.stopPropagation();importSCPlaylist('${esc(pl.id)}')" title="Import playlist" style="color:#ff5500;border-color:rgba(255,85,0,0.3)">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.26"/></svg>
+          <button class="yt-result-btn" onclick="event.stopPropagation();openSCPlaylistPage('${esc(pl.id)}')" title="Open playlist" style="color:#ff5500;border-color:rgba(255,85,0,0.3)">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg>
           </button>
         </div>
       </div>`).join('');
