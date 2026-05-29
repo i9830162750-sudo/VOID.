@@ -4471,11 +4471,13 @@ function getNextQueueIndex() {
   if (queue.manual.length) return queue.manual.shift();
   if (queue.future.length) return queue.future.shift();
   if (isSmartShuffle) {
-    // When smart queue is exhausted, rebuild it
-    if (repeatMode>0) { buildSmartShuffleQueue(); return queue.future.shift()||null; }
-    return null;
+    // Smart queue exhausted — always rebuild like Spotify radio (even without repeat)
+    buildSmartShuffleQueue();
+    // Return synchronously from local pool while async rebuild happens in background
+    const localPool = _buildWeightedLocalPool(currentIndex, true);
+    return localPool[0] ?? null;
   } else if (isShuffle) {
-    if (repeatMode>0) { buildShuffleQueue(); return queue.future.shift(); }
+    if (repeatMode > 0) { buildShuffleQueue(); return queue.future.shift() ?? null; }
     return null;
   } else {
     const next = (currentIndex+1) % tracks.length;
@@ -4630,11 +4632,13 @@ function toggleShuffle() {
   } else if (isShuffle && !isSmartShuffle) {
     // normal → smart shuffle
     isShuffle = false; isSmartShuffle = true;
+    _smartSessionHeard.clear(); // fresh session
     buildSmartShuffleQueue();
     showToast('✦ Smart Shuffle on');
   } else {
     // smart → off
     isShuffle = false; isSmartShuffle = false;
+    _smartSessionHeard.clear();
     queue.future = buildLinearQueue(currentIndex);
     showToast('Shuffle off');
   }
@@ -4657,104 +4661,199 @@ function updateShuffleBtn() {
 }
 
 // ── SPOTIFY-GRADE SMART SHUFFLE ───────────────────────────────────────────────
-// Builds a queue that:
-//  • Seeds from the currently playing track (artist + title context)
-//  • Fetches multiple parallel search queries for variety (artist, similar artists, mood keywords)
-//  • Weights results by library affinity (fav artists, recently played artists)
-//  • Deduplicates and diversifies (no artist runs of >2 in a row)
-//  • Falls back gracefully to local-only smart shuffle if offline
+// ── SMART SHUFFLE — Spotify-style radio engine ────────────────────────────────
+//
+// How it works:
+//  1. Seeds on the current track: artist + title + genre keywords
+//  2. Fires 5 parallel search queries (same artist, similar artists, genre/mood,
+//     a title-vibe query, and one discovery query from a different genre bucket)
+//  3. Scores every result: artist affinity, vibe similarity, fav/recency boost
+//  4. Applies a "session heard" blacklist so you never hear the same song twice
+//     in a session until the pool is exhausted — just like Spotify radio
+//  5. Interleaves local library tracks (weighted by fav/recency) between online
+//     results so your own songs surface naturally
+//  6. De-clusters: max 1 consecutive track from the same artist
+//  7. Queues 30 tracks so it rarely needs rebuilding mid-session
+//  8. Falls back to local-only smart shuffle if offline
+//
+const _smartSessionHeard = new Set(); // tracks played this smart-shuffle session
+
 async function buildSmartShuffleQueue() {
   const t = currentIndex >= 0 ? tracks[currentIndex] : null;
-
-  // ── If no current track, do a library-smart shuffle ──────────────────────
   if (!t) { buildSmartLocalShuffle(); return; }
 
-  // ── Always works for local tracks too (not just online) ──────────────────
-  const artist = (t.artist || '').trim();
-  const title  = (t.title  || '').trim();
-  const source = t.scMeta ? 'soundcloud' : 'jiosaavn';
+  const artist      = (t.artist || '').trim();
+  const title       = (t.title  || '').trim();
+  const source      = t.scMeta ? 'soundcloud' : 'jiosaavn';
+  const endpoint    = source === 'soundcloud' ? '/soundcloud/search' : '/youtube/search';
 
-  // Extract artist keywords (drop featuring, ft, etc.)
-  const cleanArtist = artist.split(/\s*[,&x×]\s*|\s+(?:ft|feat|featuring|vs|x)\s+/i)[0].trim();
+  // Mark current as heard
+  _smartSessionHeard.add(t.id);
 
-  // Build 3 parallel search queries for variety
+  // Clean artist: drop features
+  const cleanArtist = artist.split(/\s*[,&x×]\s*|\s+(?:ft\.?|feat\.?|featuring|vs\.?|x)\s+/i)[0].trim();
+
+  // Genre/mood seed from title keywords
+  const titleKws  = _keywords(title);
+  const vibeSeed  = titleKws.map(k => _VIBE_MAP[k]).find(Boolean) || '';
+  const moodQuery = vibeSeed || `${cleanArtist} type beats`;
+
+  // Discovery bucket: pick a related-but-different angle
+  const discoveryQuery = _smartDiscoveryQuery(cleanArtist, title, source);
+
+  // 5 parallel queries — variety is the whole point
   const queries = [
-    cleanArtist,                                  // same artist
-    `${cleanArtist} similar songs`,               // similar vibes
-    _VIBE_MAP[_keywords(title)[0]] || `${title} songs like`, // mood/vibe
+    cleanArtist,                              // core: same artist
+    `${cleanArtist} similar artists`,         // adjacent artists
+    moodQuery,                                // genre/mood
+    `${title} similar songs`,                 // title-based radio
+    discoveryQuery,                           // discovery / surprise
   ].filter(Boolean);
 
   showToast('✦ Building Smart Shuffle…');
 
   try {
-    const baseEndpoint = source === 'soundcloud' ? '/soundcloud/search' : '/youtube/search';
-
     const fetches = queries.map(q =>
-      fetch(`${VOID_API_BASE}${baseEndpoint}?q=${encodeURIComponent(q)}&limit=12`, {
-        signal: AbortSignal.timeout(9000)
+      fetch(`${VOID_API_BASE}${endpoint}?q=${encodeURIComponent(q)}&limit=15`, {
+        signal: AbortSignal.timeout(10000)
       }).then(r => r.ok ? r.json() : { items: [] }).catch(() => ({ items: [] }))
     );
 
     const results = await Promise.all(fetches);
 
-    // Flatten all items, deduplicate by id, score by relevance to current track
-    const seen  = new Set([t.id]);
-    const pool  = [];
-    for (const data of results) {
-      for (const song of (data.items || [])) {
-        const sid = source === 'soundcloud'
-          ? 'track_sc_' + String(song.id || song.videoId)
-          : 'online_' + String(song.id || song.videoId);
-        if (seen.has(sid)) continue;
-        seen.add(sid);
-        // Score similarity to current track
-        const artistSim = _similarity(cleanArtist, song.artist || '');
-        const vibeScore = _scoreResult(song, artist + ' ' + title);
-        pool.push({ song, sid, artistSim, vibeScore, source });
+    // ── Collect & score all candidates ────────────────────────────────────
+    const seenOnline = new Set();
+    const pool = [];
+
+    for (let qi = 0; qi < results.length; qi++) {
+      const queryWeight = [3, 2, 2, 2, 1][qi] || 1; // same-artist results score higher
+      for (const song of (results[qi].items || [])) {
+        const rawId = String(song.id || song.videoId || '');
+        if (!rawId) continue;
+        const onlineKey = source + ':' + rawId;
+        if (seenOnline.has(onlineKey)) continue;
+        seenOnline.add(onlineKey);
+
+        // Skip if heard this session
+        const existingTrack = tracks.find(tr =>
+          source === 'soundcloud'
+            ? tr.scMeta && tr.scMeta.trackId === rawId
+            : tr.ytMeta && tr.ytMeta.videoId === rawId
+        );
+        if (existingTrack && _smartSessionHeard.has(existingTrack.id)) continue;
+
+        const artistSim  = _similarity(cleanArtist, song.artist || '');
+        const vibeScore  = _scoreResult(song, `${artist} ${title}`);
+        // Soft randomisation: add jitter so same-score tracks aren't always in same order
+        const jitter     = Math.random() * 8;
+        const score      = artistSim * 50 * queryWeight + vibeScore * 0.4 + jitter;
+
+        pool.push({ song, rawId, onlineKey, score, source });
       }
     }
 
-    // Sort: prioritise same artist first, then vibes
-    pool.sort((a, b) => {
-      const as = a.artistSim * 60 + a.vibeScore * 0.5;
-      const bs = b.artistSim * 60 + b.vibeScore * 0.5;
-      return bs - as;
-    });
+    // Sort by score, then apply weighted random selection to top half
+    // (mimics Spotify: good stuff comes first but isn't perfectly deterministic)
+    pool.sort((a, b) => b.score - a.score);
+    const topHalf   = pool.slice(0, Math.ceil(pool.length / 2));
+    const bottomHalf = pool.slice(Math.ceil(pool.length / 2));
+    const selected  = [
+      ..._weightedSample(topHalf,    Math.min(20, topHalf.length),    x => x.score),
+      ..._weightedSample(bottomHalf, Math.min(8,  bottomHalf.length), x => x.score),
+    ];
 
-    // Build track indices, adding online tracks if needed
-    const newIndices = [];
-    for (const { song, sid } of pool.slice(0, 20)) {
+    // ── Resolve to track indices, adding online tracks to library ──────────
+    const onlineIndices = [];
+    for (const { song, rawId } of selected) {
+      const isJioSaavn = source !== 'soundcloud';
+      const sid = isJioSaavn ? 'online_' + rawId : 'track_sc_' + rawId;
+
       let idx = tracks.findIndex(tr => tr.id === sid);
       if (idx === -1) {
-        const isJioSaavn = source !== 'soundcloud';
         const newTrack = {
-          id: sid, blobId: null, url: null,
+          id: sid, blobId: null, url: null, streamUrl: null,
           title:    song.title    || 'Unknown',
           artist:   song.artist   || '',
           duration: song.duration || 0,
           cover:    song.thumbnail || null,
           isFav: false, isOnline: true,
-          ytMeta: isJioSaavn ? { videoId: String(song.id || song.videoId), title: song.title, thumbnail: song.thumbnail || '' } : null,
-          scMeta: !isJioSaavn ? { trackId: String(song.id || song.videoId), title: song.title, artwork_url: song.thumbnail || '', stream_url: song.audioUrl || '' } : null,
+          ytMeta: isJioSaavn  ? { videoId: rawId, title: song.title, thumbnail: song.thumbnail || '' } : null,
+          scMeta: !isJioSaavn ? { trackId: rawId, title: song.title, thumbnail: song.thumbnail || '' } : null,
         };
         tracks.push(newTrack);
         idx = tracks.length - 1;
       }
-      if (idx !== currentIndex) newIndices.push(idx);
+      if (idx !== currentIndex) onlineIndices.push(idx);
     }
 
-    // Mix in existing local tracks weighted by fav/recency, then de-cluster artists
-    const localBonus = _buildWeightedLocalPool(currentIndex);
-    const combined   = _deClusterArtists([...newIndices, ...localBonus], 2);
+    // ── Weighted local library tracks (interleaved, not appended) ──────────
+    const localIndices = _buildWeightedLocalPool(currentIndex);
 
-    queue.future = combined.length ? combined : _buildWeightedLocalPool(currentIndex, true);
+    // Interleave: every 3 online tracks, insert 1 local (Spotify-style blend)
+    const combined = _interleaveLocal(onlineIndices, localIndices, 3);
+
+    // De-cluster: no two consecutive tracks from the same artist
+    const deduped = _deClusterArtists(combined, 1);
+
+    queue.future = deduped.length ? deduped : _buildWeightedLocalPool(currentIndex, true);
     saveSettings();
     renderQueueList();
-    showToast(`✦ Smart Shuffle: ${combined.length} tracks queued`);
+    showToast(`✦ Smart Shuffle — ${deduped.length} tracks queued`);
+
   } catch (e) {
-    console.warn('[SmartShuffle] falling back:', e.message);
+    console.warn('[SmartShuffle] falling back to local:', e.message);
     buildSmartLocalShuffle();
   }
+}
+
+// Pick a discovery query: a related genre or style, not the same artist again
+function _smartDiscoveryQuery(artist, title, source) {
+  // Genre buckets — pick one that feels adjacent based on title keywords
+  const genreBuckets = [
+    'indie electronic chill', 'alternative R&B', 'lo-fi hip hop beats',
+    'dark pop atmospheric', 'neo soul smooth', 'bedroom pop indie',
+    'drill trap', 'phonk', 'afrobeats hits', 'jazz hip hop',
+    'ambient electronic', 'garage UK', 'hyperpop', 'singer songwriter acoustic',
+  ];
+  // Seed the pick deterministically from the artist name so it's consistent
+  // per artist but different across artists
+  const seed = [...artist].reduce((s, c) => s + c.charCodeAt(0), 0);
+  return genreBuckets[seed % genreBuckets.length];
+}
+
+// Weighted random sample without replacement
+function _weightedSample(arr, n, scoreFn) {
+  if (!arr.length || n <= 0) return [];
+  const items  = arr.map((x, i) => ({ x, w: Math.max(scoreFn(x), 0.01) }));
+  const result = [];
+  for (let pick = 0; pick < Math.min(n, items.length); pick++) {
+    const total = items.reduce((s, it) => s + it.w, 0);
+    let r = Math.random() * total;
+    for (let i = 0; i < items.length; i++) {
+      r -= items[i].w;
+      if (r <= 0) {
+        result.push(items[i].x);
+        items.splice(i, 1);
+        break;
+      }
+    }
+  }
+  return result;
+}
+
+// Interleave local tracks into online ones every `step` items
+function _interleaveLocal(online, local, step) {
+  const out   = [];
+  let   li    = 0;
+  for (let oi = 0; oi < online.length; oi++) {
+    out.push(online[oi]);
+    if ((oi + 1) % step === 0 && li < local.length) {
+      out.push(local[li++]);
+    }
+  }
+  // Append remaining local tracks
+  while (li < local.length) out.push(local[li++]);
+  return out;
 }
 
 // Weighted local-library pool: favs + recently played artists get higher weight
@@ -4762,7 +4861,7 @@ function _buildWeightedLocalPool(excludeIdx, asFallback = false) {
   const favIds    = typeof favorites !== 'undefined' ? favorites : new Set();
   const recentIds = typeof recentlyPlayed !== 'undefined' ? recentlyPlayed : [];
   const recentArtists = new Set(
-    recentIds.slice(0, 15).map(id => {
+    recentIds.slice(0, 20).map(id => {
       const tr = tracks.find(t => t.id === id); return tr ? _normalise(tr.artist) : '';
     }).filter(Boolean)
   );
@@ -4770,27 +4869,28 @@ function _buildWeightedLocalPool(excludeIdx, asFallback = false) {
   const weighted = tracks
     .map((tr, i) => {
       if (i === excludeIdx) return null;
+      if (!asFallback && _smartSessionHeard.has(tr.id)) return null; // skip heard
       let w = 1;
-      if (favIds.has(tr.id)) w += 6;
-      if (recentIds.includes(tr.id)) w += 3;
-      if (recentArtists.has(_normalise(tr.artist))) w += 2;
+      if (favIds.has(tr.id))                            w += 8;  // favs strongly preferred
+      if (recentIds.slice(0, 5).includes(tr.id))        w += 4;  // recently played
+      if (recentIds.slice(5, 15).includes(tr.id))       w += 2;
+      if (recentArtists.has(_normalise(tr.artist)))     w += 3;  // liked artists
       return { i, w };
     })
-    .filter(Boolean)
-    .sort((a, b) => b.w - a.w);
+    .filter(Boolean);
 
   if (asFallback) {
-    // Simple weighted shuffle: higher-weight items more likely to appear early
     return _weightedShuffle(weighted.map(x => x.i), weighted.map(x => x.w));
   }
-  // Return top 10 by weight (to blend with online results)
-  return weighted.slice(0, 10).map(x => x.i);
+  // Return top 12 by weight for blending with online results
+  return weighted.sort((a, b) => b.w - a.w).slice(0, 12).map(x => x.i);
 }
 
 // Smart local-only shuffle when offline: weight by fav/recency, deCluster
 function buildSmartLocalShuffle() {
+  _smartSessionHeard.clear();
   const pool = _buildWeightedLocalPool(currentIndex, true);
-  queue.future = _deClusterArtists(pool, 2);
+  queue.future = _deClusterArtists(pool, 1);
   saveSettings(); renderQueueList();
   showToast('✦ Smart Shuffle (library)');
 }
@@ -4811,17 +4911,17 @@ function _weightedShuffle(indices, weights) {
 }
 
 // De-cluster: no more than `maxRun` consecutive tracks from the same artist
-function _deClusterArtists(indices, maxRun = 2) {
+function _deClusterArtists(indices, maxRun = 1) {
   if (!indices.length) return indices;
   const getArtist = i => _normalise((tracks[i] && tracks[i].artist) || '');
   const result = [...indices];
-  for (let pass = 0; pass < 3; pass++) {
+  for (let pass = 0; pass < 5; pass++) {
     let changed = false;
     for (let i = maxRun; i < result.length; i++) {
       const runArtist = getArtist(result[i]);
+      if (!runArtist) continue;
       const isCluster = result.slice(i - maxRun, i).every(x => getArtist(x) === runArtist);
-      if (isCluster && runArtist) {
-        // Find next index with a different artist to swap in
+      if (isCluster) {
         const swapIdx = result.findIndex((x, j) => j > i && getArtist(x) !== runArtist);
         if (swapIdx !== -1) {
           [result[i], result[swapIdx]] = [result[swapIdx], result[i]];
@@ -5096,6 +5196,8 @@ function addToRecent(id) {
   recentlyPlayed = recentlyPlayed.filter(x=>x!==id);
   recentlyPlayed.unshift(id);
   if (recentlyPlayed.length>20) recentlyPlayed = recentlyPlayed.slice(0,20);
+  // Track heard in smart shuffle session so it won't repeat
+  if (isSmartShuffle) _smartSessionHeard.add(id);
   renderHomeRecent();
 }
 
