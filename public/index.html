@@ -4681,6 +4681,7 @@ function togglePlay() {
       playTrack(currentIndex, false);
       return;
     }
+    initAudioContext();
     if (audioCtx&&audioCtx.state==='suspended') audioCtx.resume();
     audioEl.play().catch(()=>{ playTrack(currentIndex, false); });
     isPlaying=true; updatePlayButtons();
