@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="description" content="VOID Player v6 — hybrid offline + YouTube music player with streaming">
-<title>VOID.</title>
+<title>VOID Player v6</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -834,6 +834,24 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
 /* Download progress */
 .yt-result-btn.downloading { border-color:var(--yt); color:var(--yt); position:relative; overflow:hidden; }
 .yt-dl-progress { position:absolute; bottom:0; left:0; height:2px; background:var(--yt); transition:width 0.3s; }
+
+/* Drive / local upload-download transfer progress on track items */
+.track-xfer-bar { position:absolute; bottom:0; left:0; right:0; height:2px; background:var(--border2); overflow:hidden; border-radius:0 0 10px 10px; pointer-events:none; }
+.track-xfer-fill { height:100%; width:0%; transition:width 0.25s linear; border-radius:2px; }
+.track-xfer-fill.upload   { background:linear-gradient(90deg,var(--accent),var(--accent2)); }
+.track-xfer-fill.download { background:linear-gradient(90deg,#4285f4,#34a8eb); }
+.track-xfer-fill.indeterminate { width:40% !important; animation:xfer-slide 1.2s ease-in-out infinite; }
+@keyframes xfer-slide { 0%{transform:translateX(-100%)} 100%{transform:translateX(300%)} }
+
+/* Settings drive progress panel */
+#drive-xfer-panel { margin-top:10px; display:none; flex-direction:column; gap:6px; }
+#drive-xfer-panel.visible { display:flex; }
+.drive-xfer-label { font-size:11px; color:var(--text2); font-family:'Space Mono',monospace; display:flex; justify-content:space-between; }
+.drive-xfer-track { font-size:11px; color:var(--text3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.drive-xfer-bar  { width:100%; height:4px; background:var(--border2); border-radius:2px; overflow:hidden; }
+.drive-xfer-fill { height:100%; width:0%; border-radius:2px; transition:width 0.25s linear; }
+.drive-xfer-fill.upload   { background:linear-gradient(90deg,var(--accent),var(--accent2)); }
+.drive-xfer-fill.download { background:linear-gradient(90deg,#4285f4,#34a8eb); }
 .yt-result-btn.dl-done { border-color:var(--accent); color:var(--accent); background:var(--accent-dim); }
 
 .yt-result-badge { display:inline-flex; align-items:center; background:rgba(255,68,68,0.12); border:1px solid rgba(255,68,68,0.2); border-radius:4px; padding:1px 5px; font-size:9px; font-weight:700; color:var(--yt); font-family:'Space Mono',monospace; vertical-align:middle; margin-left:4px; }
@@ -6313,6 +6331,9 @@ document.getElementById('file-input').addEventListener('change', async function(
 
   showToast('Loading ' + files.length + ' track' + (files.length !== 1 ? 's' : '') + '…');
 
+  // Show indeterminate progress bars on newly added tracks while processing
+  var _localUploadActive = true;
+
   // ── Fast parallel processing ──────────────────────────────────────────────
   const processFile = async (file) => {
     const url = URL.createObjectURL(file);
@@ -6370,13 +6391,19 @@ document.getElementById('file-input').addEventListener('change', async function(
   // Process files with limited concurrency to avoid memory pressure on large batches
   const CONCURRENCY = 3;
   const validResults = [];
+  // Show indeterminate bars on each file as it's processed
+  if (typeof xferStart === 'function') xferStart(files.length, 'upload');
   for (let i = 0; i < files.length; i += CONCURRENCY) {
     const batch = files.slice(i, i + CONCURRENCY);
-    const batchResults = await Promise.all(batch.map(f => processFile(f).catch(err => {
-      console.warn('Failed to process file:', err); return null;
-    })));
+    const batchResults = await Promise.all(batch.map(async f => {
+      if (typeof xferTick === 'function') xferTick(f.name.replace(/\.[^.]+$/, ''));
+      const result = await processFile(f).catch(err => { console.warn('Failed to process file:', err); return null; });
+      if (typeof xferDone === 'function') xferDone();
+      return result;
+    }));
     validResults.push(...batchResults.filter(Boolean));
   }
+  if (typeof xferEnd === 'function') xferEnd();
 
   for (const { track } of validResults) {
     tracks.push(track);
@@ -6388,19 +6415,24 @@ document.getElementById('file-input').addEventListener('change', async function(
   console.log('[Drive] file handler reached upload block, voidDriveReady:', typeof voidDriveReady, 'voidDriveUploadTrack:', typeof voidDriveUploadTrack);
   if (typeof voidDriveUploadTrack === 'function' && typeof voidDriveReady === 'function') {
     (async () => {
-      // Wait for auth check to complete before deciding whether to upload
       const user = await voidDriveReady();
       console.log('[Drive] auth ready, user:', user ? user.displayName : 'not signed in');
       if (!user) return;
+      if (typeof xferStart === 'function') xferStart(validResults.length, 'upload');
       showToast('Uploading to Google Drive…');
       let uploaded = 0;
       for (const { track, file } of validResults) {
+        if (typeof xferTick === 'function') xferTick(track.title);
+        if (typeof _xferTrackBar === 'function') _xferTrackBar(track.id, -1, 'upload');
         console.log('[Drive] uploading track:', track.title, 'file size:', file.size);
         const fileId = await voidDriveUploadTrack(track, file).catch(e => { console.error('[Drive] upload error:', e); return null; });
         console.log('[Drive] upload result fileId:', fileId);
+        if (typeof xferDone === 'function') xferDone();
+        if (typeof _xferTrackBarDone === 'function') _xferTrackBarDone(track.id);
         if (fileId) uploaded++;
       }
       console.log('[Drive] uploaded', uploaded, 'of', validResults.length);
+      if (typeof xferEnd === 'function') xferEnd();
       if (uploaded > 0) {
         showToast('✓ Uploaded ' + uploaded + ' track' + (uploaded !== 1 ? 's' : '') + ' to Drive');
         if (typeof voidDriveSaveNow === 'function') voidDriveSaveNow();
@@ -6450,7 +6482,7 @@ function renderTrackList(filter='') {
     const isNP=ri===currentIndex;
     const isFav=favorites.has(t.id);
     const thumb=(t.ytMeta&&t.ytMeta.thumbnail)?t.ytMeta.thumbnail:t.cover;
-    return `<div class="track-item${isNP?' playing':''}" onclick="playTrack(${ri})">
+    return `<div class="track-item${isNP?' playing':''}" data-track-id="${t.id}" onclick="playTrack(${ri})">
       <div class="track-thumb">${thumb?`<img src="${thumb}" alt="" loading="lazy" decoding="async">`:`<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:18px;height:18px;color:var(--text3)"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`}${isNP&&isPlaying?`<div class="playing-indicator"><div class="playing-bars"><span></span><span></span><span></span></div></div>`:''}</div>
       <div class="track-info"><div class="track-title">${esc(t.title)}</div><div class="track-artist">${esc(t.artist)}</div></div>
       ${isFav?'<div class="track-fav-dot"></div>':''}
@@ -6470,7 +6502,7 @@ function renderTrackList(filter='') {
         const isNP=ri===currentIndex;
         const isFav=favorites.has(t.id);
         const thumb=(t.ytMeta&&t.ytMeta.thumbnail)?t.ytMeta.thumbnail:t.cover;
-        return `<div class="track-item${isNP?' playing':''}" onclick="playTrack(${ri})">
+        return `<div class="track-item${isNP?' playing':''}" data-track-id="${t.id}" onclick="playTrack(${ri})">
           <div class="track-thumb">${thumb?`<img src="${thumb}" alt="" loading="lazy" decoding="async">`:`<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:18px;height:18px;color:var(--text3)"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`}${isNP&&isPlaying?`<div class="playing-indicator"><div class="playing-bars"><span></span><span></span><span></span></div></div>`:''}</div>
           <div class="track-info"><div class="track-title">${esc(t.title)}</div><div class="track-artist">${esc(t.artist)}</div></div>
           ${isFav?'<div class="track-fav-dot"></div>':''}
@@ -10625,6 +10657,77 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
   var driveAutoSave  = null;   // debounce timer
   var AUTOSAVE_MS    = 8000;   // auto-save after 8s of quiet
 
+  // ── Transfer progress tracking ─────────────────────────────────────────
+  // xferState: { total, done, current (track title), mode ('upload'|'download') }
+  var xferState = null;
+
+  function xferStart(total, mode) {
+    xferState = { total: total, done: 0, current: '', mode: mode };
+    _xferUpdatePanel();
+  }
+  function xferTick(trackTitle) {
+    if (!xferState) return;
+    xferState.current = trackTitle || '';
+    _xferUpdatePanel();
+  }
+  function xferDone() {
+    if (!xferState) return;
+    xferState.done++;
+    _xferUpdatePanel();
+  }
+  function xferEnd() {
+    xferState = null;
+    _xferUpdatePanel();
+    // Clear all per-track bars
+    document.querySelectorAll('.track-xfer-bar').forEach(function(el) { el.remove(); });
+  }
+
+  function _xferUpdatePanel() {
+    var panel = document.getElementById('drive-xfer-panel');
+    if (!panel) return;
+    if (!xferState) {
+      panel.classList.remove('visible');
+      return;
+    }
+    panel.classList.add('visible');
+    var pct = xferState.total > 0 ? Math.round((xferState.done / xferState.total) * 100) : 0;
+    var label = document.getElementById('drive-xfer-label-left');
+    var labelRight = document.getElementById('drive-xfer-label-right');
+    var trackLabel = document.getElementById('drive-xfer-track');
+    var fill = document.getElementById('drive-xfer-fill');
+    if (label) label.textContent = xferState.mode === 'upload' ? '↑ Uploading' : '↓ Downloading';
+    if (labelRight) labelRight.textContent = xferState.done + ' / ' + xferState.total;
+    if (trackLabel) trackLabel.textContent = xferState.current;
+    if (fill) {
+      fill.style.width = pct + '%';
+      fill.className = 'drive-xfer-fill ' + xferState.mode;
+    }
+  }
+
+  // Show a progress bar on a specific track item in the library list
+  function _xferTrackBar(trackId, pct, mode) {
+    var el = document.querySelector('[data-track-id="' + trackId + '"]');
+    if (!el) return;
+    var bar = el.querySelector('.track-xfer-bar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.className = 'track-xfer-bar';
+      bar.innerHTML = '<div class="track-xfer-fill ' + mode + '"></div>';
+      el.appendChild(bar);
+    }
+    var fill = bar.querySelector('.track-xfer-fill');
+    if (fill) {
+      fill.className = 'track-xfer-fill ' + mode + (pct < 0 ? ' indeterminate' : '');
+      if (pct >= 0) fill.style.width = pct + '%';
+    }
+  }
+  function _xferTrackBarDone(trackId) {
+    var el = document.querySelector('[data-track-id="' + trackId + '"]');
+    if (!el) return;
+    var bar = el.querySelector('.track-xfer-bar');
+    if (bar) { bar.style.opacity = '0'; bar.style.transition = 'opacity 0.4s'; setTimeout(function(){ bar.remove(); }, 450); }
+  }
+
   // Promise that resolves once /api/auth/me has responded (user or null)
   var _driveReadyResolve;
   var driveReady = new Promise(function(res) { _driveReadyResolve = res; });
@@ -10753,10 +10856,9 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
           blobId:   t.blobId,
           title:    t.title,
           artist:   t.artist,
-          // Omit cover from Drive snapshot — base64 art can be 100-500KB per track,
-          // making the JSON payload huge. Cover is re-read from local IDB on load,
-          // and re-extracted from the audio blob if missing (see loadAll backfill).
-          cover:    null,
+          // Include cover so it's restored on other devices.
+          // ytMeta tracks have a remote thumbnail URL (tiny), local tracks store base64.
+          cover:    t.cover || null,
           duration: t.duration,
           isFav:    t.isFav,
           ytMeta:   t.ytMeta,
@@ -10882,19 +10984,19 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
   // doesn't require a network round-trip on the next load.
   async function driveDownloadToIndexedDB(tracksToFetch) {
     if (!tracksToFetch || !tracksToFetch.length) return;
+    xferStart(tracksToFetch.length, 'download');
     showToast('Caching ' + tracksToFetch.length + ' track' + (tracksToFetch.length !== 1 ? 's' : '') + ' from Drive…');
     var cached = 0;
     for (var i = 0; i < tracksToFetch.length; i++) {
       var t = tracksToFetch[i];
+      xferTick(t.title);
+      _xferTrackBar(t.id, -1, 'download');
       try {
         var resp = await fetch('/api/drive/audio/' + t.driveFileId, { credentials: 'include' });
-        if (!resp.ok) { console.warn('[Drive] download failed for', t.title, resp.status); continue; }
+        if (!resp.ok) { console.warn('[Drive] download failed for', t.title, resp.status); xferDone(); _xferTrackBarDone(t.id); continue; }
         var blob = await resp.blob();
-        // Store blob in IndexedDB under the track's blobId
         await dbPut('blobs', { id: t.blobId, blob: blob }).catch(function(){});
-        // Swap in a local object URL so the track plays from cache immediately
         var localUrl = URL.createObjectURL(blob);
-        // Update in-memory track reference
         var allTracks = (typeof tracks !== 'undefined' && tracks.length) ? tracks : (window.tracks || []);
         var live = allTracks.find(function(x) { return x.id === t.id; });
         if (live) { live.url = localUrl; live._needsDriveFetch = false; }
@@ -10902,7 +11004,10 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
       } catch(e) {
         console.warn('[Drive] driveDownloadToIndexedDB error for', t.title, e);
       }
+      xferDone();
+      _xferTrackBarDone(t.id);
     }
+    xferEnd();
     if (cached > 0) {
       showToast('✓ Cached ' + cached + ' track' + (cached !== 1 ? 's' : '') + ' offline');
       if (typeof renderAll === 'function') renderAll();
@@ -10917,13 +11022,16 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
       return t.blobId && !t.driveFileId && !t.isOnline;
     });
     if (!localTracks.length) return;
+    xferStart(localTracks.length, 'upload');
     showToast('Uploading ' + localTracks.length + ' existing track' + (localTracks.length !== 1 ? 's' : '') + ' to Drive…');
     var uploaded = 0;
     for (var i = 0; i < localTracks.length; i++) {
       var t = localTracks[i];
+      xferTick(t.title);
+      _xferTrackBar(t.id, -1, 'upload');
       try {
         var blob = await dbGet('blobs', t.blobId).catch(function() { return null; });
-        if (!blob || !blob.blob) continue;
+        if (!blob || !blob.blob) { xferDone(); _xferTrackBarDone(t.id); continue; }
         var fd = new FormData();
         fd.append('audio', blob.blob, t.blobId);
         fd.append('blobId', t.blobId);
@@ -10936,7 +11044,10 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
       } catch(e) {
         console.warn('[Drive] backfill error for', t.title, e);
       }
+      xferDone();
+      _xferTrackBarDone(t.id);
     }
+    xferEnd();
     if (uploaded > 0) {
       showToast('✓ Backed up ' + uploaded + ' track' + (uploaded !== 1 ? 's' : '') + ' to Drive');
       driveSaveLibrary(false);
@@ -10985,6 +11096,14 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
   };
 
   window.voidDriveSaveNow = function() { driveSaveLibrary(true); };
+
+  // Expose transfer progress helpers globally (used by local file upload outside IIFE)
+  window.xferStart        = xferStart;
+  window.xferTick         = xferTick;
+  window.xferDone         = xferDone;
+  window.xferEnd          = xferEnd;
+  window._xferTrackBar    = _xferTrackBar;
+  window._xferTrackBarDone = _xferTrackBarDone;
 
   // ── Expose user info for Settings page ────────────────────────────────
   window.voidDriveGetUser = function() { return driveUser; };
@@ -11049,6 +11168,11 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
           '<div style="display:flex;gap:8px">' +
             '<button onclick="voidDriveSaveNow()" style="flex:1;padding:10px;background:var(--accent);color:#000;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer">Save to Drive</button>' +
             '<button onclick="voidDriveManualSync()" style="flex:1;padding:10px;background:var(--bg4);color:var(--text);border:1px solid var(--border2);border-radius:10px;font-size:13px;cursor:pointer">Restore from Drive</button>' +
+          '</div>' +
+          '<div id="drive-xfer-panel">' +
+            '<div class="drive-xfer-label"><span id="drive-xfer-label-left">↑ Uploading</span><span id="drive-xfer-label-right">0 / 0</span></div>' +
+            '<div class="drive-xfer-bar"><div class="drive-xfer-fill upload" id="drive-xfer-fill" style="width:0%"></div></div>' +
+            '<div class="drive-xfer-track" id="drive-xfer-track"></div>' +
           '</div>' +
           '<button onclick="voidDriveAuthClick()" style="padding:8px;background:none;color:var(--danger);border:1px solid rgba(231,76,60,0.3);border-radius:10px;font-size:12px;cursor:pointer">Sign Out</button>'
         : '<p style="font-size:13px;color:var(--text2);margin:0">Sign in with Google to sync your library and uploaded songs across devices.</p>' +
