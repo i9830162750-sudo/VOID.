@@ -4468,6 +4468,25 @@ function initAudioContext() {
 
   // Done — clear saved state
   delete window._savedStudioState;
+
+  // Re-fire all studio slider input events now that nodes exist.
+  // wire() ran its initial update() calls before the AudioContext was created,
+  // so the onChange callbacks were no-ops (nodes were null). Dispatching 'input'
+  // again here ensures every slider value is actually pushed into the live nodes
+  // for the initially-loaded song (without this, effects only apply after you
+  // switch to a different track for the first time).
+  requestAnimationFrame(function() {
+    var studioSliderIds = [
+      'studio-gain-slider', 'studio-pan-slider',
+      'studio-comp-thresh', 'studio-comp-ratio', 'studio-comp-attack',
+      'studio-comp-release', 'studio-comp-knee',
+      'studio-reverb-wet', 'studio-reverb-size', 'studio-reverb-damp'
+    ];
+    studioSliderIds.forEach(function(id) {
+      var el = document.getElementById(id);
+      if (el) el.dispatchEvent(new Event('input'));
+    });
+  });
 }
 
 let _savePosTick = 0;
