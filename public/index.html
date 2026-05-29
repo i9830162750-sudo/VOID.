@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="description" content="VOID Player v6 — hybrid offline + YouTube music player with streaming">
-<title>VOID Player v6</title>
+<title>VOID.</title>
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -10864,9 +10864,48 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
 
       var count = merged.length;
       showToast('✓ Restored ' + count + ' track' + (count !== 1 ? 's' : '') + ' from Google Drive');
+
+      // Download audio blobs from Drive into IndexedDB for tracks flagged as _needsDriveFetch.
+      // This makes them available offline and ensures loadAll() finds them in the blobs store.
+      var fetchNeeded = merged.filter(function(t) { return t._needsDriveFetch && t.driveFileId && t.blobId; });
+      if (fetchNeeded.length) driveDownloadToIndexedDB(fetchNeeded);
     } catch(e) {
       console.error('[Drive] restore error:', e);
       showToast('Could not load library from Drive');
+    }
+  }
+
+  // ── Download Drive audio blobs into IndexedDB ─────────────────────────
+  // Called after a Drive restore for tracks that exist on Drive but have no local blob.
+  // Fetches each file from /api/drive/audio/:fileId, stores the blob in IndexedDB under
+  // the track's blobId, and updates the track's url to the local blob URL so playback
+  // doesn't require a network round-trip on the next load.
+  async function driveDownloadToIndexedDB(tracksToFetch) {
+    if (!tracksToFetch || !tracksToFetch.length) return;
+    showToast('Caching ' + tracksToFetch.length + ' track' + (tracksToFetch.length !== 1 ? 's' : '') + ' from Drive…');
+    var cached = 0;
+    for (var i = 0; i < tracksToFetch.length; i++) {
+      var t = tracksToFetch[i];
+      try {
+        var resp = await fetch('/api/drive/audio/' + t.driveFileId, { credentials: 'include' });
+        if (!resp.ok) { console.warn('[Drive] download failed for', t.title, resp.status); continue; }
+        var blob = await resp.blob();
+        // Store blob in IndexedDB under the track's blobId
+        await dbPut('blobs', { id: t.blobId, blob: blob }).catch(function(){});
+        // Swap in a local object URL so the track plays from cache immediately
+        var localUrl = URL.createObjectURL(blob);
+        // Update in-memory track reference
+        var allTracks = (typeof tracks !== 'undefined' && tracks.length) ? tracks : (window.tracks || []);
+        var live = allTracks.find(function(x) { return x.id === t.id; });
+        if (live) { live.url = localUrl; live._needsDriveFetch = false; }
+        cached++;
+      } catch(e) {
+        console.warn('[Drive] driveDownloadToIndexedDB error for', t.title, e);
+      }
+    }
+    if (cached > 0) {
+      showToast('✓ Cached ' + cached + ' track' + (cached !== 1 ? 's' : '') + ' offline');
+      if (typeof renderAll === 'function') renderAll();
     }
   }
 
