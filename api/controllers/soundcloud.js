@@ -246,6 +246,60 @@ exports.artistPage = async (req, res, next) => {
   }
 };
 
+// Resolve stub tracks (tracks with id but no title) by fetching their full data.
+// SoundCloud's API commonly returns playlist tracks as stubs: { id: 123456789 }
+// with no title/artist/duration. We batch-resolve them via the track endpoint.
+// If /track?id= isn't available on the SC service, stubs fall back to their ID as title.
+async function resolveStubTracks(rawTracks) {
+  if (!Array.isArray(rawTracks) || !rawTracks.length) return [];
+
+  // Separate full tracks (have title) from stubs (only have id)
+  const full  = [];
+  const stubs = [];
+  for (const t of rawTracks) {
+    if (t && typeof t === 'object') {
+      if (t.title || t.name) {
+        full.push(t);
+      } else if (t.id || t.videoId) {
+        stubs.push(t);
+      }
+    }
+  }
+
+  if (!stubs.length) return full;
+
+  // Try to fetch full track details for stubs (cap at 50 to avoid rate limits)
+  const resolved = new Map();
+  const batchSize = 10;
+  const toFetch = stubs.slice(0, 50);
+  for (let i = 0; i < toFetch.length; i += batchSize) {
+    const batch = toFetch.slice(i, i + batchSize);
+    const results = await Promise.allSettled(
+      batch.map(stub => scFetch(`/track?id=${encodeURIComponent(stub.id || stub.videoId)}`))
+    );
+    for (let j = 0; j < results.length; j++) {
+      const r = results[j];
+      const stub = batch[j];
+      if (r.status === 'fulfilled' && r.value) {
+        const d = r.value.data || r.value;
+        if (d && (d.title || d.name)) {
+          resolved.set(String(stub.id || stub.videoId), d);
+        }
+      }
+    }
+  }
+
+  // For stubs that couldn't be resolved, keep them with a fallback title so they're still streamable
+  const resolvedStubs = stubs.map(stub => {
+    const stubId = String(stub.id || stub.videoId);
+    return resolved.get(stubId) || { ...stub, title: `Track ${stubId}`, artist: '' };
+  });
+
+  return [...full, ...resolvedStubs];
+}
+
+
+
 // GET /api/soundcloud/playlist?id=PLAYLIST_ID_OR_URL
 exports.playlistPage = async (req, res, next) => {
   try {
@@ -272,7 +326,12 @@ exports.playlistPage = async (req, res, next) => {
       trackCount:  Number(d.track_count) || (Array.isArray(d.tracks) ? d.tracks.length : 0),
       description: String(d.description || ''),
     };
-    const songs  = parseAll(d.tracks || d.songs || [], parseSCTrack);
+
+    // Resolve stub tracks — SC often returns playlist tracks with only an id field
+    const rawTracks = d.tracks || d.songs || [];
+    const resolvedTracks = await resolveStubTracks(rawTracks);
+    const songs = parseAll(resolvedTracks, parseSCTrack);
+
     const result = { playlist: plInfo, songs, source: 'soundcloud' };
     cacheSet(cacheKey, result);
     res.json(result);
@@ -282,7 +341,6 @@ exports.playlistPage = async (req, res, next) => {
     next(Object.assign(err, { status: err.status || 502 }));
   }
 };
-
 // GET /api/soundcloud/stream?id=TRACK_ID
 // Returns the stream URL. Short TTL cache since signed URLs expire.
 exports.streamProxy = async (req, res, next) => {
