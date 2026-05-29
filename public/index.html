@@ -4132,6 +4132,25 @@ async function saveSettings() {
     eqEnabled, eqValues, currentPreset, recentlyPlayed,
     queueHistory: queue.history, queueFuture: queue.future, queueManual: queue.manual,
     playbackSpeed, appSettings,
+    studioState: (function() {
+      const sl = id => { const el = document.getElementById(id); return el ? parseFloat(el.value) : null; };
+      const compBtn = document.getElementById('studio-comp-btn');
+      const reverbBtn = document.getElementById('studio-reverb-btn');
+      return {
+        compOn:   compBtn   ? compBtn.classList.contains('on')   : true,
+        reverbOn: reverbBtn ? reverbBtn.classList.contains('on') : false,
+        gain:    sl('studio-gain-slider'),
+        pan:     sl('studio-pan-slider'),
+        compThresh:  sl('studio-comp-thresh'),
+        compRatio:   sl('studio-comp-ratio'),
+        compAttack:  sl('studio-comp-attack'),
+        compRelease: sl('studio-comp-release'),
+        compKnee:    sl('studio-comp-knee'),
+        reverbWet:   sl('studio-reverb-wet'),
+        reverbSize:  sl('studio-reverb-size'),
+        reverbDamp:  sl('studio-reverb-damp'),
+      };
+    })(),
   });
   // Also persist current time so we can restore position on refresh
   if (audioEl.currentTime > 0) {
@@ -4187,6 +4206,8 @@ async function loadAll() {
     playbackSpeed  = s.playbackSpeed||1.0;
     if (s.appSettings) Object.assign(appSettings, s.appSettings);
     document.getElementById('vol-slider').value = s.volume||80;
+    // Stash studio state for the studio IIFE to restore after it initialises
+    if (s.studioState) window._savedStudioState = s.studioState;
   }
 
   buildEQ();
@@ -6013,6 +6034,7 @@ function openSeeAll(key) {
       </div>`;
     }).join('');
     overlay.classList.add('open');
+    window.history.pushState({ voidOverlay: 'seeAll', voidSeeAllKey: key }, '', window.location.pathname + window.location.search);
     return;
   } else if (key.startsWith('artist:')) {
     const artist = decodeURIComponent(key.slice(7));
@@ -6056,6 +6078,7 @@ function openSeeAll(key) {
     </div>`;
   }).join('') || `<div class="empty-state"><p>Nothing here yet</p></div>`;
   overlay.classList.add('open');
+  window.history.pushState({ voidOverlay: 'seeAll', voidSeeAllKey: key }, '', window.location.pathname + window.location.search);
 }
 
 function playArtist(artist) {
@@ -6694,6 +6717,7 @@ function openPlaylist(id) {
   document.getElementById('pl-detail-delete-btn').style.display='';
   renderPlaylistDetail();
   document.getElementById('pl-detail').classList.add('open');
+  window.history.pushState({ voidOverlay: 'playlist', voidPlaylistId: id }, '', window.location.pathname + window.location.search);
 }
 
 function renderPlaylistDetail() {
@@ -7276,6 +7300,7 @@ async function openSaavnArtistPage(artistId) {
   actionsEl.style.display = 'none';
   if (bgEl) bgEl.style.backgroundImage = 'none';
   overlay.style.display = 'flex';
+  window.history.pushState({ voidOverlay: 'artist' }, '', window.location.pathname + window.location.search);
   try {
     const resp = await fetch(`${VOID_API_BASE}/youtube/artist?id=${encodeURIComponent(artistId)}`, { signal: AbortSignal.timeout(12000) });
     if (!resp.ok) throw new Error('Artist fetch failed');
@@ -7326,6 +7351,7 @@ async function openSCArtistPage(userId) {
   actionsEl.style.display = 'none';
   if (bgEl) bgEl.style.backgroundImage = 'none';
   overlay.style.display = 'flex';
+  window.history.pushState({ voidOverlay: 'artist' }, '', window.location.pathname + window.location.search);
   try {
     const resp = await fetch(`${VOID_API_BASE}/soundcloud/artist?id=${encodeURIComponent(userId)}`, { signal: AbortSignal.timeout(12000) });
     if (!resp.ok) throw new Error('Artist fetch failed');
@@ -7428,6 +7454,7 @@ async function openSaavnAlbumPage(albumId) {
   actionsEl.style.display = 'none';
   if (bgEl) bgEl.style.backgroundImage = 'none';
   overlay.style.display='flex';
+  window.history.pushState({ voidOverlay: 'album' }, '', window.location.pathname + window.location.search);
   try {
     const resp = await fetch(`${VOID_API_BASE}/youtube/album?id=${encodeURIComponent(albumId)}`, { signal: AbortSignal.timeout(12000) });
     if (!resp.ok) throw new Error('Album fetch failed');
@@ -9168,6 +9195,9 @@ function showPage(name) {
   if (name==='playlists') renderPlaylistsPage();
   if (name==='home')      { renderHomeRecent(); renderHomePlaylists(); updateHomeCard(); loadUnifiedFeed(); }
   if (name==='settings')  { buildSettingsPage(); setTimeout(()=>ytCheckApiStatus(), 50); }
+  // Push a history state so the browser back button can return to previous page
+  if (window.history.state && window.history.state.voidPage === name) return;
+  window.history.pushState({ voidPage: name }, '', window.location.pathname + window.location.search);
 }
 
 // ==============================
@@ -10152,6 +10182,37 @@ function toggleNPPanel() {
   }
   setInterval(syncStudioNP, 1500);
   syncStudioNP();
+
+  // ── Restore studio state saved from previous session ─────────────────────
+  (function restoreSavedStudioState() {
+    const st = window._savedStudioState;
+    if (!st) return;
+    // Helper: set slider value and fire input event so wire() callbacks apply
+    function setSlider(id, val) {
+      if (val === null || val === undefined) return;
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.value = val;
+      el.dispatchEvent(new Event('input'));
+    }
+    setSlider('studio-gain-slider',  st.gain);
+    setSlider('studio-pan-slider',   st.pan);
+    setSlider('studio-comp-thresh',  st.compThresh);
+    setSlider('studio-comp-ratio',   st.compRatio);
+    setSlider('studio-comp-attack',  st.compAttack);
+    setSlider('studio-comp-release', st.compRelease);
+    setSlider('studio-comp-knee',    st.compKnee);
+    setSlider('studio-reverb-wet',   st.reverbWet);
+    setSlider('studio-reverb-size',  st.reverbSize);
+    setSlider('studio-reverb-damp',  st.reverbDamp);
+    // Sync compressor toggle (default is ON; toggle off if saved state is off)
+    if (!st.compOn && enabled.compressor) window.studioToggleFx('compressor');
+    if (st.compOn  && !enabled.compressor) window.studioToggleFx('compressor');
+    // Sync reverb toggle (default is OFF; toggle on if saved state is on)
+    if (st.reverbOn  && !enabled.reverb) window.studioToggleFx('reverb');
+    if (!st.reverbOn && enabled.reverb)  window.studioToggleFx('reverb');
+    delete window._savedStudioState;
+  })();
 })();
 
 function syncTransportChips() {
@@ -10266,14 +10327,56 @@ function updateEQBandDesk(i, val) {
 
 loadAll();
 
-// Browser back/forward button — treat as prev/next track
+// Browser back/forward button — handle track navigation AND overlay/page navigation
 window.addEventListener('popstate', function(e) {
-  if (e.state && typeof e.state.voidTrackIdx === 'number') {
-    playTrack(e.state.voidTrackIdx, false);
-  } else {
-    // No state (e.g. navigated back past first track entry) — go to previous
-    prevTrack();
+  const st = e.state;
+
+  // 1. Close any open overlay in priority order (highest z-index first)
+  const artistOverlay = document.getElementById('artist-page-overlay');
+  const albumOverlay  = document.getElementById('album-page-overlay');
+  const seeAllOverlay = document.getElementById('see-all-overlay');
+  const plDetail      = document.getElementById('pl-detail');
+
+  if (artistOverlay && artistOverlay.style.display === 'flex') {
+    closeArtistPage(); return;
   }
+  if (albumOverlay && albumOverlay.style.display === 'flex') {
+    closeAlbumPage(); return;
+  }
+  if (seeAllOverlay && seeAllOverlay.classList.contains('open')) {
+    closeSeeAll(); return;
+  }
+  if (plDetail && plDetail.classList.contains('open')) {
+    closePlDetail(); return;
+  }
+
+  // 2. Handle track state pushed by playTrack()
+  if (st && typeof st.voidTrackIdx === 'number') {
+    playTrack(st.voidTrackIdx, false);
+    return;
+  }
+
+  // 3. Handle page navigation
+  if (st && st.voidPage) {
+    // Call internal version that doesn't push another state
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+    const pageEl = document.getElementById('page-' + st.voidPage);
+    if (pageEl) {
+      pageEl.classList.add('active');
+      const navBtn = document.getElementById('nav-' + st.voidPage);
+      if (navBtn) navBtn.classList.add('active');
+      if (st.voidPage==='library')   renderTrackList(document.getElementById('search-input').value);
+      if (st.voidPage==='queue')     renderQueueList();
+      if (st.voidPage==='playlists') renderPlaylistsPage();
+      if (st.voidPage==='home')      { renderHomeRecent(); renderHomePlaylists(); updateHomeCard(); loadUnifiedFeed(); }
+      if (st.voidPage==='settings')  { buildSettingsPage(); setTimeout(()=>ytCheckApiStatus(), 50); }
+    }
+    return;
+  }
+
+  // 4. No state — navigated back past first entry, go to previous track
+  prevTrack();
 });
 
 // ============================================================
