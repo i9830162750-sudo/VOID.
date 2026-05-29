@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -422,10 +423,10 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
 .search-mode-btn.active { background:var(--bg4); color:var(--text); }
 .search-mode-btn.active.yt-mode { background:rgba(255,68,68,0.15); color:var(--yt); border:1px solid rgba(255,68,68,0.25); }
 /* YT section in library */
-.lib-yt-section { padding:0 20px; }
+.void-search-results { padding:0 20px; }
 .lib-yt-filters { display:flex; gap:6px; padding:0 20px 12px; overflow-x:auto; scrollbar-width:none; flex-shrink:0; }
 .lib-yt-filters::-webkit-scrollbar { display:none; }
-.lib-yt-results { } 
+.void-results-list { } 
 .upload-btn { margin:0 20px 18px; width:calc(100% - 40px); background:var(--bg2); border:2px dashed var(--border2); border-radius:var(--radius); padding:14px; display:flex; align-items:center; justify-content:center; gap:10px; cursor:pointer; color:var(--text2); font-size:14px; font-weight:500; transition:border-color 0.2s,color 0.2s,background 0.2s; }
 .upload-btn:active { border-color:var(--accent); color:var(--accent); background:var(--accent-dim); }
 .upload-btn svg { width:19px; height:19px; }
@@ -3044,6 +3045,49 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
 .mini-cover { will-change: transform; }
 .page { contain: layout style; }
 
+
+/* ── Unified Online Feed Track Cards ─────────────────────────────────────── */
+.feed-track-card {
+  flex-shrink: 0;
+  width: 130px;
+  cursor: pointer;
+  border-radius: 10px;
+  padding: 6px;
+  transition: background 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.feed-track-card:active { background: var(--bg3); }
+.feed-track-art {
+  width: 118px;
+  height: 118px;
+  border-radius: 8px;
+  background: var(--bg3);
+  overflow: hidden;
+  margin-bottom: 7px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.feed-track-art img { width: 100%; height: 100%; object-fit: cover; }
+.feed-track-art svg { width: 28px; height: 28px; color: var(--text3); }
+.feed-track-label {
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text);
+  max-width: 118px;
+}
+.feed-track-sub {
+  font-size: 11px;
+  color: var(--text3);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 118px;
+  margin-top: 2px;
+}
 </style>
 </head>
 <body>
@@ -3162,7 +3206,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
         <div class="topbar-search-wrap" id="topbar-search-wrap-home">
           <div class="desktop-topbar-search">
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" placeholder="Search your library…" id="desktop-search-home"
+            <input type="text" placeholder="Search everything…" id="desktop-search-home"
               oninput="topbarSearchInput(this.value,'home')"
               onkeydown="topbarSearchKeydown(event,'home')"
               onfocus="topbarSearchFocus('home')"
@@ -3190,9 +3234,9 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
           <span>Library</span>
         </div>
-        <div class="quick-btn" onclick="showPage('library');setLibSearchMode('yt')">
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:var(--yt)"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16" fill="var(--yt)" stroke="none"/></svg>
-          <span>YouTube</span>
+        <div class="quick-btn" onclick="showPage('library');document.getElementById('search-input').focus()">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <span>Search</span>
         </div>
         <div class="quick-btn" onclick="showFavorites()">
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
@@ -3233,7 +3277,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
             <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:16px;height:16px;color:var(--yt)"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16" fill="var(--yt)" stroke="none"/></svg>
             YouTube Tracks
           </div>
-          <button class="home-see-all" onclick="openSeeAll('youtube')">See all</button>
+          <button class="home-see-all" onclick="showPage('library')">See all</button>
         </div>
         <div class="home-feed-row" id="home-yt-list"></div>
       </div>
@@ -3302,91 +3346,19 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
       <!-- Genre sections (dynamically inserted here) -->
       <div id="home-genre-sections"></div>
 
-      <!-- ── ONLINE FEED SECTIONS ── -->
 
-      <!-- Trending Now (JioSaavn) -->
-      <div class="home-section" id="home-trending-section" style="display:none">
+      <!-- ── UNIFIED ONLINE FEED ── -->
+      <div class="home-section" id="home-online-section" style="display:none">
         <div class="home-section-hdr">
           <div class="home-section-title" style="display:flex;align-items:center;gap:8px">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:15px;height:15px;color:var(--accent)"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
-            Trending Now
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:15px;height:15px;color:var(--accent)"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16" fill="var(--accent)" stroke="none"/></svg>
+            Discover
           </div>
-          <div id="home-trending-loader" style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace">loading…</div>
+          <div id="home-online-loader" style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace"></div>
         </div>
-        <div class="home-feed-row" id="home-trending-list"></div>
+        <div id="home-online-feed"></div>
       </div>
 
-      <!-- New Releases (JioSaavn) -->
-      <div class="home-section" id="home-newrel-section" style="display:none">
-        <div class="home-section-hdr">
-          <div class="home-section-title" style="display:flex;align-items:center;gap:8px">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:15px;height:15px;color:var(--accent)"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
-            New Releases
-          </div>
-          <div id="home-newrel-loader" style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace">loading…</div>
-        </div>
-        <div class="home-feed-row" id="home-newrel-list"></div>
-      </div>
-
-      <!-- Popular on SoundCloud -->
-      <div class="home-section" id="home-sc-section" style="display:none">
-        <div class="home-section-hdr">
-          <div class="home-section-title" style="display:flex;align-items:center;gap:8px">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:15px;height:15px;color:#f50"><path d="M11.56 8.87V17h8.76c.89 0 1.68-.6 1.68-1.49 0-.77-.55-1.41-1.29-1.56a2.87 2.87 0 00-2.46-4.33 2.8 2.8 0 00-.86.14 3.5 3.5 0 00-3.44-2.9c-.86 0-1.64.3-2.39.01z"/><path d="M3 17h1.5V9.5S3 9.96 3 11.5V17z"/><path d="M5.5 17H7V9s-1.5.45-1.5 2V17z"/><path d="M8 17h1.5V8.5S8 9 8 10.5V17z"/></svg>
-            Popular on SoundCloud
-          </div>
-          <div id="home-sc-loader" style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace">loading…</div>
-        </div>
-        <div class="home-feed-row" id="home-sc-list"></div>
-      </div>
-
-      <!-- Chill Vibes (JioSaavn) -->
-      <div class="home-section" id="home-chill-section" style="display:none">
-        <div class="home-section-hdr">
-          <div class="home-section-title" style="display:flex;align-items:center;gap:8px">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:15px;height:15px;color:var(--accent)"><path d="M17 8C8 10 5.9 16.17 3.82 22"/><path d="M9.5 9.5c1-2.3 4-3.7 7.5-3.5"/><path d="M12 12c-2 3-2 6 0 10"/></svg>
-            Chill Vibes
-          </div>
-          <div id="home-chill-loader" style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace">loading…</div>
-        </div>
-        <div class="home-feed-row" id="home-chill-list"></div>
-      </div>
-
-      <!-- Workout & Energy (JioSaavn) -->
-      <div class="home-section" id="home-workout-section" style="display:none">
-        <div class="home-section-hdr">
-          <div class="home-section-title" style="display:flex;align-items:center;gap:8px">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:15px;height:15px;color:#ff6b35"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-            Workout &amp; Energy
-          </div>
-          <div id="home-workout-loader" style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace">loading…</div>
-        </div>
-        <div class="home-feed-row" id="home-workout-list"></div>
-      </div>
-
-      <!-- Late Night (SoundCloud) -->
-      <div class="home-section" id="home-night-section" style="display:none">
-        <div class="home-section-hdr">
-          <div class="home-section-title" style="display:flex;align-items:center;gap:8px">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:15px;height:15px;color:#8b5cf6"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
-            Late Night
-          </div>
-          <div id="home-night-loader" style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace">loading…</div>
-        </div>
-        <div class="home-feed-row" id="home-night-list"></div>
-      </div>
-
-      <!-- Desi Hits (JioSaavn) -->
-      <div class="home-section" id="home-desi-section" style="display:none">
-        <div class="home-section-hdr">
-          <div class="home-section-title" style="display:flex;align-items:center;gap:8px">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:15px;height:15px;color:#f59e0b"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-            Desi Hits
-          </div>
-          <div id="home-desi-loader" style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace">loading…</div>
-        </div>
-        <div class="home-feed-row" id="home-desi-list"></div>
-      </div>
 
       <!-- Favorites section -->
       <div class="home-section" id="home-favs-section" style="display:none">
@@ -3406,67 +3378,21 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
     <div class="page" id="page-library">
       <div class="topbar">
         <h1>Library</h1>
-        <div class="topbar-search-wrap" id="topbar-search-wrap-lib">
-          <div class="desktop-topbar-search">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <input type="text" placeholder="Search tracks…" id="desktop-search-lib"
-              oninput="topbarSearchInput(this.value,'lib')"
-              onkeydown="topbarSearchKeydown(event,'lib')"
-              onfocus="topbarSearchFocus('lib')"
-              autocomplete="off">
-          </div>
-          <div class="search-dropdown" id="search-dropdown-lib"></div>
-        </div>
         <div id="home-count-lib" style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace"></div>
       </div>
-      <div class="search-bar">
+      <!-- UNIFIED SEARCH BAR -->
+      <div class="search-bar" style="position:relative">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" id="search-input" placeholder="Search tracks…" oninput="libHandleInput(this.value)" onkeydown="if(event.key==='Enter'){if(libSearchMode==='yt')ytDoSearch(this.value,true);else if(libSearchMode==='sc')scDoSearch(this.value,true);}">
-        <button class="yt-clear-btn" id="lib-yt-clear-btn" onclick="libClearSearch()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);cursor:pointer;padding:4px;display:none">
+        <input type="text" id="search-input" placeholder="Search everything…" oninput="voidHandleInput(this.value)" onkeydown="if(event.key==='Enter')voidSearch(this.value,true)">
+        <button id="void-search-clear" onclick="voidClearSearch()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);cursor:pointer;padding:4px;display:none">
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:16px;height:16px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
-      <div class="search-mode-toggle">
-        <button class="search-mode-btn active" id="lib-mode-local" onclick="setLibSearchMode('local')">
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-          Library
-        </button>
-        <button class="search-mode-btn yt-mode" id="lib-mode-yt" onclick="setLibSearchMode('yt')">
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16" fill="var(--yt)" stroke="none"/></svg>
-          YouTube
-        </button>
-        <button class="search-mode-btn sc-mode" id="lib-mode-sc" onclick="setLibSearchMode('sc')">
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M2 16.5C2 16.5 2 18 3.5 18s1.5-1.5 1.5-1.5V10s0-6 5-6 5 6 5 6v1s0 1.5 1.5 1.5S18 10 18 10" stroke="#ff5500" stroke-width="2"/><circle cx="3.5" cy="16.5" r="1.5" fill="#ff5500"/></svg>
-          SoundCloud
-        </button>
+      <!-- UNIFIED SEARCH RESULTS (shown when query active) -->
+      <div id="void-search-results" style="display:none">
+        <div class="yt-results" id="void-results-list"></div>
       </div>
-      <!-- YT filter row: shown in YT mode, sits right under the toggle -->
-      <div id="lib-yt-filters-row" style="display:none">
-        <div class="lib-yt-filters">
-          <button class="yt-filter-btn active" data-filter="all" onclick="ytSetFilter('all')">All</button>
-          <button class="yt-filter-btn" data-filter="song" onclick="ytSetFilter('song')">Songs</button>
-          <button class="yt-filter-btn" data-filter="artist" onclick="ytSetFilter('artist')">Artists</button>
-          <button class="yt-filter-btn" data-filter="album" onclick="ytSetFilter('album')">Albums</button>
-        </div>
-      </div>
-      <!-- SC filter row: shown in SC mode -->
-      <div id="lib-sc-filters-row" style="display:none">
-        <div class="lib-yt-filters">
-          <button class="sc-filter-btn active" data-scfilter="all" onclick="scSetFilter('all')" style="border-color:rgba(255,85,0,0.3);color:#ff5500;background:rgba(255,85,0,0.12)">All</button>
-          <button class="sc-filter-btn" data-scfilter="song" onclick="scSetFilter('song')">Tracks</button>
-          <button class="sc-filter-btn" data-scfilter="artist" onclick="scSetFilter('artist')">Artists</button>
-          <button class="sc-filter-btn" data-scfilter="playlist" onclick="scSetFilter('playlist')">Playlists</button>
-        </div>
-      </div>
-      <!-- YT results section -->
-      <div id="lib-yt-section" style="display:none">
-        <div class="yt-results" id="lib-yt-results"></div>
-      </div>
-      <!-- SOUNDCLOUD results section -->
-      <div id="lib-sc-section" style="display:none">
-        <div class="yt-results" id="lib-sc-results"></div>
-      </div>
-      <!-- Local library section (shown in local mode) -->
+      <!-- Local library section (shown when no search active) -->
       <div id="lib-local-section">
       <div class="ytscan-scan-btn-wrap" id="ytscan-btn-wrap" style="display:none">
         <button class="ytscan-scan-btn" onclick="openYTScan()">
@@ -3488,35 +3414,6 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
       </div>
     </div>
 
-    <!-- YOUTUBE PAGE -->
-    <div class="page" id="page-youtube">
-      <div class="topbar">
-        <h1>You<span>Tube</span></h1>
-        <div class="yt-topbar-right">
-          <div class="yt-status-dot" id="yt-status-dot" title="API Status"></div>
-        </div>
-      </div>
-
-      <!-- JIOSAAVN — no API key needed -->
-       
-      <!-- SEARCH FILTERS -->
-      <div class="yt-filter-row">
-        <button class="yt-filter-btn active" data-filter="all" onclick="ytSetFilter('all')">All</button>
-        <button class="yt-filter-btn" data-filter="song" onclick="ytSetFilter('song')">Songs</button>
-        <button class="yt-filter-btn" data-filter="artist" onclick="ytSetFilter('artist')">Artists</button>
-        <button class="yt-filter-btn" data-filter="album" onclick="ytSetFilter('album')">Albums</button>
-      </div>
-
-      <div class="yt-search-bar">
-        <svg class="yt-search-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-        <input type="text" id="yt-search-input" placeholder="Search songs, artists, albums…" oninput="ytHandleInput(this.value)" onkeydown="if(event.key==='Enter'){ytDoSearch(this.value,true)}">
-        <button class="yt-clear-btn" id="yt-clear-btn" onclick="ytClearSearch()">
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      </div>
-      <div class="yt-results" id="yt-results"></div>
-    </div>
-
     <!-- PLAYLISTS PAGE -->
     <div class="page" id="page-playlists">
       <div class="topbar">
@@ -3524,7 +3421,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
         <div class="desktop-topbar-search">
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input type="text" placeholder="Search library…" id="desktop-search-pl"
-            oninput="(function(v){var si=document.getElementById('search-input');if(si){si.value=v;libHandleInput(v);}if(v.trim())showPage('library');})(this.value)">
+            oninput="(function(v){var si=document.getElementById('search-input');if(si){si.value=v;if(typeof voidHandleInput==='function')voidHandleInput(v);}if(v.trim())showPage('library');})(this.value)">
         </div>
       </div>
       <button class="new-pl-btn" onclick="createPlaylist()">
@@ -3545,7 +3442,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
         <div class="desktop-topbar-search">
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input type="text" placeholder="Search library…" id="desktop-search-queue"
-            oninput="(function(v){var si=document.getElementById('search-input');if(si){si.value=v;libHandleInput(v);}if(v.trim())showPage('library');})(this.value)">
+            oninput="(function(v){var si=document.getElementById('search-input');if(si){si.value=v;if(typeof voidHandleInput==='function')voidHandleInput(v);}if(v.trim())showPage('library');})(this.value)">
         </div>
       </div>
       <div class="queue-hdr">
@@ -3565,7 +3462,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
         <div class="desktop-topbar-search">
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input type="text" placeholder="Search library…" id="desktop-search-settings"
-            oninput="(function(v){var si=document.getElementById('search-input');if(si){si.value=v;libHandleInput(v);}if(v.trim())showPage('library');})(this.value)">
+            oninput="(function(v){var si=document.getElementById('search-input');if(si){si.value=v;if(typeof voidHandleInput==='function')voidHandleInput(v);}if(v.trim())showPage('library');})(this.value)">
         </div>
         <div style="font-size:9px;color:var(--accent);font-family:'Space Mono',monospace">V6</div>
       </div>
@@ -4048,6 +3945,101 @@ let recentlyPlayed = [];
 let audioCtx = null, sourceNode = null, gainNode = null, eqNodes = [];
 let db = null;
 let ctxTrackIndex  = -1;
+
+// ==============================
+// CONTEXT MENU
+// ==============================
+function openCtxMenu(ri) {
+  ctxTrackIndex=ri;
+  const t=tracks[ri]; if (!t) return;
+  document.getElementById('ctx-title').textContent=t.title;
+  document.getElementById('ctx-artist').textContent=t.artist;
+  const coverEl=document.getElementById('ctx-cover');
+  const thumb=(t.ytMeta&&t.ytMeta.thumbnail)?t.ytMeta.thumbnail:t.cover;
+  coverEl.innerHTML=thumb?`<img src="${thumb}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:8px">`:`<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:20px;height:20px;color:var(--text3)"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
+  const isFav=favorites.has(t.id);
+  document.getElementById('ctx-fav-item').querySelector('svg').setAttribute('fill',isFav?'var(--accent)':'none');
+  document.getElementById('ctx-fav-label').textContent=isFav?'Remove from Favorites':'Add to Favorites';
+  document.getElementById('ctx-items-standard').style.display='block';
+  document.getElementById('ctx-pl-picker').style.display='none';
+  document.getElementById('ctx-pl-picker').innerHTML='';
+  const dlItem=document.getElementById('ctx-download-item');
+  if (dlItem) {
+    const hasYT=!!(t.ytMeta&&t.ytMeta.videoId);
+    dlItem.style.display=hasYT?'flex':'none';
+    const dlLabel=document.getElementById('ctx-download-label');
+    if (dlLabel) dlLabel.textContent=(t.url&&!t.isOnline)?'Downloaded ✓':'Download & Cache';
+  }
+  document.getElementById('ctx-overlay').classList.add('open');
+}
+
+function closeCtxMenu() {
+  document.getElementById('ctx-overlay').classList.remove('open');
+  document.getElementById('ctx-items-standard').style.display='block';
+  document.getElementById('ctx-pl-picker').style.display='none';
+  document.getElementById('ctx-pl-picker').innerHTML='';
+}
+
+function ctxPlayNow()  { closeCtxMenu(); playTrack(ctxTrackIndex); }
+function ctxToggleFav(){ closeCtxMenu(); const t=tracks[ctxTrackIndex]; if(t) toggleTrackFav(t.id); }
+function ctxPlayNext() { closeCtxMenu(); playNextManual(ctxTrackIndex); showToast('Will play next'); }
+function ctxAddToQueue(){ closeCtxMenu(); addToManualQueue(ctxTrackIndex); showToast('Added to queue'); }
+function ctxAddToPlaylist() { closeCtxMenu(); const t=tracks[ctxTrackIndex]; if (!t) return; openPlaylistPicker(t.id); }
+function ctxSearchYT() {
+  closeCtxMenu();
+  const t=tracks[ctxTrackIndex]; if (!t) return;
+  const q=`${t.artist} ${t.title}`.trim();
+  if (typeof voidQuickSearch === 'function') voidQuickSearch(q);
+}
+async function ctxDownload() {
+  const t=tracks[ctxTrackIndex]; if (!t) return;
+  if (!t.ytMeta||!t.ytMeta.videoId) { closeCtxMenu(); showToast('No source — search first'); return; }
+  closeCtxMenu();
+  await ytDownloadAndCache(ctxTrackIndex);
+}
+function ctxRemove() {
+  closeCtxMenu();
+  const t=tracks[ctxTrackIndex]; if (!t) return;
+  removeTrackFromDB(t).catch(()=>{});
+  favorites.delete(t.id);
+  recentlyPlayed=recentlyPlayed.filter(id=>id!==t.id);
+  playlists.forEach(pl=>{ pl.trackIds=(pl.trackIds||[]).filter(id=>id!==t.id); });
+  tracks.splice(ctxTrackIndex,1);
+  if (currentIndex>=tracks.length) currentIndex=tracks.length-1;
+  queue.history=queue.history.filter(i=>i!==ctxTrackIndex).map(i=>i>ctxTrackIndex?i-1:i);
+  queue.future=queue.future.filter(i=>i!==ctxTrackIndex).map(i=>i>ctxTrackIndex?i-1:i);
+  queue.manual=queue.manual.filter(i=>i!==ctxTrackIndex).map(i=>i>ctxTrackIndex?i-1:i);
+  if (isSmartShuffle) buildSmartShuffleQueue(); else if (isShuffle) buildShuffleQueue();
+  savePlaylists(); saveSettings(); renderAll(); updateUI(); showToast('Track removed');
+}
+function openPlaylistPicker(trackId) {
+  if (!playlists.length) { showToast('Create a playlist first'); showPage('playlists'); return; }
+  const picker=document.getElementById('ctx-pl-picker');
+  document.getElementById('ctx-items-standard').style.display='none';
+  picker.style.display='block';
+  let html=`<div class="pl-picker-section"><div class="pl-picker-label">Add to Playlist</div><div class="pl-picker-item new-pl" onclick="quickCreateAndAdd('${trackId}')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>New Playlist</div>`;
+  html+=playlists.map(pl=>{
+    const inPl=(pl.trackIds||[]).includes(trackId);
+    return `<div class="pl-picker-item" onclick="addTrackToPl('${trackId}','${pl.id}')"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:${inPl?'var(--accent)':'var(--text2)'}"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg><span style="flex:1">${esc(pl.name)}</span>${inPl?'<span style="color:var(--accent);font-size:12px">✓</span>':''}</div>`;
+  }).join('');
+  html+=`</div>`;
+  picker.innerHTML=html;
+  document.getElementById('ctx-overlay').classList.add('open');
+}
+function quickCreateAndAdd(trackId) {
+  closeCtxMenu();
+  openModal('New Playlist','Playlist name…','',(name)=>{
+    if (!name.trim()) return;
+    const pl={id:'pl_'+Date.now(),name:name.trim(),trackIds:[trackId]};
+    playlists.push(pl); savePlaylists(); renderPlaylistsPage(); showToast('Added to '+pl.name);
+  });
+}
+function addTrackToPl(trackId, plId) {
+  closeCtxMenu();
+  const pl=playlists.find(p=>p.id===plId); if (!pl) return;
+  if (!(pl.trackIds||[]).includes(trackId)) { pl.trackIds=[...(pl.trackIds||[]),trackId]; savePlaylists(); showToast('Added to '+pl.name); }
+  else showToast('Already in '+pl.name);
+}
 let modalCallback  = null;
 let detailPlaylistId = null;
 let prevPressTime  = 0;
@@ -5193,41 +5185,39 @@ function renderHomeRecs() {
 }
 
 // ==============================
-// ONLINE HOME FEED
+// UNIFIED ONLINE FEED
 // ==============================
-let _onlineFeedLoaded = false;
-let _onlineFeedLoading = false;
+let _unifiedFeedLoaded = false;
+let _unifiedFeedLoading = false;
 
-// Queries for each section — rotate based on day so it feels fresh
-const TRENDING_QUERIES   = ['trending hindi 2025','top hits 2025','trending songs','viral hits 2025','bollywood hits 2025'];
-const NEWREL_QUERIES     = ['new releases 2025','latest songs 2025','new music 2025','fresh tracks 2025','new bollywood 2025'];
-const SC_QUERIES         = ['soundcloud trending','underground music 2025','indie electronic 2025','lo-fi chill 2025','phonk 2025'];
-const CHILL_QUERIES      = ['chill hits 2025','lo-fi beats','chill indian songs','chill english songs','peaceful music 2025'];
-const WORKOUT_QUERIES    = ['workout music 2025','gym hits','high energy songs 2025','motivation music','power songs 2025'];
-const NIGHT_QUERIES      = ['late night music','midnight vibes soundcloud','dark ambient 2025','night drive music','2am playlist'];
-const DESI_QUERIES       = ['punjabi hits 2025','hindi rap 2025','desi pop 2025','ap dhillon new songs','arijit singh 2025'];
+// Feed buckets: each is { label, query, source, icon }
+const VOID_FEED_BUCKETS = [
+  { label: 'Trending',      query: () => _dailyPick(['trending hindi 2025','top hits 2025','trending songs','viral hits 2025','bollywood hits 2025']),       source: 'saavn',      icon: '📈' },
+  { label: 'New Releases',  query: () => _dailyPick(['new releases 2025','latest songs 2025','new music 2025','fresh tracks 2025']),                          source: 'saavn',      icon: '✦'  },
+  { label: 'Chill Vibes',   query: () => _dailyPick(['chill hits 2025','lo-fi beats','chill songs 2025','peaceful music 2025']),                              source: 'saavn',      icon: '🌙' },
+  { label: 'Desi Hits',     query: () => _dailyPick(['punjabi hits 2025','hindi rap 2025','desi pop 2025','arijit singh 2025']),                              source: 'saavn',      icon: '⭐' },
+  { label: 'Workout',       query: () => _dailyPick(['workout music 2025','gym hits','high energy songs 2025','motivation music']),                           source: 'saavn',      icon: '⚡' },
+  { label: 'Underground',   query: () => _dailyPick(['soundcloud trending','underground music 2025','indie electronic 2025','phonk 2025']),                   source: 'soundcloud', icon: '●' },
+  { label: 'Late Night',    query: () => _dailyPick(['late night music soundcloud','midnight vibes','dark ambient 2025','night drive']),                      source: 'soundcloud', icon: '🌑' },
+];
 
-function _dailyQuery(arr) {
-  const d = new Date(); const idx = (d.getFullYear()*10000 + (d.getMonth()+1)*100 + d.getDate()) % arr.length;
+function _dailyPick(arr) {
+  const d = new Date();
+  const idx = (d.getFullYear()*10000 + (d.getMonth()+1)*100 + d.getDate()) % arr.length;
   return arr[idx];
 }
+
+if (!window._onlineCardMap) window._onlineCardMap = {};
 
 function makeOnlineCard(song, source) {
   const thumb = song.thumbnail || '';
   const title = song.title || 'Unknown';
   const artist = song.artist || '';
-  const isJioSaavn = source === 'jiosaavn';
-  const badge = isJioSaavn ? '' : '<div class="feed-yt-badge" style="background:rgba(255,80,0,0.85)">SC</div>';
-  // Use data attributes to safely store song JSON — avoids HTML/JS injection from special chars in titles
-  const safeJson = song._cardId ? '' : '';
   const cardId = 'oc_' + (song.id || song.videoId || Math.random().toString(36).slice(2));
-  // Register song in a global map so onclick can look it up by ID safely
-  if (!window._onlineCardMap) window._onlineCardMap = {};
   window._onlineCardMap[cardId] = { song, source };
   return `<div class="feed-track-card" onclick="playOnlineCardById('${cardId}')">
     <div class="feed-track-art">
       ${thumb ? `<img src="${thumb}" alt="" loading="lazy">` : `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`}
-      ${badge}
     </div>
     <div class="feed-track-label">${esc(title)}</div>
     <div class="feed-track-sub">${esc(artist)}</div>
@@ -5235,82 +5225,88 @@ function makeOnlineCard(song, source) {
 }
 
 function playOnlineCardById(cardId) {
-  if (!window._onlineCardMap || !window._onlineCardMap[cardId]) {
-    showToast('Could not find track');
-    return;
-  }
-  const { song, source } = window._onlineCardMap[cardId];
-  playOnlineTrack(song, source);
+  const entry = window._onlineCardMap && window._onlineCardMap[cardId];
+  if (!entry) { showToast('Could not find track'); return; }
+  playOnlineTrack(entry.song, entry.source);
 }
 
-async function loadOnlineHomeFeed(force) {
-  if (_onlineFeedLoading) return;
-  if (_onlineFeedLoaded && !force) return;
-  _onlineFeedLoading = true;
+async function loadUnifiedFeed(force) {
+  if (_unifiedFeedLoading) return;
+  if (_unifiedFeedLoaded && !force) return;
+  _unifiedFeedLoading = true;
 
-  // Show all online sections in loading state
-  ['home-trending-section','home-newrel-section','home-sc-section',
-   'home-chill-section','home-workout-section','home-night-section','home-desi-section'].forEach(id => {
-    const el = document.getElementById(id); if (el) el.style.display = 'block';
-  });
+  const section = document.getElementById('home-online-section');
+  const feedEl  = document.getElementById('home-online-feed');
+  const loader  = document.getElementById('home-online-loader');
+  if (!feedEl) { _unifiedFeedLoading = false; return; }
 
-  async function fetchSection(sectionId, listId, loaderId, apiPath) {
-    const loader = document.getElementById(loaderId);
-    const list   = document.getElementById(listId);
-    const section = document.getElementById(sectionId);
-    if (!list || !section) return;
+  if (section) section.style.display = 'block';
+  if (loader)  loader.textContent = 'loading…';
+
+  async function fetchBucket(bucket) {
+    const q = encodeURIComponent(bucket.query());
+    const path = bucket.source === 'soundcloud'
+      ? `/soundcloud/search?q=${q}&limit=12`
+      : `/youtube/search?q=${q}&max=12`;
     try {
-      const resp = await fetch(`${VOID_API_BASE}${apiPath}`, { signal: AbortSignal.timeout(12000) });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+      const resp = await fetch(`${VOID_API_BASE}${path}`, { signal: AbortSignal.timeout(10000) });
+      if (!resp.ok) return null;
       const data = await resp.json();
-      const items = data.items || [];
-      if (!items.length) { section.style.display = 'none'; return; }
-      if (loader) loader.style.display = 'none';
-      const src = data.source || 'jiosaavn';
-      list.innerHTML = items.slice(0, 12).map(s => makeOnlineCard(s, src)).join('');
-      section.style.display = 'block';
-    } catch(e) {
-      console.warn(`[OnlineFeed] ${sectionId}:`, e.message);
-      section.style.display = 'none';
-    }
+      const items = (data.items || []).slice(0, 12);
+      if (!items.length) return null;
+      return { bucket, items, source: data.source || bucket.source };
+    } catch(e) { return null; }
   }
 
-  const tq  = encodeURIComponent(_dailyQuery(TRENDING_QUERIES));
-  const nq  = encodeURIComponent(_dailyQuery(NEWREL_QUERIES));
-  const scq = encodeURIComponent(_dailyQuery(SC_QUERIES));
-  const cq  = encodeURIComponent(_dailyQuery(CHILL_QUERIES));
-  const wq  = encodeURIComponent(_dailyQuery(WORKOUT_QUERIES));
-  const ngq = encodeURIComponent(_dailyQuery(NIGHT_QUERIES));
-  const dq  = encodeURIComponent(_dailyQuery(DESI_QUERIES));
-
-  // Load the first 3 sections immediately (above the fold)
-  await Promise.allSettled([
-    fetchSection('home-trending-section', 'home-trending-list', 'home-trending-loader', `/youtube/search?q=${tq}&max=12`),
-    fetchSection('home-newrel-section',   'home-newrel-list',   'home-newrel-loader',   `/youtube/search?q=${nq}&max=12`),
-    fetchSection('home-sc-section',       'home-sc-list',       'home-sc-loader',       `/soundcloud/search?q=${scq}&max=12`),
+  // Fetch first 2 buckets eagerly (above fold), rest lazily
+  const [r0, r1] = await Promise.allSettled([
+    fetchBucket(VOID_FEED_BUCKETS[0]),
+    fetchBucket(VOID_FEED_BUCKETS[1]),
   ]);
 
-  // Load remaining sections in background (below the fold)
-  Promise.allSettled([
-    fetchSection('home-chill-section',   'home-chill-list',   'home-chill-loader',   `/youtube/search?q=${cq}&max=12`),
-    fetchSection('home-workout-section', 'home-workout-list', 'home-workout-loader', `/youtube/search?q=${wq}&max=12`),
-    fetchSection('home-night-section',   'home-night-list',   'home-night-loader',   `/soundcloud/search?q=${ngq}&max=12`),
-    fetchSection('home-desi-section',    'home-desi-list',    'home-desi-loader',    `/youtube/search?q=${dq}&max=12`),
-  ]);
+  let html = '';
+  function renderBucketResult(result) {
+    if (!result || result.status !== 'fulfilled' || !result.value) return '';
+    const { bucket, items, source } = result.value;
+    const src = source === 'soundcloud' ? 'soundcloud' : 'jiosaavn';
+    return `<div class="home-section" style="margin-bottom:4px">
+      <div class="home-section-hdr">
+        <div class="home-section-title">${bucket.icon} ${bucket.label}</div>
+      </div>
+      <div class="home-feed-row">${items.map(s => makeOnlineCard(s, src)).join('')}</div>
+    </div>`;
+  }
 
-  _onlineFeedLoaded = true;
-  _onlineFeedLoading = false;
+  html += renderBucketResult(r0);
+  html += renderBucketResult(r1);
+  feedEl.innerHTML = html || '';
+  if (loader) loader.textContent = '';
+
+  // Load remaining buckets in background and append
+  for (const bucket of VOID_FEED_BUCKETS.slice(2)) {
+    fetchBucket(bucket).then(result => {
+      if (!result) return;
+      const src = result.source === 'soundcloud' ? 'soundcloud' : 'jiosaavn';
+      const div = document.createElement('div');
+      div.className = 'home-section';
+      div.style.marginBottom = '4px';
+      div.innerHTML = `<div class="home-section-hdr"><div class="home-section-title">${result.bucket.icon} ${result.bucket.label}</div></div>
+        <div class="home-feed-row">${result.items.map(s => makeOnlineCard(s, src)).join('')}</div>`;
+      feedEl.appendChild(div);
+    });
+  }
+
+  _unifiedFeedLoaded = true;
+  _unifiedFeedLoading = false;
 }
 
-// Play a card from the online home feed — adds as temporary online track and plays
+// Play a card from the online feed
 function playOnlineTrack(song, source) {
   try {
-    if (typeof song === 'string') song = JSON.parse(song); // backward compat
+    if (typeof song === 'string') song = JSON.parse(song);
     const id = 'online_' + (song.id || song.videoId || Date.now());
-    // Check if already in library
     const existing = tracks.find(t => t.id === id || (t.ytMeta && t.ytMeta.videoId === String(song.id || song.videoId)));
-    if (existing) { const ri = tracks.indexOf(existing); playTrack(ri); return; }
-
+    if (existing) { playTrack(tracks.indexOf(existing)); return; }
     const isJioSaavn = source === 'jiosaavn';
     const newTrack = {
       id, blobId: null, url: null,
@@ -5318,19 +5314,9 @@ function playOnlineTrack(song, source) {
       artist: song.artist || '',
       duration: song.duration || 0,
       cover: song.thumbnail || null,
-      isFav: false,
-      isOnline: true,
-      ytMeta: isJioSaavn ? {
-        videoId: String(song.id || song.videoId),
-        title: song.title,
-        thumbnail: song.thumbnail || '',
-      } : null,
-      scMeta: !isJioSaavn ? {
-        trackId: String(song.id || song.videoId),
-        title: song.title,
-        artwork_url: song.thumbnail || '',
-        stream_url: song.audioUrl || '',
-      } : null,
+      isFav: false, isOnline: true,
+      ytMeta: isJioSaavn ? { videoId: String(song.id || song.videoId), title: song.title, thumbnail: song.thumbnail || '' } : null,
+      scMeta: !isJioSaavn ? { trackId: String(song.id || song.videoId), title: song.title, artwork_url: song.thumbnail || '', stream_url: song.audioUrl || '' } : null,
     };
     tracks.push(newTrack);
     saveSettings();
@@ -5338,6 +5324,273 @@ function playOnlineTrack(song, source) {
     showToast(`Added · ${newTrack.title}`);
     renderHomeRecent();
   } catch(e) { console.error('[playOnlineTrack]', e); showToast('Could not play track'); }
+}
+
+// ==============================
+// UNIFIED SEARCH ENGINE
+// ==============================
+if (!window._ytLastResults) window._ytLastResults = [];
+let _voidSearchTimer = null;
+let _voidLastQuery = '';
+
+function voidHandleInput(val) {
+  const clearBtn = document.getElementById('void-search-clear');
+  if (clearBtn) clearBtn.style.display = val.length > 0 ? 'flex' : 'none';
+
+  const localSec   = document.getElementById('lib-local-section');
+  const searchSec  = document.getElementById('void-search-results');
+
+  if (!val.trim()) {
+    if (localSec)  localSec.style.display  = '';
+    if (searchSec) searchSec.style.display = 'none';
+    _voidLastQuery = '';
+    return;
+  }
+  if (localSec)  localSec.style.display  = 'none';
+  if (searchSec) searchSec.style.display = '';
+
+  clearTimeout(_voidSearchTimer);
+  if (val.length > 1) _voidSearchTimer = setTimeout(() => voidSearch(val, false), 450);
+}
+
+function voidClearSearch() {
+  const inp = document.getElementById('search-input');
+  if (inp) inp.value = '';
+  const clearBtn = document.getElementById('void-search-clear');
+  if (clearBtn) clearBtn.style.display = 'none';
+  const localSec  = document.getElementById('lib-local-section');
+  const searchSec = document.getElementById('void-search-results');
+  if (localSec)  localSec.style.display  = '';
+  if (searchSec) searchSec.style.display = 'none';
+  _voidLastQuery = '';
+  // Also clear the desktop topbar input
+  const dtInp = document.getElementById('desktop-search-home');
+  if (dtInp) dtInp.value = '';
+}
+
+async function voidSearch(query, force = false) {
+  query = (query || '').trim();
+  if (!query || (!force && query === _voidLastQuery)) return;
+  _voidLastQuery = query;
+
+  const el = document.getElementById('void-results-list');
+  if (!el) return;
+  el.innerHTML = `<div class="yt-loading"><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div></div>`;
+
+  const localMatches = ytFindLocalMatches(query);
+
+  // Parallel fetch: JioSaavn + SoundCloud
+  const enriched = _enrichQuery(query);
+  const [saavnRes, scRes] = await Promise.allSettled([
+    fetch(`${VOID_API_BASE}/youtube/search?q=${encodeURIComponent(enriched)}&type=all&limit=15`, { signal: AbortSignal.timeout(10000) }),
+    fetch(`${VOID_API_BASE}/soundcloud/search?q=${encodeURIComponent(enriched)}&type=all&limit=10`, { signal: AbortSignal.timeout(10000) }),
+  ]);
+
+  let songs = [], artists = [], playlists = [], scTracks = [], scArtists = [], scPlaylists = [];
+
+  if (saavnRes.status === 'fulfilled' && saavnRes.value.ok) {
+    const d = await saavnRes.value.json();
+    songs     = (d.items   || []).map(s => ({ ...s, _score: _scoreResult(s, query) })).sort((a,b)=>(b._score||0)-(a._score||0));
+    artists   = d.artists  || [];
+    playlists = d.albums   || [];
+  }
+
+  if (scRes.status === 'fulfilled' && scRes.value.ok) {
+    const d = await scRes.value.json();
+    scTracks    = (d.items     || []).map(s => ({ ...s, _score: _scoreResult(s, query) })).sort((a,b)=>(b._score||0)-(a._score||0));
+    scArtists   = d.artists    || [];
+    scPlaylists = d.playlists  || [];
+  }
+
+  window._voidSongs     = songs;
+  window._voidScTracks  = scTracks;
+
+  _renderVoidResults({ localMatches, songs, artists, playlists, scTracks, scArtists, scPlaylists, query });
+}
+
+function _renderVoidResults({ localMatches, songs, artists, playlists, scTracks, scArtists, scPlaylists, query }) {
+  const el = document.getElementById('void-results-list');
+  if (!el) return;
+
+  const hasAny = localMatches.length || songs.length || artists.length || playlists.length || scTracks.length || scArtists.length || scPlaylists.length;
+  if (!hasAny) {
+    el.innerHTML = `<div class="yt-empty"><p>No results for "<strong>${esc(query)}</strong>"<br><span style="font-size:11px">Try a different search term</span></p></div>`;
+    return;
+  }
+
+  let html = '';
+
+  // ── In Your Library ──────────────────────────────────────────────────────
+  if (localMatches.length) {
+    html += `<div class="yt-section-hdr">In Your Library</div>`;
+    html += localMatches.map(t => {
+      const ri = tracks.indexOf(t);
+      const thumb = (t.ytMeta && t.ytMeta.thumbnail) ? t.ytMeta.thumbnail : t.cover;
+      return `<div class="yt-result-item">
+        <div class="yt-thumb" style="width:46px;height:46px;border-radius:8px">${thumb ? `<img src="${thumb}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">` : `<div class="yt-thumb-placeholder"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:18px;height:18px"><path d="M9 18V5l12-2v13"/></svg></div>`}</div>
+        <div class="yt-result-info"><div class="yt-result-title">${esc(t.title)}</div><div class="yt-result-artist">${esc(t.artist)}</div></div>
+        <div class="yt-result-actions"><button class="yt-result-btn" onclick="playTrack(${ri})" title="Play"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polygon points="5,3 19,12 5,21" fill="var(--accent)" stroke="none"/></svg></button></div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── Artists (merged, Saavn first then SC) ────────────────────────────────
+  const allArtists = [
+    ...artists.map(a => ({ ...a, _src: 'saavn' })),
+    ...scArtists.map(a => ({ ...a, _src: 'sc' })),
+  ];
+  if (allArtists.length) {
+    html += `<div class="yt-section-hdr">Artists</div>`;
+    html += `<div style="display:flex;gap:14px;padding:4px 0 12px;overflow-x:auto;scrollbar-width:none">`;
+    html += allArtists.slice(0, 8).map(a => `
+      <div onclick="${a._src === 'sc' ? `openSCArtistPage('${esc(a.id)}')` : `openSaavnArtistPage('${esc(a.id)}')`}" style="cursor:pointer;text-align:center;flex-shrink:0;width:72px">
+        <div style="width:64px;height:64px;border-radius:50%;overflow:hidden;margin:0 auto 6px;background:var(--bg3)">
+          ${a.thumbnail ? `<img src="${esc(a.thumbnail)}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">` : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:22px;height:22px;color:var(--text3)"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>`}
+        </div>
+        <div style="font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:64px">${esc(a.name)}</div>
+        ${a._src === 'sc' ? `<div style="font-size:9px;color:#ff5500;font-family:'Space Mono',monospace">SC</div>` : ''}
+      </div>`).join('');
+    html += `</div>`;
+  }
+
+  // ── Songs (Saavn) ────────────────────────────────────────────────────────
+  if (songs.length) {
+    html += `<div class="yt-section-hdr">Songs</div>`;
+    html += songs.slice(0, 10).map((v, vi) => {
+      if (!v.videoId && !v.id) return '';
+      const localT = ytFindExactLocalMatch(v.title || '', v.artist || '');
+      const isMatched = !!(localT && localT.ytMeta && localT.ytMeta.videoId === String(v.videoId || v.id));
+      const dlId = 'dl_' + (v.videoId || v.id);
+      const isCached = !!(localT && localT.url && !localT.isOnline);
+      return `<div class="yt-result-item" style="cursor:pointer" onclick="voidAddAndStream(${vi}, 'saavn')">
+        <div class="yt-thumb" style="position:relative">
+          ${v.thumbnail ? `<img src="${v.thumbnail}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">` : `<div class="yt-thumb-placeholder"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:var(--yt);width:22px;height:22px"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16" fill="var(--yt)" stroke="none"/></svg></div>`}
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.3);border-radius:inherit;opacity:0;transition:opacity 0.15s" class="yt-hover-play"><svg fill="var(--accent)" viewBox="0 0 24 24" style="width:20px;height:20px"><polygon points="5,3 19,12 5,21"/></svg></div>
+        </div>
+        <div class="yt-result-info">
+          <div class="yt-result-title">${esc(v.title)}</div>
+          <div class="yt-result-artist">${esc(v.artist)}</div>
+          <div class="yt-result-dur">${v.duration ? fmtTime(v.duration) : ''}</div>
+        </div>
+        <div class="yt-result-actions">
+          ${localT
+            ? `<button class="yt-result-btn${isMatched ? ' matched' : ''}" onclick="event.stopPropagation();ytMatchToTrack(${tracks.indexOf(localT)},${vi},'${esc(query)}')" title="${isMatched ? 'Matched — unmatch' : 'Match to library'}"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"${isMatched ? ' fill="var(--accent)"' : ''}/></svg></button>`
+            : `<button class="yt-result-btn" onclick="event.stopPropagation();ytOpenMatchPicker(${vi},'${esc(query)}')" title="Match to library"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></button>`}
+          <button class="yt-result-btn${isCached ? ' dl-done' : ''}" id="${dlId}" onclick="event.stopPropagation();voidDownloadTrack(${vi},'${dlId}')" title="${isCached ? 'Cached ✓' : 'Download & cache'}">
+            ${isCached
+              ? `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>`
+              : `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`}
+            <div class="yt-dl-progress" style="width:0%"></div>
+          </button>
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  // ── Albums/Playlists (Saavn) ─────────────────────────────────────────────
+  if (playlists.length) {
+    html += `<div class="yt-section-hdr">Albums</div>`;
+    html += playlists.slice(0, 5).map(al => `
+      <div class="yt-result-item" onclick="openSaavnAlbumPage('${esc(al.id)}')" style="cursor:pointer">
+        <div class="yt-thumb" style="border-radius:10px">
+          ${al.thumbnail ? `<img src="${esc(al.thumbnail)}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">` : `<div class="yt-thumb-placeholder"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:20px;height:20px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="3"/></svg></div>`}
+        </div>
+        <div class="yt-result-info">
+          <div class="yt-result-title">${esc(al.name)}</div>
+          <div class="yt-result-artist">${esc(al.artist)}</div>
+          <div class="yt-result-dur">${al.year ? al.year + ' · ' : ''}Album</div>
+        </div>
+        <div class="yt-result-actions"><button class="yt-result-btn" onclick="event.stopPropagation();openSaavnAlbumPage('${esc(al.id)}')" title="View album"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg></button></div>
+      </div>`).join('');
+  }
+
+  // ── SoundCloud Tracks ────────────────────────────────────────────────────
+  if (scTracks.length) {
+    html += `<div class="yt-section-hdr">SoundCloud <span style="font-size:9px;color:#ff5500;font-family:'Space Mono',monospace;margin-left:4px">● SC</span></div>`;
+    html += scTracks.slice(0, 8).map((v, vi) => `
+      <div class="yt-result-item" onclick="voidAddAndStream(${vi}, 'sc')" style="cursor:pointer">
+        <div class="yt-thumb" style="position:relative;cursor:pointer">
+          ${v.thumbnail ? `<img src="${v.thumbnail}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">` : `<div class="yt-thumb-placeholder"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:#ff5500;width:22px;height:22px"><path d="M2 16.5C2 16.5 2 18 3.5 18s1.5-1.5 1.5-1.5V10s0-6 5-6 5 6 5 6v1s0 1.5 1.5 1.5S18 10 18 10" stroke="#ff5500" stroke-width="2"/><circle cx="3.5" cy="16.5" r="1.5" fill="#ff5500"/></svg></div>`}
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.3);border-radius:inherit;opacity:0;transition:opacity 0.15s" class="yt-hover-play"><svg fill="#ff5500" viewBox="0 0 24 24" style="width:20px;height:20px"><polygon points="5,3 19,12 5,21"/></svg></div>
+        </div>
+        <div class="yt-result-info">
+          <div class="yt-result-title">${esc(v.title)}</div>
+          <div class="yt-result-artist">${esc(v.artist)}</div>
+          <div class="yt-result-dur">${v.duration ? fmtTime(v.duration) : ''}</div>
+        </div>
+        <div class="yt-result-actions">
+          <button class="yt-result-btn" onclick="event.stopPropagation();voidAddAndStream(${vi},'sc')" title="Stream" style="color:#ff5500;border-color:rgba(255,85,0,0.3)">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polygon points="5,3 19,12 5,21" fill="#ff5500" stroke="none"/></svg>
+          </button>
+        </div>
+      </div>`).join('');
+  }
+
+  // ── SoundCloud Playlists ─────────────────────────────────────────────────
+  if (scPlaylists.length) {
+    html += `<div class="yt-section-hdr">Playlists <span style="font-size:9px;color:#ff5500;font-family:'Space Mono',monospace;margin-left:4px">● SC</span></div>`;
+    html += scPlaylists.slice(0, 4).map(pl => `
+      <div class="yt-result-item" onclick="importSCPlaylist('${esc(pl.id)}')" style="cursor:pointer">
+        <div class="yt-thumb" style="border-radius:8px">
+          ${pl.thumbnail ? `<img src="${esc(pl.thumbnail)}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">` : `<div class="yt-thumb-placeholder"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:#ff5500;width:20px;height:20px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></div>`}
+        </div>
+        <div class="yt-result-info">
+          <div class="yt-result-title">${esc(pl.name)}</div>
+          <div class="yt-result-artist">${esc(pl.artist)}</div>
+          ${pl.trackCount ? `<div class="yt-result-dur">${pl.trackCount} tracks</div>` : ''}
+        </div>
+        <div class="yt-result-actions">
+          <button class="yt-result-btn" onclick="event.stopPropagation();importSCPlaylist('${esc(pl.id)}')" title="Import" style="color:#ff5500;border-color:rgba(255,85,0,0.3)">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.26"/></svg>
+          </button>
+        </div>
+      </div>`).join('');
+  }
+
+  el.innerHTML = html;
+}
+
+// Unified stream: routes saavn or sc based on source param
+async function voidAddAndStream(idx, source) {
+  if (source === 'sc') {
+    const v = (window._voidScTracks || [])[idx]; if (!v) return;
+    let t = tracks.find(tr => tr.scMeta && tr.scMeta.trackId === String(v.videoId || v.id));
+    let tIdx;
+    if (t) { tIdx = tracks.indexOf(t); }
+    else {
+      const id = 'track_sc_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+      t = { id, blobId: null, title: v.title, artist: v.artist, duration: v.duration, cover: v.thumbnail || null,
+        isFav: false, isOnline: true, scMeta: { trackId: String(v.videoId || v.id), thumbnail: v.thumbnail, title: v.title },
+        ytMeta: null, url: null, streamUrl: null };
+      tracks.push(t); tIdx = tracks.length - 1;
+      await dbPut('tracks', { id: t.id, blobId: null, title: t.title, artist: t.artist, duration: t.duration, cover: t.cover, isFav: false, isOnline: true, ytMeta: null, scMeta: t.scMeta });
+      saveSettings();
+    }
+    playTrack(tIdx);
+  } else {
+    // saavn — reuse ytAddAndStream with window._voidSongs as the result array
+    const oldResults = window._ytLastResults;
+    window._ytLastResults = window._voidSongs || [];
+    await ytAddAndStream(idx);
+    window._ytLastResults = oldResults;
+  }
+}
+
+// Unified download (saavn only)
+async function voidDownloadTrack(idx, btnId) {
+  const oldResults = window._ytLastResults;
+  window._ytLastResults = window._voidSongs || [];
+  await ytDownloadTrack(idx, btnId);
+  window._ytLastResults = oldResults;
+}
+
+// Quick-search entry point (used by artist chips, artist pages, etc.)
+function voidQuickSearch(term) {
+  showPage('library');
+  const inp = document.getElementById('search-input');
+  if (inp) { inp.value = term; voidHandleInput(term); }
+  _voidLastQuery = '';
+  voidSearch(term, true);
 }
 
 // ==============================
@@ -5983,7 +6236,7 @@ function renderAll() {
   const cnt=tracks.length+' track'+(tracks.length!==1?'s':'');
   document.getElementById('home-count').textContent=cnt;
   document.getElementById('home-count-lib').textContent=cnt;
-  loadOnlineHomeFeed();
+  loadUnifiedFeed();
 }
 
 function renderTrackList(filter='') {
@@ -6458,17 +6711,7 @@ function ctxToggleFav(){ closeCtxMenu(); const t=tracks[ctxTrackIndex]; if(t) to
 function ctxPlayNext() { closeCtxMenu(); playNextManual(ctxTrackIndex); showToast('Will play next'); }
 function ctxAddToQueue(){ closeCtxMenu(); addToManualQueue(ctxTrackIndex); showToast('Added to queue'); }
 function ctxAddToPlaylist() { closeCtxMenu(); const t=tracks[ctxTrackIndex]; if (!t) return; openPlaylistPicker(t.id); }
-function ctxSearchYT() {
-  closeCtxMenu();
-  const t=tracks[ctxTrackIndex]; if (!t) return;
-  showPage('library');
-  setLibSearchMode('yt');
-  const q=`${t.artist} ${t.title}`;
-  document.getElementById('search-input').value=q;
-  const clearBtn=document.getElementById('lib-yt-clear-btn');
-  if (clearBtn) clearBtn.style.display='flex';
-  ytDoSearch(q, true);
-}
+
 async function ctxDownload() {
   const t = tracks[ctxTrackIndex]; if (!t) return;
   if (!t.ytMeta || !t.ytMeta.videoId) { closeCtxMenu(); showToast('No YouTube source — search YouTube first'); return; }
@@ -6720,73 +6963,7 @@ function confirmClearLibrary() {
   setTimeout(()=>{ document.getElementById('modal-input').placeholder='Type "clear" to confirm'; }, 50);
 }
 
-// ==============================
-// YOUTUBE — SEARCH UI
-// ==============================
-function ytSetFilter(filter) {
-  ytActiveFilter = filter;
-  document.querySelectorAll('.yt-filter-btn').forEach(b=>b.classList.toggle('active',b.dataset.filter===filter));
-  const q = document.getElementById('search-input').value.trim();
-  if (q.length>1) { ytLastQuery=''; ytDoSearch(q,true); }
-}
-
-let scActiveFilter = 'all';
-function scSetFilter(filter) {
-  scActiveFilter = filter;
-  document.querySelectorAll('.sc-filter-btn').forEach(b=>{
-    const active = b.dataset.scfilter === filter;
-    b.classList.toggle('active', active);
-    b.style.background = active ? 'rgba(255,85,0,0.12)' : '';
-    b.style.borderColor = active ? 'rgba(255,85,0,0.3)' : '';
-    b.style.color = active ? '#ff5500' : '';
-  });
-  const q = document.getElementById('search-input').value.trim();
-  if (q.length>1) { scLastQuery=''; scDoSearch(q,true); }
-}
-
-// ── VOID Entity System — lightweight normalized structures ────────────────────
-// All search results flow through these normalizers so the rest of the app
-// works with consistent shapes regardless of which provider returned the data.
-
-function normSong(raw, source) {
-  return {
-    type: 'song',
-    id:       raw.id || raw.videoId || '',
-    title:    raw.title || raw.name || 'Unknown',
-    artist:   raw.artist || raw.artistName || '',
-    album:    raw.album || '',
-    cover:    raw.thumbnail || raw.image || null,
-    duration: raw.duration || 0,
-    source,                              // 'jiosaavn' | 'soundcloud' | 'local'
-    _raw:     raw,                       // preserve original for playback
-  };
-}
-
-function normArtist(raw, source) {
-  return {
-    type:   'artist',
-    id:     raw.id || '',
-    name:   raw.name || raw.artist || 'Unknown',
-    image:  raw.thumbnail || raw.image || null,
-    source,
-    _raw:   raw,
-  };
-}
-
-function normPlaylist(raw, source) {
-  return {
-    type:     'playlist',
-    id:       raw.id || raw.playlistId || '',
-    title:    raw.title || raw.name || 'Untitled',
-    artist:   raw.artist || raw.owner || '',
-    cover:    raw.thumbnail || raw.image || null,
-    count:    raw.videoCount || raw.trackCount || null,
-    source,
-    _raw:     raw,
-  };
-}
-
-// ── Artist / Album page overlay functions ──────────────────────────────────────
+// ── Artist / Album / Podcast page overlay functions ──────────────────────────
 
 function _renderTrackListInOverlay(songs, containerEl, source) {
   if (!songs.length) { containerEl.innerHTML=`<div class="yt-empty"><p>No tracks found</p></div>`; return; }
@@ -6946,7 +7123,7 @@ function closeArtistPage() {
   document.getElementById('artist-page-overlay').style.display='none';
 }
 
-// Play all / Shuffle all tracks in any overlay (artist, album, playlist)
+// Play all / Shuffle all tracks in any overlay (artist, album, podcast, playlist)
 function _playOverlayAll() {
   const songs = window._overlayTracks || [];
   const source = window._overlaySource || 'jiosaavn';
@@ -7045,6 +7222,7 @@ async function openSaavnAlbumPage(albumId) {
 
 function closeAlbumPage() { document.getElementById('album-page-overlay').style.display='none'; }
 
+
 // ── Online Playlist Import (JioSaavn + SoundCloud) ───────────────────────────
 
 function showOnlinePlOverlay() {
@@ -7136,116 +7314,8 @@ async function importSCPlaylist(idOrUrl) {
 
 
 
-let libSearchMode = 'local';
 
-function setLibSearchMode(mode) {
-  libSearchMode = mode;
-  const localBtn  = document.getElementById('lib-mode-local');
-  const ytBtn     = document.getElementById('lib-mode-yt');
-  const localSec  = document.getElementById('lib-local-section');
-  const ytSec     = document.getElementById('lib-yt-section');
-  const ytFilters = document.getElementById('lib-yt-filters-row');
-  const input     = document.getElementById('search-input');
-  if (mode === 'yt') {
-    localBtn.classList.remove('active'); ytBtn.classList.add('active');
-    localSec.style.display='none'; ytSec.style.display='block'; ytFilters.style.display='block';
-    input.placeholder = 'Search YouTube…';
-    const val = input.value.trim();
-    if (val.length > 1) { ytLastQuery=''; ytDoSearch(val, true); }
-    else renderYTDefault();
-  } else {
-    ytBtn.classList.remove('active'); localBtn.classList.add('active');
-    localSec.style.display=''; ytSec.style.display='none'; ytFilters.style.display='none';
-    input.placeholder = 'Search tracks…';
-    ytLastQuery = '';
-    renderTrackList(input.value);
-  }
-  document.getElementById('lib-mode-local').classList.toggle('active', mode==='local');
-  document.getElementById('lib-mode-yt').classList.toggle('active', mode==='yt');
-  document.getElementById('lib-mode-yt').classList.toggle('yt-mode', mode==='yt');
-  const scBtn = document.getElementById('lib-mode-sc');
-  if (scBtn) { scBtn.classList.toggle('active', mode==='sc'); scBtn.classList.toggle('sc-mode', true); }
-  document.getElementById('lib-yt-section').style.display = mode==='yt' ? '' : 'none';
-  const scFilters = document.getElementById('lib-sc-filters-row');
-  if (scFilters) scFilters.style.display = mode==='sc' ? '' : 'none';
-  const scSec = document.getElementById('lib-sc-section');
-  if (scSec) scSec.style.display = mode==='sc' ? '' : 'none';
-  document.getElementById('lib-local-section').style.display = mode==='local' ? '' : 'none';
-  const val = document.getElementById('search-input')?.value?.trim() || '';
-  if (mode === 'yt') {
-    if (val.length > 1) { ytLastQuery=''; ytDoSearch(val, true); }
-    else renderYTDefault();
-  }
-  if (mode === 'sc') {
-    if (val.length > 1) { scLastQuery=''; scDoSearch(val, true); }
-    else renderSCDefault();
-  }
-}
-
-function libHandleInput(val) {
-  const clearBtn = document.getElementById('lib-yt-clear-btn');
-  if (clearBtn) clearBtn.style.display = val.length > 0 ? 'flex' : 'none';
-  if (libSearchMode === 'local') { filterTracks(val); }
-  else if (libSearchMode === 'sc') { clearTimeout(ytSearchTimer); if (val.length > 2) ytSearchTimer = setTimeout(()=>scDoSearch(val, false), 550); }
-  else { clearTimeout(ytSearchTimer); if (val.length > 2) ytSearchTimer = setTimeout(()=>ytDoSearch(val, false), 550); }
-}
-
-function libClearSearch() {
-  const input = document.getElementById('search-input');
-  input.value = '';
-  const clearBtn = document.getElementById('lib-yt-clear-btn');
-  if (clearBtn) clearBtn.style.display = 'none';
-  if (libSearchMode === 'yt') { ytLastQuery=''; renderYTDefault(); }
-  else filterTracks('');
-}
-
-function ytHandleInput(val) {
-  const cb = document.getElementById('yt-clear-btn');
-  if(cb) cb.classList.toggle('visible', val.length>0);
-  clearTimeout(ytSearchTimer);
-  if (val.length>2) ytSearchTimer = setTimeout(()=>ytDoSearch(val,false), 550);
-}
-
-function ytClearSearch() {
-  const inp = document.getElementById('yt-search-input');
-  const cb  = document.getElementById('yt-clear-btn');
-  if(inp) inp.value=''; if(cb) cb.classList.remove('visible');
-  ytLastQuery=''; renderYTDefault();
-}
-
-function renderYTDefault() {
-  const el = document.getElementById('lib-yt-results');
-  if (!el) return;
-  el.innerHTML=`
-    <div class="yt-empty">
-      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:var(--yt);width:44px;height:44px;margin:0 auto 12px;display:block"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16" fill="var(--yt)" stroke="none"/></svg>
-      <p>Search for songs, artists, albums<br><span style="font-size:11px;color:var(--text3)">Tap ▶ to stream · Tap ↓ to cache</span></p>
-    </div>`;
-}
-
-function ytFilterToQuery(baseQ) {
-  switch(ytActiveFilter) {
-    case 'song':     return baseQ+' official audio';
-    case 'artist':   return baseQ+' artist topic';
-    case 'album':    return baseQ+' full album';
-    case 'playlist': return baseQ+' playlist mix';
-    default:         return baseQ;
-  }
-}
-
-async function ytDoSearch(query, force=false) {
-  if (!query||(!force&&query===ytLastQuery)) return;
-  ytLastQuery=query;
-  const results=document.getElementById('lib-yt-results');
-  if (!results) return;
-  results.innerHTML=`<div class="yt-loading"><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div><div class="yt-loading-dot"></div></div>`;
-  try {
-    const data=await ytFetchResults(query);
-    renderYTResults(data,query);
-  } catch(e) {
-    results.innerHTML=`<div class="yt-empty"><p>Search unavailable.<br><span style="font-size:11px">${esc(e.message||'Check connection.')}</span></p></div>`;
-  }
-}
+// ── Smart Search Engine (shared utilities)
 
 // ── Smart Search Engine ───────────────────────────────────────────────────────
 // Tokenise + normalise helpers
@@ -7373,10 +7443,10 @@ function _scoreResult(item, rawQuery) {
 
 async function ytFetchResults(query) {
   const localMatches = ytFindLocalMatches(query);
-  let ytResults = [], ytPlaylistResults = [], ytArtists = [], ytAlbums = [];
+  let ytResults = [], ytPlaylistResults = [], ytArtists = [], ytAlbums = [], ytPodcasts = [];
   const enriched = _enrichQuery(query);
   // Map filter to API type
-  const typeMap = { all: 'all', song: 'song', artist: 'artist', album: 'album', playlist: 'album' };
+  const typeMap = { all: 'all', song: 'song', artist: 'artist', album: 'album', playlist: 'album', podcast: 'podcast' };
   const apiType = typeMap[ytActiveFilter] || 'all';
   try {
     // For a specific song/artist query also fire a parallel broad search for better coverage
@@ -7409,6 +7479,7 @@ async function ytFetchResults(query) {
       ytResults.sort((a,b) => (b._score||0) - (a._score||0));
       ytArtists = (data.artists || []);
       ytAlbums = (data.albums || []);
+      ytPodcasts = (data.podcasts || []);
     }
     // Merge extra artist results from dash query
     if (artistResp && artistResp.status === 'fulfilled' && artistResp.value.ok) {
@@ -7419,7 +7490,7 @@ async function ytFetchResults(query) {
       for (const a of extraArtists) { if (!existingIds.has(String(a.id))) ytArtists.push(a); }
     }
   } catch(e) { console.warn('[VOID saavn search]', e.message); }
-  return { ytResults, ytPlaylistResults, ytArtists, ytAlbums, localMatches, source: 'jiosaavn' };
+  return { ytResults, ytPlaylistResults, ytArtists, ytAlbums, ytPodcasts, localMatches, source: 'jiosaavn' };
 }
 
 // ==============================
@@ -7625,7 +7696,6 @@ function ytFindLocalMatches(query) {
 
 function ytFindExactLocalMatch(title,artist) {
   const tq = _normalise(title), aq = _normalise(artist);
-  // Score all and return best
   let best = null, bestScore = 0;
   for (const tr of tracks) {
     const tt = _normalise(tr.title), ta = _normalise(tr.artist);
@@ -7637,169 +7707,8 @@ function ytFindExactLocalMatch(title,artist) {
   return best;
 }
 
-// ==============================
-// YOUTUBE — RENDER RESULTS
-// ==============================
-function renderYTResults(data, query) {
-  const {ytResults, ytPlaylistResults, ytArtists, ytAlbums, localMatches, source, smartLabel}=data;
-  const results=document.getElementById('lib-yt-results');
-  if (!results) return;
-  let html='';
 
-  if (smartLabel) {
-    html+=`<div style="display:flex;align-items:center;gap:8px;padding:10px 14px 6px;margin-bottom:2px">
-      <span style="font-size:10px;letter-spacing:.08em;font-family:'Space Mono',monospace;color:var(--accent)">✦ SMART</span>
-      <span style="font-size:13px;font-weight:600;color:var(--text1)">${esc(smartLabel)}</span>
-    </div>`;
-  }
-
-  const srcBadge = source==='yt_api'
-    ? `<span style="font-size:9px;color:var(--accent);font-family:'Space Mono',monospace;margin-left:6px">● LIVE</span>`
-    : source==='invidious'
-    ? `<span style="font-size:9px;color:var(--text3);font-family:'Space Mono',monospace;margin-left:6px">● PROXY</span>`
-    : '';
-
-  if (localMatches.length) {
-    html+=`<div class="yt-section-hdr">In Your Library</div>`;
-    html+=localMatches.map(t=>{
-      const ri=tracks.indexOf(t);
-      const thumb=(t.ytMeta&&t.ytMeta.thumbnail)?t.ytMeta.thumbnail:t.cover;
-      return `<div class="yt-result-item">
-        <div class="yt-thumb" style="width:46px;height:46px;border-radius:8px">${thumb?`<img src="${thumb}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">`:`<div class="yt-thumb-placeholder"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:18px;height:18px"><path d="M9 18V5l12-2v13"/></svg></div>`}</div>
-        <div class="yt-result-info"><div class="yt-result-title">${esc(t.title)}</div><div class="yt-result-artist">${esc(t.artist)}</div></div>
-        <div class="yt-result-actions">
-          <button class="yt-result-btn" onclick="playTrack(${ri})" title="Play">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polygon points="5,3 19,12 5,21" fill="var(--accent)" stroke="none"/></svg>
-          </button>
-        </div>
-      </div>`;
-    }).join('');
-  }
-
-  if (ytArtists&&ytArtists.length) {
-    html+=`<div class="yt-section-hdr">Artists</div>`;
-    html+=`<div style="display:flex;gap:14px;padding:4px 0 12px;overflow-x:auto;scrollbar-width:none">`;
-    html+=ytArtists.map(a=>`
-      <div onclick="openSaavnArtistPage('${esc(a.id)}')" style="cursor:pointer;text-align:center;flex-shrink:0;width:72px">
-        <div style="width:64px;height:64px;border-radius:50%;overflow:hidden;margin:0 auto 6px;background:var(--bg3)">
-          ${a.thumbnail?`<img src="${esc(a.thumbnail)}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">`:`<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:22px;height:22px;color:var(--text3)"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>`}
-        </div>
-        <div style="font-size:11px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:64px">${esc(a.name)}</div>
-      </div>`).join('');
-    html+=`</div>`;
-  }
-
-  if (ytAlbums&&ytAlbums.length) {
-    html+=`<div class="yt-section-hdr">Albums</div>`;
-    html+=ytAlbums.map(al=>`
-      <div class="yt-result-item" onclick="openSaavnAlbumPage('${esc(al.id)}')" style="cursor:pointer">
-        <div class="yt-thumb" style="border-radius:10px">
-          ${al.thumbnail?`<img src="${esc(al.thumbnail)}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">`:`<div class="yt-thumb-placeholder"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:20px;height:20px"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="12" cy="12" r="3"/></svg></div>`}
-        </div>
-        <div class="yt-result-info">
-          <div class="yt-result-title">${esc(al.name)}</div>
-          <div class="yt-result-artist">${esc(al.artist)}</div>
-          <div class="yt-result-dur">${al.year?al.year+' · ':''} Album</div>
-        </div>
-        <div class="yt-result-actions">
-          <button class="yt-result-btn" onclick="event.stopPropagation();openSaavnAlbumPage('${esc(al.id)}')" title="View album">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg>
-          </button>
-        </div>
-      </div>`).join('');
-  }
-
-  if (ytPlaylistResults&&ytPlaylistResults.length) {
-    html+=`<div class="yt-section-hdr">Playlists${srcBadge}</div>`;
-    html+=ytPlaylistResults.map(p=>{
-      if (!p.playlistId) return '';
-      return `<div class="yt-result-item yt-result-playlist">
-        <div class="yt-thumb" style="position:relative">
-          ${p.thumbnail?`<img src="${p.thumbnail}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">`:`<div class="yt-thumb-placeholder"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:20px;height:20px"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg></div>`}
-          ${p.videoCount?`<div class="yt-pl-count-badge">${p.videoCount}</div>`:''}
-        </div>
-        <div class="yt-result-info">
-          <div class="yt-result-title">${esc(p.title)}</div>
-          <div class="yt-result-artist">${esc(p.artist)}</div>
-          ${p.videoCount?`<div class="yt-result-dur">${p.videoCount} videos</div>`:''}
-        </div>
-        <div class="yt-result-actions">
-          <button class="yt-result-btn" onclick="ytImportPlaylistById('${esc(p.playlistId)}','${esc(p.title)}')" title="Import playlist">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.26"/></svg>
-          </button>
-        </div>
-      </div>`;
-    }).join('');
-  }
-
-  if (ytResults.length) {
-    html+=`<div class="yt-section-hdr">Songs${srcBadge}</div>`;
-    html+=ytResults.map((v,vi)=>{
-      if (!v.videoId) return '';
-      const localT=v.localMatch;
-      const isMatched=!!(localT&&localT.ytMeta&&localT.ytMeta.videoId===v.videoId);
-      const dlId='dl_'+v.videoId;
-      const isCached = !!(localT && localT.url && !localT.isOnline);
-      return `<div class="yt-result-item" style="cursor:pointer" onclick="ytAddAndStream(${vi})">
-        <div class="yt-thumb" style="position:relative">
-          ${v.thumbnail?`<img src="${v.thumbnail}" alt="" loading="lazy" style="width:100%;height:100%;object-fit:cover">`:`<div class="yt-thumb-placeholder"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:var(--yt);width:22px;height:22px"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16" fill="var(--yt)" stroke="none"/></svg></div>`}
-          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.3);border-radius:inherit;opacity:0;transition:opacity 0.15s" class="yt-hover-play"><svg fill="var(--accent)" viewBox="0 0 24 24" style="width:22px;height:22px"><polygon points="5,3 19,12 5,21"/></svg></div>
-        </div>
-        <div class="yt-result-info">
-          <div class="yt-result-title">${esc(v.title)}</div>
-          <div class="yt-result-artist">${esc(v.artist)}</div>
-          <div class="yt-result-dur">${v.duration?fmtTime(v.duration):''}</div>
-        </div>
-        <div class="yt-result-actions">
-          ${localT
-            ?`<button class="yt-result-btn${isMatched?' matched':''}" onclick="event.stopPropagation();ytMatchToTrack(${tracks.indexOf(localT)},${vi},'${esc(query)}')" title="${isMatched?'Matched — unmatch':'Match to library track'}">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"${isMatched?' fill="var(--accent)"':''}/></svg>
-              </button>`
-            :`<button class="yt-result-btn" onclick="event.stopPropagation();ytOpenMatchPicker(${vi},'${esc(query)}')" title="Match to library track">
-                <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-              </button>`}
-          <button class="yt-result-btn${isCached?' dl-done':''}" id="${dlId}" onclick="event.stopPropagation();ytDownloadTrack(${vi},'${dlId}')" title="${isCached?'Cached ✓':'Download & cache'}">
-            ${isCached
-              ? `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="20 6 9 17 4 12"/></svg>`
-              : `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>`}
-            <div class="yt-dl-progress" style="width:0%"></div>
-          </button>
-        </div>
-      </div>`;
-    }).join('');
-
-    const relatedTerms=ytResults.slice(0,6).map(v=>v.artist).filter((a,i,arr)=>a&&arr.indexOf(a)===i).slice(0,5);
-    if (relatedTerms.length>1) {
-      html+=`<div class="yt-section-hdr">Related Artists</div>
-        <div style="padding:0 0 4px"><div class="yt-related-row">${relatedTerms.map(a=>`<div class="yt-related-chip" onclick="ytSearchArtist('${esc(a)}')">${esc(a)}</div>`).join('')}</div></div>`;
-    }
-  } else if (!localMatches.length&&!(ytPlaylistResults&&ytPlaylistResults.length)&&!(ytArtists&&ytArtists.length)&&!(ytAlbums&&ytAlbums.length)) {
-    html=`<div class="yt-empty"><p>No results for "<strong>${esc(query)}</strong>"<br><span style="font-size:11px">Try a different search term</span></p></div>`;
-  }
-
-  results.innerHTML=html;
-  window._ytLastResults=ytResults;
-}
-
-function ytQuickSearch(term) {
-  showPage('library');
-  setLibSearchMode('yt');
-  document.getElementById('search-input').value=term;
-  const clearBtn=document.getElementById('lib-yt-clear-btn');
-  if(clearBtn) clearBtn.style.display='flex';
-  ytLastQuery=''; ytDoSearch(term,true);
-}
-
-function ytSearchArtist(artistName) {
-  showPage('library');
-  setLibSearchMode('yt');
-  ytSetFilter('artist');
-  document.getElementById('search-input').value=artistName;
-  const clearBtn=document.getElementById('lib-yt-clear-btn');
-  if(clearBtn) clearBtn.style.display='flex';
-  ytLastQuery=''; ytDoSearch(artistName,true);
-}
-
+// ────────────────────────────────────
 // ==============================
 // YOUTUBE — STREAM & PLAY (stream without downloading)
 // ==============================
@@ -8122,11 +8031,11 @@ function ytMatchToTrack(trackIdx, ytResultIdx, query) {
   const v=(window._ytLastResults||[])[ytResultIdx]; if (!v) return;
   if (t.ytMeta&&t.ytMeta.videoId===v.videoId) {
     t.ytMeta=null; updateTrackMeta(t); updateUI(); renderTrackList(); renderAll();
-    showToast('YT metadata removed'); ytDoSearch(query,true); return;
+    showToast('YT metadata removed'); voidSearch(query,true); return;
   }
   t.ytMeta={videoId:v.videoId,thumbnail:v.thumbnail,channelTitle:v.artist,title:v.title};
   updateTrackMeta(t); updateUI(); renderTrackList(); renderAll();
-  showToast('✓ Matched: '+t.title); ytDoSearch(query,true);
+  showToast('✓ Matched: '+t.title); voidSearch(query,true);
 }
 
 let _ytPickerResultIdx=null, _ytPickerQuery=null;
@@ -8158,7 +8067,7 @@ function ytApplyMatchFromPicker(trackIdx) {
   t.ytMeta={videoId:v.videoId,thumbnail:v.thumbnail,channelTitle:v.artist,title:v.title};
   updateTrackMeta(t); updateUI(); renderTrackList(); renderAll();
   showToast('✓ Matched: '+t.title);
-  if (_ytPickerQuery) setTimeout(()=>ytDoSearch(_ytPickerQuery,true),300);
+  if (_ytPickerQuery) setTimeout(()=>voidSearch(_ytPickerQuery,true),300);
   _ytPickerResultIdx=null; _ytPickerQuery=null;
 }
 
@@ -8657,7 +8566,7 @@ function isDesktop() { return window.matchMedia('(min-width:1025px)').matches; }
   // Pages that are cheap to re-render on demand
   // Maps page name → render function (called when page becomes active)
   const PAGE_RENDERERS = {
-    home:      () => { renderHomeRecent(); renderHomePlaylists(); updateHomeCard(); loadOnlineHomeFeed(); },
+    home:      () => { renderHomeRecent(); renderHomePlaylists(); updateHomeCard(); loadUnifiedFeed(); },
     library:   () => renderTrackList(document.getElementById('search-input')?.value || ''),
     queue:     () => renderQueueList(),
     playlists: () => renderPlaylistsPage(),
@@ -8671,7 +8580,7 @@ function isDesktop() { return window.matchMedia('(min-width:1025px)').matches; }
     home:      ['#home-recent-list','#home-playlists-list','#home-jumpback-list',
                  '#home-short-list','#home-long-list','#home-offline-list',
                  '#home-favs-list','#home-genre-sections','#home-hero'],
-    library:   ['#track-list','#lib-yt-results'],
+    library:   ['#track-list','#void-results-list'],
     queue:     ['#queue-list'],
     playlists: ['#pl-list'],
     settings:  ['#settings-wrap'],
@@ -8800,7 +8709,7 @@ function showPage(name) {
   if (name==='library')   { renderTrackList(document.getElementById('search-input').value); }
   if (name==='queue')     renderQueueList();
   if (name==='playlists') renderPlaylistsPage();
-  if (name==='home')      { renderHomeRecent(); renderHomePlaylists(); updateHomeCard(); loadOnlineHomeFeed(); }
+  if (name==='home')      { renderHomeRecent(); renderHomePlaylists(); updateHomeCard(); loadUnifiedFeed(); }
   if (name==='settings')  { buildSettingsPage(); setTimeout(()=>ytCheckApiStatus(), 50); }
 }
 
@@ -10033,9 +9942,9 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
     const ddEl = document.getElementById('search-dropdown-' + ctx);
     if (!ddEl) return;
     buildDropdown(ddEl, val, ctx);
-    // Also sync the main library search input
+    // Sync unified search input
     const si = document.getElementById('search-input');
-    if (si) { si.value = val; if (typeof libHandleInput === 'function') libHandleInput(val); }
+    if (si) { si.value = val; if (typeof voidHandleInput === 'function') voidHandleInput(val); }
   };
 
   window.topbarSearchFocus = function(ctx) {
@@ -10063,14 +9972,7 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
       const inp = e.target;
       const v = inp.value;
       if (ddEl) { ddEl.classList.remove('visible'); ddEl.innerHTML = ''; }
-      if (ctx === 'lib' && typeof libSearchMode !== 'undefined' && libSearchMode === 'yt') {
-        if (typeof ytDoSearch === 'function') ytDoSearch(v, true);
-      } else {
-        if (typeof showPage === 'function') showPage('library');
-        if (typeof setLibSearchMode === 'function') setLibSearchMode('local');
-        const si = document.getElementById('search-input');
-        if (si) { si.value = v; if (typeof libHandleInput === 'function') libHandleInput(v); }
-      }
+      if (typeof voidQuickSearch === 'function') voidQuickSearch(v);
     }
   };
 
@@ -10087,13 +9989,7 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
     const q = decodeURIComponent(encodedQ);
     const ddEl = document.getElementById('search-dropdown-' + ctx);
     if (ddEl) { ddEl.classList.remove('visible'); ddEl.innerHTML = ''; }
-    if (typeof showPage === 'function') showPage('library');
-    if (typeof setLibSearchMode === 'function') setLibSearchMode('local');
-    const si = document.getElementById('search-input');
-    if (si) { si.value = q; if (typeof libHandleInput === 'function') libHandleInput(q); }
-    // Keep topbar in sync
-    const inp = document.getElementById('desktop-search-lib');
-    if (inp) inp.value = q;
+    if (typeof voidQuickSearch === 'function') voidQuickSearch(q);
   };
 
   // Close dropdown on outside click
