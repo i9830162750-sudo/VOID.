@@ -7376,27 +7376,30 @@ async function importSaavnPlaylist(idOrUrl) {
 async function importSCPlaylist(idOrUrl) {
   showToast('Fetching SoundCloud playlist…');
   try {
-    const resp = await fetch(`${VOID_API_BASE}/soundcloud/playlist?id=${encodeURIComponent(idOrUrl)}`, { signal: AbortSignal.timeout(15000) });
+    const resp = await fetch(`${VOID_API_BASE}/soundcloud/playlist?id=${encodeURIComponent(idOrUrl)}`, { signal: AbortSignal.timeout(30000) });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
     const plInfo = data.playlist || {};
     const songs = data.songs || [];
-    if (!songs.length) throw new Error('No tracks in playlist');
+    if (!songs.length) throw new Error('No playable tracks found — the playlist may be private or empty');
 
     const plId = 'pl_sc_'+Date.now();
     const newPl = { id: plId, name: plInfo.name||'SoundCloud Playlist', trackIds: [], source: 'soundcloud' };
     let added = 0;
     for (const s of songs) {
-      if (!s.videoId) continue;
-      const existing = tracks.find(tr=>tr.scMeta&&tr.scMeta.trackId===String(s.videoId));
+      // Use videoId with fallback to id (both are set by the backend parser)
+      const scTrackId = String(s.videoId || s.id || '');
+      if (!scTrackId) continue;
+      const existing = tracks.find(tr=>tr.scMeta&&tr.scMeta.trackId===scTrackId);
       if (existing) { if (!newPl.trackIds.includes(existing.id)) newPl.trackIds.push(existing.id); continue; }
       const id='track_sc_'+Date.now()+'_'+Math.random().toString(36).slice(2);
-      const t = { id,blobId:null,title:s.title,artist:s.artist,duration:s.duration,cover:s.thumbnail||null,isFav:false,isOnline:true,
-        scMeta:{trackId:String(s.videoId),thumbnail:s.thumbnail,title:s.title},ytMeta:null,url:null,streamUrl:null };
+      const t = { id,blobId:null,title:s.title||'Unknown',artist:s.artist||'',duration:s.duration||0,cover:s.thumbnail||null,isFav:false,isOnline:true,
+        scMeta:{trackId:scTrackId,thumbnail:s.thumbnail||'',title:s.title||'Unknown'},ytMeta:null,url:null,streamUrl:null };
       tracks.push(t); newPl.trackIds.push(id);
       await dbPut('tracks',{id:t.id,blobId:null,title:t.title,artist:t.artist,duration:t.duration,cover:t.cover,isFav:false,isOnline:true,ytMeta:null,scMeta:t.scMeta});
       added++;
     }
+    if (!added && !newPl.trackIds.length) throw new Error('No playable tracks found — the playlist may be private');
     playlists.push(newPl); savePlaylists(); renderAll(); saveSettings();
     showToast(`✓ "${newPl.name}" — ${added} tracks added`);
     setTimeout(()=>showPage('playlists'),800);
