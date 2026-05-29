@@ -10,6 +10,7 @@ const router  = express.Router();
 
 // ── Active routes ────────────────────────────────────────────────────────────
 router.use('/health',     require('./routes/health'));
+router.use('/suggest',    require('./routes/suggest'));
 router.use('/youtube',    require('./routes/youtube'));
 router.use('/soundcloud', require('./routes/soundcloud'));
 router.use('/auth',       require('./routes/auth'));
