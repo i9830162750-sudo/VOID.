@@ -318,18 +318,14 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
 .eq-toggle.on { background:var(--accent-dim); border-color:var(--accent); color:var(--accent); }
 .eq-presets-wrap { position:relative; margin:0 -16px 12px; padding:0 16px; }
 .eq-presets {
-  display:flex; gap:7px; overflow-x:auto; padding-bottom:4px; scrollbar-width:none;
-  cursor:grab; user-select:none; -webkit-user-select:none;
-  scroll-behavior:smooth;
+  display:flex; gap:6px; flex-wrap:wrap; padding-bottom:4px;
 }
-.eq-presets:active { cursor:grabbing; }
-.eq-presets::-webkit-scrollbar { display:none; }
 .preset-btn { white-space:nowrap; background:var(--bg3); border:1px solid var(--border2); color:var(--text2); font-size:11px; padding:6px 13px; border-radius:20px; cursor:pointer; font-family:'DM Sans',sans-serif; font-weight:500; transition:all 0.18s; flex-shrink:0; }
 .preset-btn.active { background:var(--accent-dim); border-color:var(--accent); color:var(--accent); }
-.eq-bars { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:14px 6px 8px; display:flex; gap:1px; align-items:flex-end; height:170px; }
+.eq-bars { background:var(--bg2); border:1px solid var(--border); border-radius:var(--radius); padding:10px 6px 6px; display:flex; gap:1px; align-items:flex-end; height:200px; }
 .eq-band { flex:1; display:flex; flex-direction:column; align-items:center; gap:3px; height:100%; min-width:0; }
 .eq-band-wrap { flex:1; display:flex; align-items:center; justify-content:center; width:100%; position:relative; }
-.eq-band input[type=range] { writing-mode:vertical-lr; direction:rtl; width:100%; height:126px; appearance:none; -webkit-appearance:none; background:transparent; cursor:pointer; outline:none; }
+.eq-band input[type=range] { writing-mode:vertical-lr; direction:rtl; width:100%; height:80px; appearance:none; -webkit-appearance:none; background:transparent; cursor:pointer; outline:none; }
 .eq-band input[type=range]::-webkit-slider-runnable-track { width:3px; background:var(--bg4); border-radius:2px; }
 .eq-band input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:12px; height:12px; background:var(--accent); border-radius:50%; cursor:pointer; margin-left:-4.5px; }
 .eq-label { font-size:7px; color:var(--text3); font-family:'Space Mono',monospace; text-align:center; }
@@ -983,6 +979,23 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   .bottom-nav { display: flex !important; }
 }
 
+/* ── Mobile Studio page — real desktop panel styles ── */
+@media (max-width:1024px) {
+  #mobile-studio-scroll .studio-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    padding: 0;
+    height: auto;
+  }
+  #mobile-studio-scroll .studio-spectrum {
+    height: 80px;
+  }
+  #mobile-studio-scroll .studio-waveform {
+    height: 28px;
+  }
+}
+
 @media (max-height:700px) {
   .np-cover-wrap { padding:2px 32px 14px; }
   .np-cover { max-width:220px; }
@@ -1018,7 +1031,10 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
 
   /* Desktop NP panel tabs and studio panel */
   .np-panel-tabs { display: none !important; }
-  #studio-panel { display: none !important; }
+  /* Studio panel hidden on mobile ONLY when inside the np-overlay (desktop placement) */
+  #np-overlay #studio-panel { display: none !important; }
+  /* When inside mobile page, show it normally */
+  #mobile-studio-scroll #studio-panel { display: block !important; }
 
   /* Desktop playbar transport zones — hide on mobile */
   .transport-eq-chips { display: none !important; }
@@ -1095,6 +1111,128 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
        .mini-bar       → grid-area: playbar
      #np-overlay (outside app-wrap) → grid-area: npanel
    ============================================================ */
+
+
+/* ── Studio panel CSS — global (works on both mobile and desktop) ── */
+.studio-panel {
+  display: flex; flex-direction: column; gap: 0;
+  padding: 0;
+}
+.studio-now-playing {
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 10px;
+  flex-shrink: 0; background: rgba(29,185,84,0.03);
+}
+.studio-np-cover {
+  width: 38px; height: 38px; border-radius: 7px;
+  background: var(--bg3); flex-shrink: 0; overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+}
+.studio-np-cover img { width:100%; height:100%; object-fit:cover; }
+.studio-np-info { flex:1; min-width:0; }
+.studio-np-title { font-size:11px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.studio-np-artist { font-size:10px; color:var(--text2); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+.studio-section {
+  border-bottom: 1px solid var(--border);
+  padding: 12px 14px;
+  flex-shrink: 0;
+}
+.studio-section-hdr {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 10px;
+}
+.studio-section-title {
+  font-size: 9px; font-weight: 700; letter-spacing: 1.2px;
+  text-transform: uppercase; color: var(--text3); font-family: 'Space Mono', monospace;
+  flex: 1;
+}
+.studio-badge {
+  font-size: 8px; font-weight: 700; letter-spacing: 1px;
+  text-transform: uppercase; color: var(--accent);
+  font-family: 'Space Mono', monospace; padding: 2px 5px;
+  border: 1px solid rgba(29,185,84,0.3); border-radius: 3px;
+}
+.studio-spectrum {
+  width: 100%; height: 80px; border-radius: 6px;
+  background: var(--bg2); overflow: hidden; position: relative;
+}
+.studio-spectrum canvas { display: block; }
+.studio-waveform {
+  display: flex; gap: 1px; align-items: center;
+  height: 28px; margin-top: 6px;
+}
+.studio-wave-bar {
+  flex: 1; height: 100%; background: rgba(29,185,84,0.35);
+  border-radius: 1px; transform-origin: center; will-change: transform;
+}
+.studio-slider-row {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 6px;
+}
+.studio-slider-label {
+  font-size: 9px; font-weight: 700; color: var(--text3);
+  font-family: 'Space Mono', monospace; min-width: 44px; text-transform: uppercase;
+}
+.studio-slider {
+  flex: 1; height: 3px; -webkit-appearance: none; appearance: none;
+  background: var(--bg4); border-radius: 2px; outline: none; cursor: pointer;
+}
+.studio-slider::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 12px; height: 12px;
+  border-radius: 50%; background: var(--text); cursor: pointer;
+  box-shadow: 0 0 0 2px var(--bg1);
+}
+.studio-slider-val {
+  font-size: 9px; color: var(--text3); font-family: 'Space Mono', monospace;
+  min-width: 38px; text-align: right;
+}
+.studio-fx-btn {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.8px;
+  text-transform: uppercase; font-family: 'Space Mono', monospace;
+  background: none; border: 1px solid var(--border2); border-radius: 4px;
+  padding: 4px 8px; color: var(--text3); cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s; white-space: nowrap;
+}
+.studio-fx-btn:hover { border-color: var(--text3); color: var(--text2); }
+.studio-fx-btn.on { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+.studio-fx-btn.warm.on { background: rgba(243,156,18,0.12); border-color: #f39c12; color: #f39c12; }
+.studio-fx-btn.red.on { background: rgba(231,76,60,0.12); border-color: var(--danger); color: var(--danger); }
+.studio-fx-row { display: flex; flex-wrap: wrap; gap: 5px; }
+.studio-gain-readout {
+  display: flex; align-items: baseline; gap: 3px; margin-bottom: 10px;
+}
+.studio-gain-number {
+  font-size: 28px; font-weight: 700; font-family: 'Space Mono', monospace;
+  color: var(--accent); line-height: 1;
+}
+.studio-gain-unit { font-size: 10px; color: var(--text3); font-family: 'Space Mono', monospace; }
+.studio-meter-row {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+}
+.studio-meter-label {
+  font-size: 9px; font-weight: 700; color: var(--text3);
+  font-family: 'Space Mono', monospace; min-width: 18px; text-transform: uppercase;
+}
+.studio-meter-track {
+  flex: 1; height: 4px; background: var(--bg4); border-radius: 2px; overflow: hidden;
+}
+.studio-meter-fill {
+  height: 100%; border-radius: 2px; transition: width 0.1s linear;
+}
+.studio-meter-fill.green { background: var(--accent); }
+.studio-overall-preset-wrap {
+  display: flex; flex-wrap: wrap; gap: 5px;
+}
+.studio-overall-preset-btn {
+  font-size: 9px; font-weight: 700; letter-spacing: 0.8px;
+  text-transform: uppercase; font-family: 'Space Mono', monospace;
+  background: none; border: 1px solid var(--border2); border-radius: 4px;
+  padding: 4px 8px; color: var(--text3); cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.studio-overall-preset-btn.active { background: rgba(255,255,255,0.07); border-color: var(--text2); color: var(--text); }
+.studio-section .eq-bars { height: 120px; }
+.studio-section .eq-label { font-size: 7px; }
 
 @media (min-width:1025px) {
 
@@ -2119,6 +2257,221 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   --sidebar-accent-line: 2px solid var(--accent);
 }
 
+
+/* ── Spotify-style Library page ── */
+.lib-spotify-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 14px 10px;
+  flex-shrink: 0;
+}
+.lib-spotify-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  font-family: 'DM Sans', sans-serif;
+}
+.lib-spotify-title svg { width: 20px; height: 20px; color: var(--text2); }
+.lib-spotify-actions { display: flex; gap: 6px; }
+.lib-spotify-add-btn {
+  background: none; border: none; color: var(--text3); cursor: pointer;
+  padding: 6px; border-radius: 50%; transition: color 0.15s, background 0.15s;
+  display: flex; align-items: center;
+}
+.lib-spotify-add-btn:hover { color: var(--text); background: rgba(255,255,255,0.07); }
+.lib-spotify-add-btn svg { width: 18px; height: 18px; }
+
+/* Filter chips */
+.lib-filter-chips {
+  display: flex;
+  gap: 8px;
+  padding: 0 14px 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  flex-shrink: 0;
+}
+.lib-filter-chips::-webkit-scrollbar { display: none; }
+.lib-chip {
+  background: rgba(255,255,255,0.08);
+  border: none;
+  border-radius: 20px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--text2);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.lib-chip:hover { background: rgba(255,255,255,0.14); color: var(--text); }
+.lib-chip.active { background: var(--text); color: #000; }
+
+/* Grid layout */
+.lib-spotify-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  padding: 0 14px 4px;
+}
+.lib-spotify-item {
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.15s;
+  padding: 4px;
+}
+.lib-spotify-item:hover { background: rgba(255,255,255,0.06); }
+.lib-spotify-item:active { background: rgba(255,255,255,0.1); }
+.lib-spotify-cover {
+  width: 100%;
+  aspect-ratio: 1;
+  border-radius: 8px;
+  background: var(--bg3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  margin-bottom: 8px;
+  flex-shrink: 0;
+}
+.lib-spotify-cover img { width: 100%; height: 100%; object-fit: cover; }
+.lib-spotify-cover svg { width: 36px; height: 36px; }
+/* 4-image grid inside cover */
+.lib-spotify-cover .pl-cover-grid {
+  width: 100%; height: 100%;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.lib-spotify-cover .pl-cover-grid img {
+  width: 100%; height: 100%; object-fit: cover;
+}
+.lib-spotify-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+.lib-spotify-meta {
+  font-size: 11px;
+  color: var(--text3);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* New playlist / Import buttons */
+.lib-new-pl-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'DM Sans', sans-serif;
+  color: var(--text2);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.lib-new-pl-btn:hover { background: rgba(255,255,255,0.1); color: var(--text); }
+.lib-new-pl-btn.accent { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+.lib-new-pl-btn.accent:hover { background: rgba(29,185,84,0.25); }
+.lib-new-pl-btn svg { width: 14px; height: 14px; }
+
+/* Desktop: larger grid cols */
+@media (min-width: 1025px) {
+  .lib-spotify-grid { grid-template-columns: repeat(3, 1fr); }
+  #page-library .lib-spotify-header { padding: 20px 24px 12px; }
+  #page-library .lib-filter-chips { padding: 0 24px 14px; }
+  #page-library .lib-spotify-grid { padding: 0 24px 8px; }
+}
+
+/* ── Spotify-style Library panel expand ── */
+@media (min-width:1025px) {
+  .sidebar-pl-section {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+  #sidebar-pl-list {
+    overflow-y: auto;
+    flex: 1;
+    min-height: 0;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255,255,255,0.1) transparent;
+  }
+  #sidebar-pl-list::-webkit-scrollbar { width: 3px; }
+  #sidebar-pl-list::-webkit-scrollbar-track { background: transparent; }
+  #sidebar-pl-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+  .sidebar-pl-header {
+    display: flex;
+    align-items: center;
+    padding: 10px 14px 8px !important;
+    gap: 6px;
+  }
+  .sidebar-pl-label {
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    color: rgba(255,255,255,0.4) !important;
+    letter-spacing: 1px !important;
+    text-transform: uppercase !important;
+    flex: 1;
+  }
+  .sidebar-pl-expand-btn {
+    background: none;
+    border: none;
+    color: rgba(255,255,255,0.3);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    transition: color 0.15s, background 0.15s;
+  }
+  .sidebar-pl-expand-btn:hover { color: rgba(255,255,255,0.8); background: rgba(255,255,255,0.06); }
+  .sidebar-pl-expand-btn svg { width: 14px; height: 14px; }
+
+  /* Expanded library takes more width */
+  body.library-expanded .bottom-nav {
+    width: 420px !important;
+    min-width: 420px !important;
+  }
+  body.library-expanded .sidebar-pl-section {
+    overflow-y: auto;
+  }
+  /* scrollbar */
+  .sidebar-pl-section::-webkit-scrollbar { width: 3px; }
+  .sidebar-pl-section::-webkit-scrollbar-track { background: transparent; }
+  .sidebar-pl-section::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 2px; }
+
+  /* Show "Recently Played" in sidebar too */
+  .sidebar-pl-recent-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 6px 14px; cursor: pointer;
+    border-radius: 0; transition: background 0.15s;
+  }
+  .sidebar-pl-recent-item:hover { background: rgba(255,255,255,0.05); }
+}
+
+
 /* ============================================================
    PLAYBAR — full redesign (desktop only)
    ============================================================ */
@@ -2829,6 +3182,11 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
 }
 /* ── end desktop redesign ── */
 
+@media (min-width:1025px) {
+  #nav-studio, #sidebar-pl-section { display:none !important; }
+  .bottom-nav .sidebar-nav-label:last-of-type { margin-top: auto; }
+}
+
 /* ====== TOPBAR SEARCH DROPDOWN ====== */
 .topbar-search-wrap {
   position: relative;
@@ -3392,12 +3750,9 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
     </div>
 
     <!-- LIBRARY PAGE -->
-    <div class="page" id="page-library">
-      <div class="topbar">
-        <h1>Library</h1>
-        <div id="home-count-lib" style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace"></div>
-      </div>
-      <!-- UNIFIED SEARCH BAR -->
+    <!-- SEARCH PAGE -->
+    <div class="page" id="page-search">
+      <div class="topbar"><h1>Search</h1></div>
       <div class="search-bar" style="position:relative">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
         <input type="text" id="search-input" placeholder="Search everything…" oninput="voidHandleInput(this.value)" onkeydown="if(event.key==='Enter')voidSearch(this.value,true)">
@@ -3405,25 +3760,42 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:16px;height:16px"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
-      <!-- UNIFIED SEARCH RESULTS (shown when query active) -->
       <div id="void-search-results" style="display:none">
         <div class="yt-results" id="void-results-list"></div>
       </div>
-      <!-- Local library section (shown when no search active) -->
-      <div id="lib-local-section">
-      <div class="ytscan-scan-btn-wrap" id="ytscan-btn-wrap" style="display:none">
-        <button class="ytscan-scan-btn" onclick="openYTScan()">
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16" fill="var(--yt)" stroke="none"/></svg>
-          Scan Library for YouTube Matches
-        </button>
+      <div id="search-empty-state" style="padding:40px 20px;text-align:center;color:var(--text3)">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:48px;height:48px;margin:0 auto 12px;display:block;opacity:0.3"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <div style="font-size:14px;font-weight:600;margin-bottom:4px">Search VOID</div>
+        <div style="font-size:12px">Find local tracks, YouTube &amp; SoundCloud</div>
       </div>
-      <label class="upload-btn" for="file-input">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/></svg>
-        Upload Music Files
-      </label>
+    </div>
+
+    <div class="page" id="page-library">
+      <!-- Spotify-style Library header -->
+      <div class="lib-spotify-header">
+        <div class="lib-spotify-title">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+          Your Library
+        </div>
+        <div class="lib-spotify-actions">
+          <button class="lib-spotify-add-btn" onclick="createPlaylist()" title="Create playlist">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Filter chips -->
+      <div class="lib-filter-chips" id="lib-filter-chips">
+        <button class="lib-chip active" data-filter="all" onclick="setLibFilter('all')">All</button>
+        <button class="lib-chip" data-filter="playlists" onclick="setLibFilter('playlists')">Playlists</button>
+        <button class="lib-chip" data-filter="tracks" onclick="setLibFilter('tracks')">Songs</button>
+      </div>
+
+      <!-- Upload + file input (hidden label, always available) -->
       <input type="file" id="file-input" multiple accept="audio/*">
-      <!-- Drive transfer progress banner — shown during upload/download only -->
-      <div id="lib-xfer-banner" style="display:none;margin:0 20px 10px;padding:10px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:12px;">
+
+      <!-- Drive transfer progress banner -->
+      <div id="lib-xfer-banner" style="display:none;margin:0 14px 10px;padding:10px 14px;background:var(--bg3);border:1px solid var(--border2);border-radius:12px;">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
           <span id="lib-xfer-label" style="font-size:11px;font-family:'Space Mono',monospace;color:var(--text2)">Uploading to Drive</span>
           <span id="lib-xfer-count" style="font-size:11px;font-family:'Space Mono',monospace;color:var(--text3)">0 / 0</span>
@@ -3433,43 +3805,91 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
         </div>
         <div id="lib-xfer-track" style="font-size:11px;color:var(--text3);margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
       </div>
-      <div class="lib-section">
-        <div class="lib-section-row">
-          <div class="lib-label" id="lib-label">All Tracks</div>
-        </div>
-        <div id="track-list"><div class="empty-state"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><p>Upload music files or stream from YouTube</p></div></div>
-      </div>
+
+      <!-- YT scan button -->
+      <div class="ytscan-scan-btn-wrap" id="ytscan-btn-wrap" style="display:none">
+        <button class="ytscan-scan-btn" onclick="openYTScan()">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="10"/><polygon points="10,8 16,12 10,16" fill="var(--yt)" stroke="none"/></svg>
+          Scan Library for YouTube Matches
+        </button>
       </div>
 
-      <!-- PLAYLISTS SECTION (merged into Library) -->
+      <!-- PLAYLISTS VIEW (Spotify grid style) -->
       <div id="lib-playlists-section">
-        <div class="lib-section-row" style="padding:16px 20px 4px;display:flex;align-items:center;justify-content:space-between">
-          <div class="lib-label">Playlists</div>
-          <div style="display:flex;gap:8px">
-            <button class="queue-clear-btn" onclick="showOnlinePlOverlay()" style="font-size:10px">Import</button>
-            <button class="queue-clear-btn" onclick="createPlaylist()" style="font-size:10px">+ New</button>
+        <!-- Pinned special items row -->
+        <div class="lib-spotify-grid" id="lib-special-grid">
+          <div class="lib-spotify-item" onclick="showFavorites()">
+            <div class="lib-spotify-cover" style="background:rgba(29,185,84,0.15);border:1px solid rgba(29,185,84,0.25)">
+              <svg fill="var(--accent)" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+            </div>
+            <div class="lib-spotify-name">Favorites</div>
+            <div class="lib-spotify-meta">Playlist</div>
+          </div>
+          <div class="lib-spotify-item" onclick="showRecentlyPlayed()">
+            <div class="lib-spotify-cover" style="background:rgba(255,255,255,0.05)">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:var(--text2)"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </div>
+            <div class="lib-spotify-name">Recently Played</div>
+            <div class="lib-spotify-meta">Playlist</div>
+          </div>
+          <div class="lib-spotify-item lib-upload-tile" onclick="document.getElementById('file-input').click()">
+            <div class="lib-spotify-cover" style="background:rgba(255,255,255,0.04);border:1.5px dashed rgba(255,255,255,0.12)">
+              <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:var(--text3)"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0018 9h-1.26A8 8 0 103 16.3"/></svg>
+            </div>
+            <div class="lib-spotify-name" style="color:var(--text2)">Upload Files</div>
+            <div class="lib-spotify-meta">Add music</div>
           </div>
         </div>
-        <div class="pl-list" id="pl-list"></div>
+
+        <!-- User playlists grid -->
+        <div class="lib-spotify-grid" id="pl-list"></div>
+
+        <!-- Import / New buttons -->
+        <div style="display:flex;gap:8px;padding:4px 14px 16px">
+          <button class="lib-new-pl-btn" onclick="showOnlinePlOverlay()">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Import Playlist
+          </button>
+          <button class="lib-new-pl-btn accent" onclick="createPlaylist()">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            New Playlist
+          </button>
+        </div>
+      </div>
+
+      <!-- SONGS VIEW -->
+      <div id="lib-local-section" style="display:none">
+        <div class="lib-section">
+          <div class="lib-section-row" style="padding:8px 14px 4px;display:flex;align-items:center;justify-content:space-between">
+            <div class="lib-label" id="lib-label">All Songs</div>
+          </div>
+          <div id="track-list"><div class="empty-state"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg><p>Upload music files or stream from YouTube</p></div></div>
+        </div>
       </div>
 
     </div>
 
     <!-- QUEUE PAGE -->
+    <!-- STUDIO PAGE (mobile) — full content injected by initMobileStudio() -->
+    <div class="page" id="page-studio">
+      <div class="topbar"><h1>Studio</h1></div>
+      <div id="mobile-studio-scroll" style="overflow-y:auto;flex:1;min-height:0;padding-bottom:80px"></div>
+    </div>
+
     <div class="page" id="page-queue">
       <div class="topbar">
         <h1>Queue</h1>
         <div class="desktop-topbar-search">
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input type="text" placeholder="Search library…" id="desktop-search-queue"
-            oninput="(function(v){var si=document.getElementById('search-input');if(si){si.value=v;if(typeof voidHandleInput==='function')voidHandleInput(v);}if(v.trim())showPage('library');})(this.value)">
+            oninput="(function(v){var si=document.getElementById('search-input');if(si){si.value=v;if(typeof voidHandleInput==='function')voidHandleInput(v);}if(v.trim())showPage('search');})(this.value)">
         </div>
       </div>
       <div class="queue-hdr">
         <p id="queue-info">No tracks in queue</p>
         <div class="queue-hdr-actions">
           <button class="queue-clear-btn" onclick="clearManualQueue()" id="queue-clear-manual-btn" style="display:none">Clear Added</button>
-          <button class="queue-clear-btn" onclick="showPage('library')">+ Add</button>
+          <button class="queue-clear-btn" onclick="showPage('search')">+ Add</button>
         </div>
       </div>
       <div class="queue-list" id="queue-list"></div>
@@ -3482,7 +3902,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
         <div class="desktop-topbar-search">
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
           <input type="text" placeholder="Search library…" id="desktop-search-settings"
-            oninput="(function(v){var si=document.getElementById('search-input');if(si){si.value=v;if(typeof voidHandleInput==='function')voidHandleInput(v);}if(v.trim())showPage('library');})(this.value)">
+            oninput="(function(v){var si=document.getElementById('search-input');if(si){si.value=v;if(typeof voidHandleInput==='function')voidHandleInput(v);}if(v.trim())showPage('search');})(this.value)">
         </div>
         <div style="font-size:9px;color:var(--accent);font-family:'Space Mono',monospace">V6</div>
       </div>
@@ -3631,10 +4051,22 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
       <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
       Library
     </button>
+    <button class="nav-btn" id="nav-search" onclick="showPage('search')" aria-label="Search">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      Search
+    </button>
+    <button class="nav-btn" id="nav-studio" onclick="showPage('studio')" aria-label="Studio">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      Studio
+    </button>
     <!-- Sidebar playlist quick-access panel (desktop only) -->
     <div class="sidebar-pl-section" id="sidebar-pl-section">
       <div class="sidebar-pl-header">
-        <span class="sidebar-pl-label">Playlists</span>
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:16px;height:16px;color:rgba(255,255,255,0.4);flex-shrink:0"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+        <span class="sidebar-pl-label">Your Library</span>
+        <button class="sidebar-pl-expand-btn" onclick="toggleLibraryExpand()" title="Expand library" id="lib-expand-btn">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+        </button>
         <button class="sidebar-pl-new-btn" onclick="createPlaylist()" title="New playlist">
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
         </button>
@@ -3739,9 +4171,8 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
       <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 010 14.14"/><path d="M15.54 8.46a5 5 0 010 7.07"/></svg>
     </div>
 
-    <div class="np-tabs">
+    <div class="np-tabs" style="display:none">
       <button class="np-tab active" data-tab="queue" onclick="switchNPTab('queue')">Queue</button>
-      <button class="np-tab" data-tab="eq" onclick="switchNPTab('eq')">Equalizer</button>
     </div>
 
     <!-- QUEUE TAB -->
@@ -4375,6 +4806,12 @@ function initAudioContext() {
   analyserNode.fftSize = 256;
   analyserNode.smoothingTimeConstant = 0.8;
 
+  // Post-gain analyser — this sees the final output signal including gain changes
+  // The visualizer uses this so it reflects EQ + comp + reverb + gain
+  const postGainAnalyser = audioCtx.createAnalyser();
+  postGainAnalyser.fftSize = 256;
+  postGainAnalyser.smoothingTimeConstant = 0.8;
+
   // Reverb (convolver + wet/dry gains)
   reverbNode     = audioCtx.createConvolver();
   reverbGainNode = audioCtx.createGain(); reverbGainNode.gain.value = 0;
@@ -4391,10 +4828,11 @@ function initAudioContext() {
   dryGainNode.connect(analyserNode);
   reverbGainNode.connect(analyserNode);
   analyserNode.connect(gainNode);
-  gainNode.connect(audioCtx.destination);
+  gainNode.connect(postGainAnalyser);
+  postGainAnalyser.connect(audioCtx.destination);
 
   // Expose globally so studio panel can access
-  window._voidAudio = { compNode, panNode, analyserNode, reverbNode, reverbGainNode, dryGainNode, gainNode, audioCtx };
+  window._voidAudio = { compNode, panNode, analyserNode, reverbNode, reverbGainNode, dryGainNode, gainNode, audioCtx, postGainAnalyser };
 
   // ── Apply saved studio state to freshly created nodes ────────────────────
   // _savedStudioState is set by loadAll() and kept alive until here
@@ -4607,11 +5045,6 @@ async function playTrack(idx, pushHistory=true) {
   if (pushHistory && currentIndex>=0) queue.history.push(currentIndex);
   currentIndex = idx;
   const t = tracks[idx];
-  // Reflect current track in the browser URL bar and enable the back button
-  if (pushHistory) {
-    window.history.pushState({ voidTrackIdx: idx }, '', '/?t=' + encodeURIComponent(t.id));
-  }
-
   if (t.isOnline) {
     // No direct streaming — download & cache the audio first, then play.
     // ytFetchAndPlay handles the whole flow with a progress toast.
@@ -5082,6 +5515,108 @@ function setVolume(val) {
   if (gainNode) gainNode.gain.value = multiplier;
   else audioEl.volume = v;
   saveSettings();
+  checkAudioSafety();
+}
+
+// ==============================
+// AUDIO SAFETY SYSTEM
+// ==============================
+let _safetyWarnState = 0; // 0=ok, 1=warned, 2=danger-warned
+let _safetyDialogOpen = false;
+
+function getAudioSafetyLevel() {
+  const vol = parseFloat((document.getElementById('vol-slider') || {}).value || 0);
+  const gain = parseFloat((document.getElementById('studio-gain-slider') || {}).value || 0);
+  if (vol > 85 || gain > 15) return 2; // danger
+  if (vol > 70 || gain > 10) return 1; // warning
+  return 0; // ok
+}
+
+function updateGainSafetyColor() {
+  const gain = parseFloat((document.getElementById('studio-gain-slider') || {}).value || 0);
+  const gainNumEl = document.getElementById('studio-gain-num');
+  const gainValEl = document.getElementById('studio-gain-val');
+  const gainSlider = document.getElementById('studio-gain-slider');
+  let color = 'var(--accent)';
+  if (gain > 15) color = 'var(--danger)';
+  else if (gain > 10) color = '#f1c40f';
+  if (gainNumEl) gainNumEl.style.color = color;
+  if (gainValEl) gainValEl.style.color = color;
+  if (gainSlider) {
+    const min = parseFloat(gainSlider.min), max = parseFloat(gainSlider.max);
+    const pct = ((gain - min) / (max - min)) * 100;
+    gainSlider.style.background = `linear-gradient(to right, ${color} ${pct}%, var(--bg4) ${pct}%)`;
+  }
+}
+
+function checkAudioSafety() {
+  updateGainSafetyColor();
+  if (_safetyDialogOpen) return;
+  const level = getAudioSafetyLevel();
+  if (level === 0) {
+    _safetyWarnState = 0; // Reset so warnings can re-trigger if user goes high again
+    return;
+  }
+  if (level < 2 && _safetyWarnState >= 2) {
+    _safetyWarnState = 1; // Dropped from danger to warning zone
+  }
+  if (level === 2 && _safetyWarnState < 2) {
+    _safetyWarnState = 2;
+    showSafetyDialog();
+  } else if (level === 1 && _safetyWarnState < 1) {
+    _safetyWarnState = 1;
+    showSafetyToast();
+  }
+}
+
+function showSafetyToast() {
+  const msg = 'High volume may cause hearing discomfort.';
+  const toastEl = document.getElementById('toast');
+  if (!toastEl) return;
+  const prev = toastEl.textContent;
+  toastEl.style.background = 'rgba(241,196,15,0.95)';
+  toastEl.style.color = '#000';
+  toastEl.textContent = '⚠ ' + msg;
+  toastEl.classList.add('show');
+  setTimeout(() => {
+    toastEl.classList.remove('show');
+    setTimeout(() => {
+      toastEl.style.background = '';
+      toastEl.style.color = '';
+    }, 300);
+  }, 3500);
+}
+
+function showSafetyDialog() {
+  if (_safetyDialogOpen) return;
+  _safetyDialogOpen = true;
+  const overlay = document.createElement('div');
+  overlay.id = 'safety-dialog-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px)';
+  overlay.innerHTML = `
+    <div style="background:#111;border:1px solid rgba(231,76,60,0.4);border-radius:16px;padding:28px 24px;max-width:340px;width:90%;box-shadow:0 24px 64px rgba(0,0,0,0.8),0 0 0 1px rgba(231,76,60,0.2)">
+      <div style="font-size:28px;margin-bottom:12px;text-align:center">🔊</div>
+      <div style="font-size:15px;font-weight:700;color:#fff;margin-bottom:8px;text-align:center">Extremely High Audio Levels</div>
+      <div style="font-size:13px;color:rgba(255,255,255,0.6);line-height:1.5;text-align:center;margin-bottom:20px">Warning: Extremely high audio levels may damage hearing. Prolonged exposure at this volume is not recommended.</div>
+      <div style="display:flex;gap:10px">
+        <button id="safety-lower-btn" style="flex:1;padding:12px;background:var(--accent);border:none;border-radius:10px;font-size:13px;font-weight:700;color:#000;cursor:pointer;font-family:'DM Sans',sans-serif">Lower Volume</button>
+        <button id="safety-continue-btn" style="flex:1;padding:12px;background:rgba(231,76,60,0.12);border:1px solid rgba(231,76,60,0.3);border-radius:10px;font-size:13px;font-weight:600;color:var(--danger);cursor:pointer;font-family:'DM Sans',sans-serif">Continue</button>
+      </div>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.querySelector('#safety-lower-btn').onclick = function() {
+    const volEl = document.getElementById('vol-slider');
+    const gainEl = document.getElementById('studio-gain-slider');
+    if (volEl && parseFloat(volEl.value) > 70) { volEl.value = 70; setVolume(70); }
+    if (gainEl && parseFloat(gainEl.value) > 10) { gainEl.value = 10; gainEl.dispatchEvent(new Event('input')); }
+    _safetyWarnState = 1;
+    _safetyDialogOpen = false;
+    overlay.remove();
+  };
+  overlay.querySelector('#safety-continue-btn').onclick = function() {
+    _safetyDialogOpen = false;
+    overlay.remove();
+  };
 }
 
 // ==============================
@@ -5658,17 +6193,20 @@ function voidHandleInput(val) {
   const localSec   = document.getElementById('lib-local-section');
   const searchSec  = document.getElementById('void-search-results');
   const plSec      = document.getElementById('lib-playlists-section');
+  const emptyState = document.getElementById('search-empty-state');
 
   if (!val.trim()) {
     if (localSec)  localSec.style.display  = '';
     if (searchSec) searchSec.style.display = 'none';
     if (plSec)     plSec.style.display     = '';
+    if (emptyState) emptyState.style.display = 'block';
     _voidLastQuery = '';
     return;
   }
   if (localSec)  localSec.style.display  = 'none';
   if (searchSec) searchSec.style.display = '';
   if (plSec)     plSec.style.display     = 'none';
+  if (emptyState) emptyState.style.display = 'none';
 
   clearTimeout(_voidSearchTimer);
   if (val.length > 1) _voidSearchTimer = setTimeout(() => voidSearch(val, false), 450);
@@ -5909,7 +6447,7 @@ async function voidDownloadTrack(idx, btnId) {
 
 // Quick-search entry point (used by artist chips, artist pages, etc.)
 function voidQuickSearch(term) {
-  showPage('library');
+  showPage('search');
   const inp = document.getElementById('search-input');
   if (inp) { inp.value = term; voidHandleInput(term); }
   _voidLastQuery = '';
@@ -6106,7 +6644,7 @@ function openSeeAll(key) {
       </div>`;
     }).join('');
     overlay.classList.add('open');
-    window.history.pushState({ voidOverlay: 'seeAll', voidSeeAllKey: key }, '', window.location.pathname + window.location.search);
+    
     return;
   } else if (key.startsWith('artist:')) {
     const artist = decodeURIComponent(key.slice(7));
@@ -6150,7 +6688,7 @@ function openSeeAll(key) {
     </div>`;
   }).join('') || `<div class="empty-state"><p>Nothing here yet</p></div>`;
   overlay.classList.add('open');
-  window.history.pushState({ voidOverlay: 'seeAll', voidSeeAllKey: key }, '', window.location.pathname + window.location.search);
+  
 }
 
 function playArtist(artist) {
@@ -6731,47 +7269,55 @@ function jumpToQueueItem(futureIdx) {
 // ==============================
 // PLAYLIST SYSTEM
 // ==============================
-function renderPlaylistsPage() {
-  const list=document.getElementById('pl-list');
-  const favCount=[...favorites].filter(id=>tracks.find(t=>t.id===id)).length;
-  let html=`
-    <div class="pl-item pl-special" onclick="showFavorites()">
-      <div class="pl-cover" style="background:rgba(29,185,84,0.12);border:1px solid rgba(29,185,84,0.2)">
-        <svg fill="var(--accent)" viewBox="0 0 24 24" stroke="none"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
-      </div>
-      <div class="pl-info"><div class="pl-name" style="color:var(--accent)">Favorites</div><div class="pl-count">${favCount} track${favCount!==1?'s':''}</div></div>
-    </div>
-    <div class="pl-item pl-special" onclick="showRecentlyPlayed()">
-      <div class="pl-cover" style="background:rgba(255,255,255,0.05);border:1px solid var(--border2)">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:var(--text2)"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-      </div>
-      <div class="pl-info"><div class="pl-name">Recently Played</div><div class="pl-count">${recentlyPlayed.length} track${recentlyPlayed.length!==1?'s':''}</div></div>
-    </div>`;
 
-  if (playlists.length) {
-    html+=playlists.map(pl=>{
-      const plTracks=(pl.trackIds||[]).map(id=>tracks.find(t=>t.id===id)).filter(Boolean);
-      const covers=plTracks.slice(0,4).map(t=>(t.ytMeta&&t.ytMeta.thumbnail)?t.ytMeta.thumbnail:t.cover);
-      let coverHTML;
-      if (covers.length>=4) {
-        coverHTML=`<div class="pl-cover-grid">${covers.map(c=>c?`<img src="${c}" alt="">`:`<div class="pl-grid-placeholder"></div>`).join('')}</div>`;
-      } else if (covers[0]) {
-        coverHTML=`<img src="${covers[0]}" alt="" style="width:100%;height:100%;object-fit:cover">`;
-      } else {
-        coverHTML=`<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>`;
-      }
-      return `<div class="pl-item" onclick="openPlaylist('${pl.id}')">
-        <div class="pl-cover">${coverHTML}</div>
-        <div class="pl-info"><div class="pl-name">${esc(pl.name)}</div><div class="pl-count">${plTracks.length} track${plTracks.length!==1?'s':''}</div></div>
-        <button class="pl-more-btn" onclick="event.stopPropagation();openPlaylist('${pl.id}')">
-          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg>
-        </button>
-      </div>`;
-    }).join('');
-  } else {
-    html+=`<div class="empty-state" style="padding:32px 20px"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg><p>Create a playlist to organize your music</p></div>`;
+// ── Auto-maintained "Local Songs" playlist ─────────────────────────────────
+function ensureLocalSongsPlaylist() {
+  const LOCAL_PL_ID = 'void_local_songs';
+  const localTracks = tracks.filter(t => !t.ytId && !t.scId && t.url && !t.url.startsWith('http'));
+  let pl = playlists.find(p => p.id === LOCAL_PL_ID);
+  if (!pl) {
+    pl = { id: LOCAL_PL_ID, name: 'Local Songs', trackIds: [], _auto: true };
+    playlists.unshift(pl);
   }
-  list.innerHTML=html;
+  pl.trackIds = localTracks.map(t => t.id);
+  pl._auto = true;
+  if (pl.trackIds.length === 0) {
+    // Remove if empty to avoid clutter
+    const idx = playlists.findIndex(p => p.id === LOCAL_PL_ID);
+    if (idx > -1) playlists.splice(idx, 1);
+  }
+}
+
+function renderPlaylistsPage() {
+  ensureLocalSongsPlaylist();
+  const list = document.getElementById('pl-list');
+  if (!list) return;
+
+  if (!playlists.length) {
+    list.innerHTML = `<div style="grid-column:1/-1;padding:20px 0 8px;text-align:center;color:var(--text3);font-size:13px">No playlists yet</div>`;
+    return;
+  }
+
+  list.innerHTML = playlists.map(pl => {
+    const plTracks = (pl.trackIds || []).map(id => tracks.find(t => t.id === id)).filter(Boolean);
+    const covers = plTracks.slice(0, 4).map(t => (t.ytMeta && t.ytMeta.thumbnail) ? t.ytMeta.thumbnail : t.cover);
+    const isLocal = pl.id === 'void_local_songs';
+    let coverHTML;
+    if (isLocal) {
+      coverHTML = `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;background:rgba(29,185,84,0.1)"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:36px;height:36px;color:var(--accent)"><path d="M3 18v-6a9 9 0 0118 0v6"/><path d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z"/></svg></div>`;
+    } else if (covers.length >= 4) {
+      coverHTML = `<div class="pl-cover-grid">${covers.map(c => c ? `<img src="${c}" alt="">` : `<div class="pl-grid-placeholder"></div>`).join('')}</div>`;
+    } else if (covers[0]) {
+      coverHTML = `<img src="${covers[0]}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:8px">`;
+    } else {
+      coverHTML = `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>`;
+    }
+    return `<div class="lib-spotify-item" onclick="openPlaylist('${pl.id}')">
+      <div class="lib-spotify-cover">${coverHTML}</div>
+      <div class="lib-spotify-name" style="${isLocal ? 'color:var(--accent)' : ''}">${esc(pl.name)}</div>
+      <div class="lib-spotify-meta">${plTracks.length} song${plTracks.length !== 1 ? 's' : ''}</div>
+    </div>`;
+  }).join('');
 }
 
 function createPlaylist() {
@@ -6786,10 +7332,10 @@ function openPlaylist(id) {
   const pl=playlists.find(p=>p.id===id); if (!pl) return;
   detailPlaylistId=id;
   document.getElementById('pl-detail-title').textContent=pl.name;
-  document.getElementById('pl-detail-delete-btn').style.display='';
+  document.getElementById('pl-detail-delete-btn').style.display=(id==='void_local_songs'?'none':'');
   renderPlaylistDetail();
   document.getElementById('pl-detail').classList.add('open');
-  window.history.pushState({ voidOverlay: 'playlist', voidPlaylistId: id }, '', window.location.pathname + window.location.search);
+  
 }
 
 function renderPlaylistDetail() {
@@ -6895,6 +7441,7 @@ function renameCurrPlaylist() {
 
 function deleteCurrPlaylist() {
   const pl=playlists.find(p=>p.id===detailPlaylistId); if (!pl) return;
+  if (pl.id==='void_local_songs') { showToast('Local Songs cannot be deleted'); return; }
   playlists=playlists.filter(p=>p.id!==detailPlaylistId);
   savePlaylists(); closePlDetail(); renderPlaylistsPage(); showToast('Playlist deleted');
 }
@@ -6921,6 +7468,23 @@ function shufflePlayPlaylist() {
 
 function removePlTrack(plId, trackId) {
   const pl=playlists.find(p=>p.id===plId); if (!pl) return;
+  if (plId==='void_local_songs') {
+    // Remove from entire library
+    const idx=tracks.findIndex(t=>t.id===trackId); if (idx<0) return;
+    const t=tracks[idx];
+    removeTrackFromDB(t).catch(()=>{});
+    favorites.delete(t.id);
+    recentlyPlayed=recentlyPlayed.filter(id=>id!==t.id);
+    playlists.forEach(p=>{ p.trackIds=(p.trackIds||[]).filter(id=>id!==t.id); });
+    tracks.splice(idx,1);
+    if (currentIndex>=tracks.length) currentIndex=tracks.length-1;
+    queue.history=queue.history.filter(i=>i!==idx).map(i=>i>idx?i-1:i);
+    queue.future=queue.future.filter(i=>i!==idx).map(i=>i>idx?i-1:i);
+    queue.manual=queue.manual.filter(i=>i!==idx).map(i=>i>idx?i-1:i);
+    if (isSmartShuffle) buildSmartShuffleQueue(); else if (isShuffle) buildShuffleQueue();
+    savePlaylists(); saveSettings(); renderAll(); updateUI(); ensureLocalSongsPlaylist(); renderPlaylistDetail(); showToast('Track removed from library');
+    return;
+  }
   pl.trackIds=(pl.trackIds||[]).filter(id=>id!==trackId);
   savePlaylists(); renderPlaylistDetail(); renderPlaylistsPage(); showToast('Removed from playlist');
 }
@@ -7286,6 +7850,21 @@ function saveCustomEQPreset() {
   });
 }
 
+function deleteCustomEQPreset(name) {
+  const builtIn = ['VOID','Flat','Bass+','Treble+','V-Shape','Pop','Rock','Jazz','Classical','Hip-Hop','Electronic','Lounge','Acoustic'];
+  if (builtIn.includes(name)) return;
+  delete EQ_PRESETS[name];
+  const custom = {};
+  for (const [k, v] of Object.entries(EQ_PRESETS)) {
+    if (!builtIn.includes(k)) custom[k] = v;
+  }
+  localStorage.setItem('void_custom_eq_presets', JSON.stringify(custom));
+  if (currentPreset === name) currentPreset = 'VOID';
+  buildEQ();
+  if (typeof syncDesktopEQ === 'function') syncDesktopEQ();
+  showToast('Preset "' + name + '" deleted');
+}
+
 function confirmClearLibrary() {
   openModal('Clear Library','Type "clear" to confirm','', async (val) => {
     if (val.toLowerCase() !== 'clear') return;
@@ -7372,7 +7951,7 @@ async function openSaavnArtistPage(artistId) {
   actionsEl.style.display = 'none';
   if (bgEl) bgEl.style.backgroundImage = 'none';
   overlay.style.display = 'flex';
-  window.history.pushState({ voidOverlay: 'artist' }, '', window.location.pathname + window.location.search);
+  
   try {
     const resp = await fetch(`${VOID_API_BASE}/youtube/artist?id=${encodeURIComponent(artistId)}`, { signal: AbortSignal.timeout(12000) });
     if (!resp.ok) throw new Error('Artist fetch failed');
@@ -7423,7 +8002,7 @@ async function openSCArtistPage(userId) {
   actionsEl.style.display = 'none';
   if (bgEl) bgEl.style.backgroundImage = 'none';
   overlay.style.display = 'flex';
-  window.history.pushState({ voidOverlay: 'artist' }, '', window.location.pathname + window.location.search);
+  
   try {
     const resp = await fetch(`${VOID_API_BASE}/soundcloud/artist?id=${encodeURIComponent(userId)}`, { signal: AbortSignal.timeout(12000) });
     if (!resp.ok) throw new Error('Artist fetch failed');
@@ -7526,7 +8105,7 @@ async function openSaavnAlbumPage(albumId) {
   actionsEl.style.display = 'none';
   if (bgEl) bgEl.style.backgroundImage = 'none';
   overlay.style.display='flex';
-  window.history.pushState({ voidOverlay: 'album' }, '', window.location.pathname + window.location.search);
+  
   try {
     const resp = await fetch(`${VOID_API_BASE}/youtube/album?id=${encodeURIComponent(albumId)}`, { signal: AbortSignal.timeout(12000) });
     if (!resp.ok) throw new Error('Album fetch failed');
@@ -7578,7 +8157,7 @@ async function openSCPlaylistPage(idOrUrl) {
   actionsEl.style.display = 'none';
   if (bgEl) bgEl.style.backgroundImage = 'none';
   overlay.style.display = 'flex';
-  window.history.pushState({ voidOverlay: 'album' }, '', window.location.pathname + window.location.search);
+  
 
   try {
     const resp = await fetch(`${VOID_API_BASE}/soundcloud/playlist?id=${encodeURIComponent(idOrUrl)}`, { signal: AbortSignal.timeout(30000) });
@@ -9012,26 +9591,26 @@ async function ytImportPlaylistById(plId, knownTitle, inputEl) {
 // EQ
 // ==============================
 function buildEQ() {
-  const pc=document.getElementById('eq-presets');
-  pc.innerHTML=Object.keys(EQ_PRESETS).map(name=>`<button class="preset-btn${name===currentPreset?' active':''}" onclick="applyPreset('${name}')">${name}</button>`).join('');
+  const builtInEQ = ['VOID','Flat','Bass+','Treble+','V-Shape','Pop','Rock','Jazz','Classical','Hip-Hop','Electronic','Lounge','Acoustic'];
+  function eqPresetHTML(onclick) {
+    return Object.keys(EQ_PRESETS).map(name => {
+      const isCustom = !builtInEQ.includes(name);
+      const isActive = name === currentPreset;
+      return `<div class="preset-chip-wrap">
+        <button class="preset-btn${isActive?' active':''}" onclick="${onclick}('${name}')">${name}</button>
+        ${isCustom ? `<button class="preset-chip-del" onclick="event.stopPropagation();deleteCustomEQPreset('${name}')" title="Delete">×</button>` : ''}
+      </div>`;
+    }).join('');
+  }
 
-  // Smooth drag scrolling for presets
-  const el=pc;
-  let isDown=false, startX=0, scrollLeft=0, hasDragged=false;
-  el.addEventListener('mousedown',e=>{ isDown=true; hasDragged=false; startX=e.pageX-el.offsetLeft; scrollLeft=el.scrollLeft; el.style.cursor='grabbing'; });
-  document.addEventListener('mouseup',()=>{ isDown=false; el.style.cursor='grab'; });
-  el.addEventListener('mouseleave',()=>{ isDown=false; el.style.cursor='grab'; });
-  el.addEventListener('mousemove',e=>{
-    if (!isDown) return; e.preventDefault();
-    const x=e.pageX-el.offsetLeft; const walk=(x-startX)*1.2;
-    if (Math.abs(walk)>3) hasDragged=true;
-    el.scrollLeft=scrollLeft-walk;
-  });
-  // Mouse wheel horizontal scroll
-  el.addEventListener('wheel',e=>{ e.preventDefault(); el.scrollLeft+=e.deltaY||e.deltaX; },{passive:false});
+  const pc=document.getElementById('eq-presets');
+  if (pc) pc.innerHTML = eqPresetHTML('applyPreset');
+
+  const mobPc = document.getElementById('mob-eq-presets');
+  if (mobPc) mobPc.innerHTML = eqPresetHTML('applyPreset');
 
   const bc=document.getElementById('eq-bars');
-  bc.innerHTML=EQ_ALL_FREQS.map((freq,i)=>`
+  const eqBandHTML = EQ_ALL_FREQS.map((freq,i)=>`
     <div class="eq-band">
       <div class="eq-db" id="eq-db-${i}">${eqValues[i]>0?'+':''}${eqValues[i]}</div>
       <div class="eq-band-wrap">
@@ -9040,12 +9619,22 @@ function buildEQ() {
       </div>
       <div class="eq-label">${EQ_ALL_LABELS[i]}</div>
     </div>`).join('');
+  bc.innerHTML = eqBandHTML;
+
+  const mobBc = document.getElementById('mob-eq-bars');
+  if (mobBc) mobBc.innerHTML = eqBandHTML;
 }
 
 function updateEQBand(i,val) {
   val=parseFloat(val); eqValues[i]=val;
-  const db=document.getElementById('eq-db-'+i); if(db) db.textContent=(val>0?'+':'')+val;
-  const ddb=document.getElementById('eq-db-desk-'+i); if(ddb) ddb.textContent=(val>0?'+':'')+val;
+  const label = (val>0?'+':'')+val;
+  // Update all eq-db labels (eq-bars and mob-eq-bars share the same id pattern)
+  document.querySelectorAll('#eq-db-'+i).forEach(el=>el.textContent=label);
+  const ddb=document.getElementById('eq-db-desk-'+i); if(ddb) ddb.textContent=label;
+  // Sync mob-eq-bars slider
+  const mobSl=document.querySelector(`#mob-eq-bars .eq-band:nth-child(${i+1}) input`); if(mobSl) mobSl.value=val;
+  // Sync eq-bars slider (if triggered from mob-eq-bars)
+  const mainSl=document.querySelector(`#eq-bars .eq-band:nth-child(${i+1}) input`); if(mainSl) mainSl.value=val;
   if (eqNodes[i]) eqNodes[i].gain.value=eqEnabled?val:0;
   currentPreset='Custom'; document.querySelectorAll('.preset-btn').forEach(b=>b.classList.remove('active'));
 }
@@ -9054,12 +9643,14 @@ function applyPreset(name) {
   currentPreset=name; eqValues=[...EQ_PRESETS[name]];
   eqValues.forEach((v,i)=>{
     if (eqNodes[i]) eqNodes[i].gain.value=eqEnabled?v:0;
-    // update main EQ panel
-    const sl=document.querySelector(`#eq-bars .eq-band:nth-child(${i+1}) input`); if(sl) sl.value=v;
-    const db=document.getElementById('eq-db-'+i); if(db) db.textContent=(v>0?'+':'')+v;
-    // update desktop EQ panel
+    const label = (v>0?'+':'')+v;
+    // Update all panels: main, desktop studio, mobile studio
+    ['#eq-bars','#mob-eq-bars'].forEach(sel=>{
+      const sl=document.querySelector(`${sel} .eq-band:nth-child(${i+1}) input`); if(sl) sl.value=v;
+    });
+    document.querySelectorAll('#eq-db-'+i).forEach(el=>el.textContent=label);
     const dsl=document.querySelector(`#eq-bars-desk .eq-band:nth-child(${i+1}) input`); if(dsl) dsl.value=v;
-    const ddb=document.getElementById('eq-db-desk-'+i); if(ddb) ddb.textContent=(v>0?'+':'')+v;
+    const ddb=document.getElementById('eq-db-desk-'+i); if(ddb) ddb.textContent=label;
   });
   document.querySelectorAll('.preset-btn').forEach(b=>b.classList.toggle('active',b.textContent===name));
   saveSettings();
@@ -9071,6 +9662,8 @@ function toggleEQ() {
   if(btn){ btn.textContent=eqEnabled?'ON':'OFF'; btn.className='eq-toggle'+(eqEnabled?' on':''); }
   const deskBtn=document.getElementById('eq-toggle-btn-desk');
   if(deskBtn){ deskBtn.textContent=eqEnabled?'ON':'OFF'; deskBtn.className='studio-fx-btn'+(eqEnabled?' on':''); }
+  const mobBtn=document.getElementById('mob-eq-toggle-btn');
+  if(mobBtn){ mobBtn.textContent=eqEnabled?'ON':'OFF'; mobBtn.className='studio-fx-btn'+(eqEnabled?' on':''); }
   eqNodes.forEach((n,i)=>{ n.gain.value=eqEnabled?eqValues[i]:0; });
   showToast('EQ '+(eqEnabled?'enabled':'bypassed')); saveSettings();
   buildSettingsPage();
@@ -9327,21 +9920,41 @@ function closeNowPlaying() { if (!isDesktop()) document.getElementById('np-overl
 // ==============================
 // PAGES
 // ==============================
+
+
 function showPage(name) {
   // Playlists tab is now merged into Library — redirect
   if (name === 'playlists') name = 'library';
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-  document.getElementById('page-'+name).classList.add('active');
+  const pageEl = document.getElementById('page-'+name);
+  if (!pageEl) return;
+  pageEl.classList.add('active');
   const navBtn=document.getElementById('nav-'+name); if (navBtn) navBtn.classList.add('active');
-  if (name==='library')   { renderTrackList(document.getElementById('search-input').value); renderPlaylistsPage(); }
+  if (name==='library')   { renderTrackList(''); renderPlaylistsPage(); }
   if (name==='queue')     renderQueueList();
   if (name==='home')      { renderHomeRecent(); renderHomePlaylists(); updateHomeCard(); loadUnifiedFeed(); }
   if (name==='settings')  { buildSettingsPage(); setTimeout(()=>ytCheckApiStatus(), 50); }
+  if (name==='search')    {
+    // Show/hide empty state based on search input
+    const si = document.getElementById('search-input');
+    const empty = document.getElementById('search-empty-state');
+    const results = document.getElementById('void-search-results');
+    if (si && si.value.trim()) {
+      if (empty) empty.style.display = 'none';
+    } else {
+      if (empty) empty.style.display = 'block';
+      if (results) results.style.display = 'none';
+    }
+    setTimeout(()=>{ if(si) si.focus(); }, 100);
+  }
+  if (name==='studio')    { renderMobileStudio(); }
   // Push a history state so the browser back button can return to previous page
   if (window.history.state && window.history.state.voidPage === name) return;
-  window.history.pushState({ voidPage: name }, '', window.location.pathname + window.location.search);
+  
 }
+
+function renderMobileStudio() { /* real panel — no sync needed */ }
 
 // ==============================
 // MODAL
@@ -9528,14 +10141,14 @@ function toggleNPPanel() {
 // AUDIO STUDIO PANEL (desktop only)
 // ==============================
 (function initAudioStudio() {
-  if (!window.matchMedia('(min-width:1025px)').matches) return;
+  const isDesktop = window.matchMedia('(min-width:1025px)').matches;
 
   // Helper: get real audio nodes (available after initAudioContext runs on first play)
   function nodes() { return window._voidAudio || {}; }
 
-  // ── Inject studio HTML into the right panel scroll area ──────────────────
+  // ── Inject studio HTML into the right panel (desktop) or mobile page ──────
   const npScroll = document.querySelector('#np-overlay .np-scroll');
-  if (!npScroll) return;
+  // On mobile npScroll may not exist — that's fine, we place it differently
 
   const studioEl = document.createElement('div');
   studioEl.className = 'studio-panel';
@@ -9581,7 +10194,7 @@ function toggleNPPanel() {
       </div>
       <div class="studio-slider-row">
         <span class="studio-slider-label">GAIN</span>
-        <input type="range" class="studio-slider accent-track" id="studio-gain-slider" min="-20" max="20" step="0.1" value="0">
+        <input type="range" class="studio-slider accent-track" id="studio-gain-slider" min="-20" max="20" step="0.5" value="0">
         <span class="studio-slider-val" id="studio-gain-val">0.0dB</span>
       </div>
     </div>
@@ -9644,7 +10257,6 @@ function toggleNPPanel() {
         <div id="studio-reverb-presets" style="flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:4px"></div>
         <button class="studio-fx-btn" style="flex-shrink:0;white-space:nowrap" onclick="studioSaveReverbPreset()">+ SAVE</button>
       </div>
-      </div>
       <div class="studio-slider-row"><span class="studio-slider-label">WET</span><input type="range" class="studio-slider" id="studio-reverb-wet" min="0" max="1" step="0.01" value="0"><span class="studio-slider-val" id="studio-reverb-wet-val">0%</span></div>
       <div class="studio-slider-row"><span class="studio-slider-label">SIZE</span><input type="range" class="studio-slider" id="studio-reverb-size" min="0.1" max="6" step="0.1" value="1"><span class="studio-slider-val" id="studio-reverb-size-val">1.0s</span></div>
       <div class="studio-slider-row"><span class="studio-slider-label">DAMP</span><input type="range" class="studio-slider" id="studio-reverb-damp" min="0" max="1" step="0.01" value="0.5"><span class="studio-slider-val" id="studio-reverb-damp-val">50%</span></div>
@@ -9657,9 +10269,7 @@ function toggleNPPanel() {
         <button class="studio-fx-btn on" id="eq-toggle-btn-desk" onclick="toggleEQ()">ON</button>
       </div>
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;min-width:0">
-        <div style="flex:1;min-width:0;overflow:hidden">
-          <div class="eq-presets" id="eq-presets-desk" style="display:flex;flex-wrap:nowrap;gap:5px;padding-bottom:4px;overflow-x:auto;scrollbar-width:none;cursor:grab;-webkit-overflow-scrolling:touch"></div>
-        </div>
+        <div id="eq-presets-desk" style="flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:4px"></div>
         <button class="studio-fx-btn" style="flex-shrink:0;white-space:nowrap" onclick="saveCustomEQPreset()">+ SAVE</button>
       </div>
       <div class="eq-bars" id="eq-bars-desk"></div>
@@ -9668,7 +10278,17 @@ function toggleNPPanel() {
       </div>
     </div>
   `;
-  npScroll.appendChild(studioEl);
+  // Place panel: desktop → right NP scroll area, mobile → mobile studio page
+  if (isDesktop && npScroll) {
+    npScroll.appendChild(studioEl);
+  } else {
+    const mobScroll = document.getElementById('mobile-studio-scroll');
+    if (mobScroll) {
+      mobScroll.appendChild(studioEl);
+      // Build EQ into the studio panel (uses eq-bars-desk / eq-presets-desk)
+      if (typeof syncDesktopEQ === 'function') syncDesktopEQ();
+    }
+  }
 
   // ── Spectrum canvas setup ─────────────────────────────────────────────────
   const specEl = document.getElementById('studio-spectrum');
@@ -9767,7 +10387,7 @@ function toggleNPPanel() {
     // Skip all work when studio panel is hidden
     if (_studioPanel && _studioPanel.offsetParent === null) return;
 
-    const an = nodes().analyserNode;
+    const an = nodes().postGainAnalyser || nodes().analyserNode;
     if (an) {
       if (!_freqBuf || _freqBuf.length !== an.frequencyBinCount) {
         _freqBuf = new Uint8Array(an.frequencyBinCount);
@@ -9896,6 +10516,7 @@ function toggleNPPanel() {
       const volLinear = (document.getElementById('vol-slider').value || 80) / 100;
       g.gain.setTargetAtTime(volLinear * Math.pow(10, v / 20), audioCtx.currentTime, 0.02);
     }
+    if (typeof checkAudioSafety === 'function') checkAudioSafety();
   });
 
   // ── Pan → real StereoPannerNode ───────────────────────────────────────────
@@ -10199,6 +10820,10 @@ function toggleNPPanel() {
     const n = nodes();
     if (!n.analyserNode || !audioCtx) return;
     currentOutputMode = mode;
+    // Sync both desktop and mobile output mode buttons
+    document.querySelectorAll('#studio-output-modes .studio-fx-btn, #mob-studio-output-modes .studio-fx-btn').forEach(b => {
+      b.classList.toggle('on', b.dataset.mode === mode);
+    });
 
     // Lazy-create splitter/merger
     if (!splitterNode) {
@@ -10243,9 +10868,8 @@ function toggleNPPanel() {
   }
   window.studioSetOutputMode = function(mode) {
     if (!nodes().analyserNode) {
-      // AudioContext not init yet — store for when it is
       currentOutputMode = mode;
-      document.querySelectorAll('#studio-output-modes .studio-fx-btn').forEach(b => {
+      document.querySelectorAll('#studio-output-modes .studio-fx-btn, #mob-studio-output-modes .studio-fx-btn').forEach(b => {
         b.classList.toggle('on', b.dataset.mode === mode);
       });
       return;
@@ -10267,11 +10891,15 @@ function toggleNPPanel() {
   // ── Toggle FX ─────────────────────────────────────────────────────────────
   window.studioToggleFx = function(key) {
     const btnId = { compressor: 'studio-comp-btn', reverb: 'studio-reverb-btn' }[key];
+    const mobBtnId = { compressor: 'mob-studio-comp-btn', reverb: 'mob-studio-reverb-btn' }[key];
     const btn = document.getElementById(btnId); if (!btn) return;
     enabled[key] = !enabled[key];
     const on = enabled[key];
     btn.classList.toggle('on', on);
     btn.textContent = on ? 'ON' : 'OFF';
+    // Sync mobile button
+    const mobBtn = document.getElementById(mobBtnId);
+    if (mobBtn) { mobBtn.classList.toggle('on', on); mobBtn.textContent = on ? 'ON' : 'OFF'; }
 
     if (key === 'compressor') {
       const c = nodes().compNode;
@@ -10316,12 +10944,22 @@ function toggleNPPanel() {
   // ── NP strip sync ─────────────────────────────────────────────────────────
   function syncStudioNP() {
     const imgEl = document.querySelector('#np-cover img');
+    // Sync desktop studio NP strip
     const cover = document.getElementById('studio-np-cover');
     const title = document.getElementById('studio-np-title');
     const artist = document.getElementById('studio-np-artist');
     if (cover && imgEl) { cover.innerHTML = ''; cover.appendChild(imgEl.cloneNode(true)); }
-    if (title)  title.textContent  = (document.getElementById('np-title')  || {}).textContent || 'No Track';
-    if (artist) artist.textContent = (document.getElementById('np-artist') || {}).textContent || '\u2014';
+    const npTitle  = (document.getElementById('np-title')  || {}).textContent || 'No Track';
+    const npArtist = (document.getElementById('np-artist') || {}).textContent || '\u2014';
+    if (title)  title.textContent  = npTitle;
+    if (artist) artist.textContent = npArtist;
+    // Sync mobile studio NP strip
+    const mobCover  = document.getElementById('mob-studio-np-cover');
+    const mobTitle  = document.getElementById('mob-studio-np-title');
+    const mobArtist = document.getElementById('mob-studio-np-artist');
+    if (mobCover && imgEl) { mobCover.innerHTML = ''; mobCover.appendChild(imgEl.cloneNode(true)); }
+    if (mobTitle)  mobTitle.textContent  = npTitle;
+    if (mobArtist) mobArtist.textContent = npArtist;
   }
   setInterval(syncStudioNP, 1500);
   syncStudioNP();
@@ -10342,7 +10980,7 @@ function toggleNPPanel() {
       // just be no-ops if compNode/reverbNode are null at this point
       el.dispatchEvent(new Event('input'));
     }
-    setSlider('studio-gain-slider',  st.gain);
+    setSlider('studio-gain-slider',  0); // Always start at 0dB regardless of saved state
     setSlider('studio-pan-slider',   st.pan);
     setSlider('studio-comp-thresh',  st.compThresh);
     setSlider('studio-comp-ratio',   st.compRatio);
@@ -10413,30 +11051,23 @@ updateProgress = function() { _origUpdateProgress(); syncTransportBar(); };
 
 // ── DESKTOP RIGHT PANEL EQ SYNC ──────────────────────────────
 // Sync desktop EQ panel from the main EQ state
-let _eqDeskDragInit = false;
+var _eqDeskDragInit = false;
 function syncDesktopEQ() {
-  if (!isDesktop()) return;
   const dstPresets = document.getElementById('eq-presets-desk');
   const dstBars    = document.getElementById('eq-bars-desk');
   const dstToggle  = document.getElementById('eq-toggle-btn-desk');
   if (!dstPresets || !dstBars) return;
 
-  // Build presets
-  dstPresets.innerHTML = Object.keys(EQ_PRESETS).map(name =>
-    `<button class="preset-btn${name === currentPreset ? ' active' : ''}" onclick="applyPresetDesk('${name}')">${name}</button>`
-  ).join('');
-
-  // Add drag-to-scroll once
-  if (!_eqDeskDragInit) {
-    _eqDeskDragInit = true;
-    let isDown=false, startX=0, scrollLeft=0;
-    dstPresets.addEventListener('mousedown', e=>{ isDown=true; startX=e.pageX-dstPresets.offsetLeft; scrollLeft=dstPresets.scrollLeft; dstPresets.style.cursor='grabbing'; });
-    document.addEventListener('mouseup', ()=>{ isDown=false; dstPresets.style.cursor='grab'; });
-    dstPresets.addEventListener('mouseleave', ()=>{ isDown=false; dstPresets.style.cursor='grab'; });
-    dstPresets.addEventListener('mousemove', e=>{ if (!isDown) return; e.preventDefault(); const x=e.pageX-dstPresets.offsetLeft; dstPresets.scrollLeft=scrollLeft-(x-startX)*1.2; });
-    dstPresets.addEventListener('wheel', e=>{ e.preventDefault(); dstPresets.scrollLeft+=e.deltaY||e.deltaX; }, {passive:false});
-    dstPresets.style.cursor = 'grab';
-  }
+  const builtInEQ = ['VOID','Flat','Bass+','Treble+','V-Shape','Pop','Rock','Jazz','Classical','Hip-Hop','Electronic','Lounge','Acoustic'];
+  // Build presets as chips with delete for custom ones
+  dstPresets.innerHTML = Object.keys(EQ_PRESETS).map(name => {
+    const isCustom = !builtInEQ.includes(name);
+    const isActive = name === currentPreset;
+    return `<div class="preset-chip-wrap">
+      <button class="studio-fx-btn${isActive ? ' on' : ''}" onclick="applyPresetDesk('${name}')">${name}</button>
+      ${isCustom ? `<button class="preset-chip-del" onclick="event.stopPropagation();deleteCustomEQPreset('${name}')" title="Delete">×</button>` : ''}
+    </div>`;
+  }).join('');
 
   // Build EQ bars
   dstBars.innerHTML = EQ_ALL_FREQS.map((freq, i) => `
@@ -10482,58 +11113,13 @@ function updateEQBandDesk(i, val) {
 }
 
 loadAll();
+// Initialize gain safety color on startup
+setTimeout(function() { if (typeof updateGainSafetyColor === 'function') updateGainSafetyColor(); }, 100);
 
 // Browser back/forward button — handle track navigation AND overlay/page navigation
-window.addEventListener('popstate', function(e) {
-  const st = e.state;
-
-  // 1. Close any open overlay in priority order (highest z-index first)
-  const artistOverlay = document.getElementById('artist-page-overlay');
-  const albumOverlay  = document.getElementById('album-page-overlay');
-  const seeAllOverlay = document.getElementById('see-all-overlay');
-  const plDetail      = document.getElementById('pl-detail');
-
-  if (artistOverlay && artistOverlay.style.display === 'flex') {
-    closeArtistPage(); return;
-  }
-  if (albumOverlay && albumOverlay.style.display === 'flex') {
-    closeAlbumPage(); return;
-  }
-  if (seeAllOverlay && seeAllOverlay.classList.contains('open')) {
-    closeSeeAll(); return;
-  }
-  if (plDetail && plDetail.classList.contains('open')) {
-    closePlDetail(); return;
-  }
-
-  // 2. Handle track state pushed by playTrack()
-  if (st && typeof st.voidTrackIdx === 'number') {
-    playTrack(st.voidTrackIdx, false);
-    return;
-  }
-
-  // 3. Handle page navigation
-  if (st && st.voidPage) {
-    // Call internal version that doesn't push another state
-    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
-    document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
-    const pageEl = document.getElementById('page-' + st.voidPage);
-    if (pageEl) {
-      pageEl.classList.add('active');
-      const navBtn = document.getElementById('nav-' + st.voidPage);
-      if (navBtn) navBtn.classList.add('active');
-      if (st.voidPage==='library')   renderTrackList(document.getElementById('search-input').value);
-      if (st.voidPage==='queue')     renderQueueList();
-      if (st.voidPage==='playlists') renderPlaylistsPage();
-      if (st.voidPage==='home')      { renderHomeRecent(); renderHomePlaylists(); updateHomeCard(); loadUnifiedFeed(); }
-      if (st.voidPage==='settings')  { buildSettingsPage(); setTimeout(()=>ytCheckApiStatus(), 50); }
-    }
-    return;
-  }
-
-  // 4. No state — navigated back past first entry, go to previous track
-  prevTrack();
-});
+// Save state immediately on page unload/refresh so resume always works
+window.addEventListener('pagehide', () => { saveSettings(); localStorage.setItem('void_resume_idx', currentIndex); if (audioEl) localStorage.setItem('void_resume_time', audioEl.currentTime); });
+window.addEventListener('beforeunload', () => { saveSettings(); localStorage.setItem('void_resume_idx', currentIndex); if (audioEl) localStorage.setItem('void_resume_time', audioEl.currentTime); });
 
 // ============================================================
 //  DESKTOP REDESIGN — sidebar playlist sync + EQ badge sync
@@ -10549,24 +11135,58 @@ function renderSidebarPlaylists() {
   }
   listEl.innerHTML = playlists.map(pl => {
     const tracks_in_pl = (pl.trackIds || []);
+    const isLocal = pl.id === 'void_local_songs';
     // Try to get a cover from first track
     const firstId = tracks_in_pl[0];
     const firstTrack = firstId ? tracks.find(t => t.id === firstId) : null;
     const thumb = firstTrack
       ? ((firstTrack.ytMeta && firstTrack.ytMeta.thumbnail) ? firstTrack.ytMeta.thumbnail : firstTrack.cover)
       : null;
-    return `<div class="sidebar-pl-item" onclick="openPlaylist('${pl.id}')">
-      <div class="sidebar-pl-thumb">
-        ${thumb
-          ? `<img src="${thumb}" alt="">`
-          : `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`}
+    const thumbHTML = isLocal
+      ? `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:var(--accent)"><path d="M3 18v-6a9 9 0 0118 0v6"/><path d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z"/></svg>`
+      : thumb ? `<img src="${thumb}" alt="">` : `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
+    return `<div class="sidebar-pl-item${isLocal?' pinned':''}" onclick="openPlaylist('${pl.id}')">
+      <div class="sidebar-pl-thumb" style="${isLocal?'background:rgba(29,185,84,0.1);border:1px solid rgba(29,185,84,0.2)':''}">
+        ${thumbHTML}
       </div>
       <div class="sidebar-pl-info">
-        <div class="sidebar-pl-name">${esc(pl.name)}</div>
+        <div class="sidebar-pl-name" style="${isLocal?'color:var(--accent)':''}">${esc(pl.name)}</div>
         <div class="sidebar-pl-count">${tracks_in_pl.length} track${tracks_in_pl.length !== 1 ? 's' : ''}</div>
       </div>
     </div>`;
   }).join('');
+}
+
+
+// ── Library filter chips ──────────────────────────────────────────────────
+let _libFilter = 'all';
+function setLibFilter(filter) {
+  _libFilter = filter;
+  document.querySelectorAll('.lib-chip').forEach(c => c.classList.toggle('active', c.dataset.filter === filter));
+  const plSec   = document.getElementById('lib-playlists-section');
+  const trackSec = document.getElementById('lib-local-section');
+  if (filter === 'all') {
+    if (plSec)   plSec.style.display   = '';
+    if (trackSec) trackSec.style.display = 'none';
+  } else if (filter === 'playlists') {
+    if (plSec)   plSec.style.display   = '';
+    if (trackSec) trackSec.style.display = 'none';
+  } else if (filter === 'tracks') {
+    if (plSec)   plSec.style.display   = 'none';
+    if (trackSec) trackSec.style.display = '';
+    renderTrackList('');
+  }
+}
+
+function toggleLibraryExpand() {
+  document.body.classList.toggle('library-expanded');
+  const btn = document.getElementById('lib-expand-btn');
+  if (!btn) return;
+  const expanded = document.body.classList.contains('library-expanded');
+  btn.title = expanded ? 'Collapse library' : 'Expand library';
+  btn.innerHTML = expanded
+    ? '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="9 3 3 3 3 9"/><polyline points="15 21 21 21 21 15"/><line x1="3" y1="3" x2="10" y2="10"/><line x1="21" y1="21" x2="14" y2="14"/></svg>'
+    : '<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>';
 }
 
 function syncVoidEQBadge() {
@@ -10668,9 +11288,7 @@ setTimeout(() => { renderSidebarPlaylists(); syncVoidEQBadge(); }, 500);
     const ddEl = document.getElementById('search-dropdown-' + ctx);
     if (!ddEl) return;
     buildDropdown(ddEl, val, ctx);
-    // Sync unified search input
-    const si = document.getElementById('search-input');
-    if (si) { si.value = val; if (typeof voidHandleInput === 'function') voidHandleInput(val); }
+    // Do NOT sync into library search-input — topbar search is independent
   };
 
   window.topbarSearchFocus = function(ctx) {
