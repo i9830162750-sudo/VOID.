@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -29,13 +28,15 @@
   --border2: #2d2d40;
   --accent:  #1db954;
   --accent2: #1ed760;
-  --accent-dim:  rgba(29,185,84,0.14);
-  --accent-glow: rgba(29,185,84,0.3);
+  --accent-dim:  rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.14);
+  --accent-glow: rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.3);
   --dyn-r: 29; --dyn-g: 185; --dyn-b: 84;
   --dyn: rgb(var(--dyn-r),var(--dyn-g),var(--dyn-b));
   --dyn-dim: rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.12);
   --dyn-glow: rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.28);
   --dyn-glow2: rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.08);
+  /* Dynamic accent transition duration */
+  --dyn-transition: 2s;
   --text:  #f0f0f5;
   --text2: #8888a0;
   --text3: #3a3a52;
@@ -59,7 +60,33 @@ body {
   -webkit-font-smoothing:antialiased;
 }
 
-/* ====== LAYOUT ====== */
+/* ====== DYNAMIC ACCENT TRANSITIONS ====== */
+/* Smooth color transitions when dynamic accent changes */
+.play-btn,
+.mini-progress,
+.np-seekbar-fill,
+.home-hero-progress-fill,
+.np-overlay::before,
+.mini-bg,
+.np-cover.playing,
+.feed-card-art.is-playing,
+.nav-btn.active,
+.mini-play-btn svg,
+.playing-bars span,
+.track-fav-dot,
+.home-hero-badge,
+.quick-btn svg,
+.topbar h1 {
+  transition-property: background, background-color, box-shadow, color, filter, border-color, text-shadow;
+  transition-duration: var(--dyn-transition, 0.7s);
+  transition-timing-function: ease;
+}
+/* np-overlay glow transitions */
+.np-overlay::before { transition: background 2s ease; }
+.home-hero { transition: background 2s ease, box-shadow 2s ease; }
+.home-hero::before { transition: background 2s ease; }
+
+
 .app-wrap { position:absolute; inset:0; display:flex; flex-direction:column; overflow:hidden; }
 .page-stack { flex:1; position:relative; overflow:hidden; min-height:0; }
 .page { position:absolute; inset:0; display:none; flex-direction:column;
@@ -101,7 +128,7 @@ body {
   letter-spacing:0.3px; text-transform:uppercase; padding:8px 4px; gap:4px;
 }
 .nav-btn svg { width:20px; height:20px; stroke-width:1.6; transition:transform 0.2s; }
-.nav-btn.active { color:var(--accent); }
+.nav-btn.active { color:var(--accent); transition: color var(--dyn-transition, 0.7s) ease; }
 .nav-btn.active svg {
   filter:drop-shadow(0 0 8px rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.7));
   transform:translateY(-1px);
@@ -239,7 +266,7 @@ body {
 }
 .np-buffering-overlay.active { display:flex; }
 .np-spinner {
-  width:40px; height:40px; border:3px solid rgba(29,185,84,0.2);
+  width:40px; height:40px; border:3px solid rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.2);
   border-top-color:var(--accent); border-radius:50%;
   animation:spin 0.8s linear infinite;
 }
@@ -263,7 +290,7 @@ body {
 /* Progress */
 .np-progress-wrap { padding:0 22px 12px; flex-shrink:0; }
 .np-seekbar-track { width:100%; height:5px; background:var(--bg4); border-radius:3px; position:relative; cursor:pointer; }
-.np-seekbar-buffer { position:absolute; top:0; left:0; height:100%; background:rgba(29,185,84,0.2); border-radius:3px; pointer-events:none; transition:width 0.5s ease; }
+.np-seekbar-buffer { position:absolute; top:0; left:0; height:100%; background:rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.2); border-radius:3px; pointer-events:none; transition:width 0.5s ease; }
 .np-seekbar-fill { height:100%; background:linear-gradient(90deg,var(--dyn,var(--accent)),var(--accent2)); border-radius:3px; width:0%; transition:width 0.3s linear; pointer-events:none; position:relative; z-index:1; }
 .np-seekbar-thumb { position:absolute; top:50%; right:-6px; transform:translateY(-50%); width:14px; height:14px; background:var(--text); border-radius:50%; box-shadow:0 0 0 2px rgba(0,0,0,0.4), 0 0 8px rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.4); pointer-events:none; transition:transform 0.1s; }
 .np-seekbar-track:active .np-seekbar-thumb { transform:translateY(-50%) scale(1.3); }
@@ -310,7 +337,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
 }
 .play-btn:active { transform:scale(0.9); }
 .play-btn svg { width:28px; height:28px; color:#000; }
-.play-btn-loading { position:absolute; inset:-4px; border:2px solid rgba(29,185,84,0.3); border-top-color:var(--accent); border-radius:50%; animation:spin 1s linear infinite; display:none; }
+.play-btn-loading { position:absolute; inset:-4px; border:2px solid rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.3); border-top-color:var(--accent); border-radius:50%; animation:spin 1s linear infinite; display:none; }
 .play-btn.loading .play-btn-loading { display:block; }
 .play-btn.loading svg { opacity:0.5; }
 
@@ -634,7 +661,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
 }
 .feed-track-art img { width:100%; height:100%; object-fit:cover; }
 .feed-track-art svg { width:40px; height:40px; color:var(--text3); }
-.feed-track-art.is-playing { box-shadow: 0 0 0 2px var(--accent), 0 4px 20px rgba(29,185,84,0.3); }
+.feed-track-art.is-playing { box-shadow: 0 0 0 2px var(--accent), 0 4px 20px rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.3); }
 .feed-track-art .feed-yt-badge { position:absolute; top:6px; right:6px; background:rgba(255,68,68,0.85); border-radius:4px; padding:2px 5px; font-size:8px; font-weight:700; color:#fff; font-family:'Space Mono',monospace; }
 .feed-track-label { font-size:12px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text); }
 .feed-track-sub   { font-size:11px; color:var(--text2); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -879,7 +906,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
 .queue-clear-btn { background:none; border:none; color:var(--text3); font-size:12px; cursor:pointer; font-family:'DM Sans',sans-serif; padding:4px 0; }
 .queue-list { padding:0 20px; }
 .queue-section-label { font-size:10px; text-transform:uppercase; letter-spacing:1.5px; color:var(--text3); font-weight:600; padding:12px 0 6px; font-family:'Space Mono',monospace; }
-.queue-item-np { background:rgba(29,185,84,0.06); border-radius:10px; border-left:2px solid var(--accent); }
+.queue-item-np { background:rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.06); border-radius:10px; border-left:2px solid var(--accent); }
 .queue-future-item { opacity:0.85; }
 .queue-item-num { font-size:11px; color:var(--text3); font-family:'Space Mono',monospace; width:24px; text-align:center; flex-shrink:0; }
 
@@ -889,7 +916,8 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
 .settings-section-title {
   font-size:10px; text-transform:uppercase; letter-spacing:2px;
   color:var(--accent); font-family:'Space Mono',monospace; font-weight:700;
-  padding:0 0 10px; border-bottom:1px solid rgba(29,185,84,0.15); margin-bottom:4px;
+  padding:0 0 10px; border-bottom:1px solid rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.15); margin-bottom:4px;
+  transition: color var(--dyn-transition, 0.7s) ease, border-color var(--dyn-transition, 0.7s) ease;
 }
 .settings-row {
   display:flex; align-items:center; justify-content:space-between;
@@ -914,7 +942,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   background:#fff; border-radius:50%; transition:transform 0.2s, background 0.2s;
   pointer-events:none;
 }
-.toggle-switch input:checked ~ .toggle-track { background:var(--accent); }
+.toggle-switch input:checked ~ .toggle-track { background:var(--accent); transition: background var(--dyn-transition, 0.7s) ease; }
 .toggle-switch input:checked ~ .toggle-thumb { transform:translateX(20px); }
 
 /* Select */
@@ -987,7 +1015,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
 .np-panel-tabs, .desktop-eq-panel { display:none; }
 
 /* ====== PWA BANNER ====== */
-.pwa-banner { display:none; align-items:center; gap:10px; background:rgba(29,185,84,0.08); border-bottom:1px solid rgba(29,185,84,0.15); padding:10px 14px; flex-shrink:0; padding-top:calc(var(--safe-top) + 10px); }
+.pwa-banner { display:none; align-items:center; gap:10px; background:rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.08); border-bottom:1px solid rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.15); padding:10px 14px; flex-shrink:0; padding-top:calc(var(--safe-top) + 10px); }
 .pwa-banner.visible { display:flex; }
 .pwa-banner-text { flex:1; font-size:12px; line-height:1.4; }
 .pwa-banner-text strong { color:var(--accent); display:block; font-size:13px; margin-bottom:1px; }
@@ -1139,7 +1167,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   padding:6px 10px; font-size:11px; font-weight:600; color:var(--accent);
   cursor:pointer; font-family:'DM Sans',sans-serif; transition:background 0.15s;
 }
-.ytscan-accept-btn:active { background:rgba(29,185,84,0.25); }
+.ytscan-accept-btn:active { background:rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.25); }
 .ytscan-skip-btn {
   background:none; border:1px solid var(--border2); border-radius:8px;
   padding:6px 10px; font-size:11px; font-weight:600; color:var(--text3);
@@ -1329,7 +1357,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   padding: 12px 14px 10px;
   border-bottom: 1px solid var(--border);
   display: flex; align-items: center; gap: 10px;
-  flex-shrink: 0; background: rgba(29,185,84,0.03);
+  flex-shrink: 0; background: rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.03);
 }
 .studio-np-cover {
   width: 38px; height: 38px; border-radius: 7px;
@@ -1358,7 +1386,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   font-size: 8px; font-weight: 700; letter-spacing: 1px;
   text-transform: uppercase; color: var(--accent);
   font-family: 'Space Mono', monospace; padding: 2px 5px;
-  border: 1px solid rgba(29,185,84,0.3); border-radius: 3px;
+  border: 1px solid rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.3); border-radius: 3px;
 }
 .studio-spectrum {
   width: 100%; height: 80px; border-radius: 6px;
@@ -1370,7 +1398,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   height: 28px; margin-top: 6px;
 }
 .studio-wave-bar {
-  flex: 1; height: 100%; background: rgba(29,185,84,0.35);
+  flex: 1; height: 100%; background: rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.35);
   border-radius: 1px; transform-origin: center; will-change: transform;
 }
 .studio-slider-row {
@@ -1857,7 +1885,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
     border-right: 1px solid rgba(255,255,255,0.04);
   }
   #desk-np-overlay.open {
-    top: 0;
+    top: 54px; /* sit below the desktop topbar */
   }
   body.np-collapsed #desk-np-overlay { right: 48px; }
 
@@ -1922,7 +1950,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   }
   .dnp-cover.playing {
     transform: scale(1.025);
-    box-shadow: 0 28px 72px rgba(0,0,0,0.7), 0 0 32px rgba(29,185,84,0.15), 0 0 0 1px rgba(255,255,255,0.08);
+    box-shadow: 0 28px 72px rgba(0,0,0,0.7), 0 0 32px rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.15), 0 0 0 1px rgba(255,255,255,0.08);
   }
   .dnp-cover img { width:100%; height:100%; object-fit:cover; }
   .dnp-cover-ph { width:100%;height:100%;display:flex;align-items:center;justify-content:center; }
@@ -2006,7 +2034,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
     transition: transform 0.15s cubic-bezier(0.34,1.56,0.64,1), background 0.15s, box-shadow 0.2s;
     box-shadow: 0 4px 20px rgba(0,0,0,0.4);
   }
-  .dnp-play-btn:hover { background: var(--accent2); transform: scale(1.08); box-shadow: 0 0 24px rgba(29,185,84,0.4); }
+  .dnp-play-btn:hover { background: var(--accent2); transform: scale(1.08); box-shadow: 0 0 24px rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.4); }
   .dnp-play-btn:active { transform: scale(0.9); }
   .dnp-play-btn svg { width: 20px; height: 20px; color: #000; }
 
@@ -2062,7 +2090,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
     transition: background 0.12s;
   }
   .dnp-queue-item:hover { background: rgba(255,255,255,0.05); }
-  .dnp-queue-item.now-playing { background: rgba(29,185,84,0.08); border-left: 2px solid var(--accent); }
+  .dnp-queue-item.now-playing { background: rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.08); border-left: 2px solid var(--accent); }
   .dnp-queue-thumb {
     width: 36px; height: 36px; border-radius: 6px;
     background: rgba(255,255,255,0.07); flex-shrink: 0; overflow: hidden;
@@ -2074,6 +2102,293 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   .dnp-queue-title { font-size:12px;font-weight:600;color:rgba(255,255,255,0.85);white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
   .dnp-queue-artist { font-size:10px;color:rgba(255,255,255,0.35);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis; }
   .dnp-queue-dur { font-size:10px;color:rgba(255,255,255,0.2);font-family:'Space Mono',monospace;flex-shrink:0; }
+
+  /* ── DESK NP FULLSCREEN (TV MODE) ── */
+  #desk-np-overlay.dnp-fullscreen {
+    position: fixed !important;
+    inset: 0 !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    z-index: 600 !important;
+  }
+  #desk-np-overlay.dnp-fullscreen .dnp-inner { display: none; }
+  #desk-np-overlay.dnp-fullscreen .dnp-bg { display: block; filter: blur(80px) saturate(220%) brightness(0.22); }
+
+  /* ── Fullscreen view: YouTube-style layout ── */
+  .dnp-fs-view {
+    display: none;
+    position: absolute; inset: 0; z-index: 2;
+    flex-direction: column;
+    align-items: stretch;
+    justify-content: flex-end;
+    cursor: none;
+  }
+  #desk-np-overlay.dnp-fullscreen .dnp-fs-view { display: flex; }
+  .dnp-fs-view.fs-controls-visible { cursor: default; }
+
+  /* Bottom gradient scrim — always present but dims when controls hidden */
+  .dnp-fs-view::before {
+    content: '';
+    position: absolute; bottom: 0; left: 0; right: 0;
+    height: 280px;
+    background: linear-gradient(to top, rgba(0,0,0,0.88) 0%, transparent 100%);
+    pointer-events: none;
+    opacity: 0.4;
+    transition: opacity 0.3s ease;
+    z-index: 0;
+  }
+  .dnp-fs-view.fs-controls-visible::before { opacity: 1; }
+
+  /* ── Cover art: bigger, bottom-left ── */
+  .dnp-fs-cover {
+    position: absolute;
+    bottom: 56px; left: 52px;
+    width: min(220px, 22vw);
+    height: min(220px, 22vw);
+    border-radius: 18px;
+    overflow: hidden;
+    flex-shrink: 0;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.09);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    opacity: 1;
+    transform: none;
+    z-index: 2;
+  }
+  .dnp-fs-cover img { width: 100%; height: 100%; object-fit: cover; }
+  .dnp-fs-cover-ph { width:100%;height:100%;display:flex;align-items:center;justify-content:center; }
+  .dnp-fs-cover-ph svg { width:60px;height:60px;color:rgba(255,255,255,0.1); }
+
+  /* ── Meta: bigger title, next to cover, always visible ── */
+  .dnp-fs-meta {
+    position: absolute;
+    bottom: 56px;
+    left: calc(52px + min(220px, 22vw) + 24px);
+    right: 52px;
+    text-align: left;
+    min-width: 0;
+    opacity: 1;
+    z-index: 2;
+    display: flex; flex-direction: column; justify-content: flex-end;
+    padding-bottom: 6px;
+  }
+  .dnp-fs-title {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-size: clamp(26px, 3.8vw, 58px);
+    font-weight: 800; letter-spacing: -1.5px;
+    color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    text-shadow: 0 2px 20px rgba(0,0,0,0.6);
+  }
+  .dnp-fs-artist {
+    font-size: clamp(14px, 1.6vw, 24px);
+    color: rgba(255,255,255,0.6);
+    margin-top: 8px; font-weight: 500;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+
+  /* ── Bottom bar: seek at very bottom, timestamps + controls in row above ── */
+  .dnp-fs-bottom {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    display: flex; flex-direction: column; gap: 0;
+    z-index: 3;
+  }
+
+  /* Row above the seek: timestamps on left, controls on right */
+  .dnp-fs-above-seek {
+    display: flex; align-items: center;
+    padding: 0 0 4px 0;
+    opacity: 0; transition: opacity 0.25s ease, transform 0.25s ease;
+    transform: translateY(4px);
+    pointer-events: none;
+  }
+  .dnp-fs-view.fs-controls-visible .dnp-fs-above-seek {
+    opacity: 1; transform: translateY(0); pointer-events: auto;
+  }
+
+  /* Times: left side, flanking the seek */
+  .dnp-fs-times {
+    display: flex; align-items: center; gap: 10px;
+    font-size: 11px; color: rgba(255,255,255,0.5);
+    font-family: 'Space Mono', monospace;
+    padding: 0 0 0 16px; letter-spacing: 0.3px;
+    flex: 1; min-width: 0; white-space: nowrap;
+  }
+  .dnp-fs-times-sep { color: rgba(255,255,255,0.2); }
+
+  /* Controls: right side of above-seek row */
+  .dnp-fs-controls {
+    display: flex; align-items: center; justify-content: flex-end;
+    gap: 4px;
+    padding: 0 16px 0 12px;
+    flex-shrink: 0;
+  }
+
+  .dnp-fs-ctrl-btn {
+    background: none; border: none; color: rgba(255,255,255,0.6);
+    cursor: pointer; padding: 10px; border-radius: 50%;
+    display: flex; transition: color 0.15s, background 0.15s;
+  }
+  .dnp-fs-ctrl-btn:hover { color: #fff; background: rgba(255,255,255,0.08); }
+  .dnp-fs-ctrl-btn.active { color: var(--accent); }
+  .dnp-fs-ctrl-btn svg { width: 22px; height: 22px; }
+  .dnp-fs-play-btn {
+    width: 64px; height: 64px; border-radius: 50%;
+    background: rgb(var(--dyn2-r,var(--dyn-r)),var(--dyn2-g,var(--dyn-g)),var(--dyn2-b,var(--dyn-b)));
+    border: none; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 0 32px rgba(var(--dyn2-r,var(--dyn-r)),var(--dyn2-g,var(--dyn-g)),var(--dyn2-b,var(--dyn-b)),0.5);
+  }
+  .dnp-fs-play-btn:hover { transform: scale(1.08); }
+  .dnp-fs-play-btn:active { transform: scale(0.92); }
+  .dnp-fs-play-btn svg { width: 24px; height: 24px; color: #000; }
+
+  /* ── Seek bar: ALWAYS visible, edge-to-edge, flush at very bottom ── */
+  .dnp-fs-seek-wrap {
+    position: relative;
+    padding: 0;
+    cursor: pointer;
+    /* expand hit area upward */
+    margin-top: 8px;
+  }
+  .dnp-fs-seek-track {
+    height: 3px;
+    background: rgba(255,255,255,0.18);
+    border-radius: 0;
+    position: relative;
+    transition: height 0.15s;
+    width: 100%;
+  }
+  .dnp-fs-seek-wrap:hover .dnp-fs-seek-track { height: 5px; }
+  .dnp-fs-seek-fill {
+    position: absolute; top: 0; left: 0; height: 100%;
+    background: rgb(var(--dyn2-r,var(--dyn-r)),var(--dyn2-g,var(--dyn-g)),var(--dyn2-b,var(--dyn-b)));
+    border-radius: 0; width: 0%;
+    transition: width 0.3s linear; pointer-events: none;
+    box-shadow: 0 0 8px rgba(var(--dyn2-r,var(--dyn-r)),var(--dyn2-g,var(--dyn-g)),var(--dyn2-b,var(--dyn-b)),0.6);
+  }
+  .dnp-fs-seek-thumb {
+    position: absolute; top: 50%; right: -7px;
+    transform: translateY(-50%); width: 14px; height: 14px;
+    background: #fff; border-radius: 50%;
+    box-shadow: 0 0 0 2px rgba(0,0,0,0.4);
+    pointer-events: none; opacity: 0; transition: opacity 0.15s;
+  }
+  .dnp-fs-seek-wrap:hover .dnp-fs-seek-thumb { opacity: 1; }
+  input.dnp-fs-seek-input {
+    position: absolute; top: -14px; left: 0; right: 0; bottom: 0;
+    width: 100%; height: calc(100% + 14px);
+    opacity: 0; cursor: pointer;
+    appearance: none; -webkit-appearance: none;
+    z-index: 2; margin: 0; padding: 0;
+  }
+
+  /* Exit button — top-right, hides with controls */
+  .dnp-fs-exit-btn {
+    position: absolute; top: 20px; right: 20px;
+    background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1);
+    color: rgba(255,255,255,0.6); cursor: pointer;
+    width: 38px; height: 38px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s, color 0.15s, opacity 0.25s;
+    z-index: 10; opacity: 0;
+  }
+  .dnp-fs-view.fs-controls-visible .dnp-fs-exit-btn { opacity: 1; }
+  .dnp-fs-exit-btn:hover { background: rgba(255,255,255,0.14); color: #fff; }
+  .dnp-fs-exit-btn svg { width: 16px; height: 16px; }
+
+
+  /* ── FS shuffle/repeat: never show active highlight ── */
+  #dnp-fs-shuf-btn.active,
+  #dnp-fs-rep-btn.active {
+    color: rgba(255,255,255,0.6) !important;
+    background: none !important;
+  }
+  #dnp-fs-shuf-btn.smart-shuffle-active::after { display: none !important; }
+
+  /* ── Next song countdown popup (top-right) ── */
+  /* ── Next-song popup: rectangle flush to top-right corner ── */
+  .fs-next-popup {
+    position: absolute;
+    top: 0; right: 0;
+    background: rgba(8,8,14,0.92);
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border-left: 1px solid rgba(255,255,255,0.09);
+    border-bottom: 1px solid rgba(255,255,255,0.09);
+    border-radius: 0 0 0 18px; /* only bottom-left rounded */
+    padding: 18px 20px 18px 18px;
+    display: flex; align-items: center; gap: 14px;
+    z-index: 20;
+    width: 360px;
+    /* Hidden: slid off to the right */
+    opacity: 0; transform: translateX(100%);
+    transition: opacity 0.3s ease, transform 0.35s cubic-bezier(0.32,0.72,0,1), top 0.3s ease;
+    pointer-events: none;
+  }
+  .fs-next-popup.visible {
+    opacity: 1; transform: translateX(0);
+    pointer-events: auto;
+  }
+  /* When controls are showing, nudge down to clear the exit button (top:0 → top:68px) */
+  .dnp-fs-view.fs-controls-visible .fs-next-popup.visible {
+    top: 68px;
+    border-radius: 0 0 0 18px;
+  }
+  .fs-next-popup-thumb {
+    width: 64px; height: 64px; border-radius: 10px;
+    background: rgba(255,255,255,0.07); flex-shrink: 0;
+    overflow: hidden; display: flex; align-items: center; justify-content: center;
+  }
+  .fs-next-popup-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .fs-next-popup-thumb svg { width: 24px; height: 24px; color: rgba(255,255,255,0.2); }
+  .fs-next-popup-info { flex: 1; min-width: 0; }
+  .fs-next-popup-label {
+    font-size: 9px; font-weight: 700; letter-spacing: 2px;
+    text-transform: uppercase; color: rgba(255,255,255,0.3);
+    font-family: 'Space Mono', monospace; margin-bottom: 5px;
+  }
+  .fs-next-popup-title {
+    font-family: 'Bricolage Grotesque', sans-serif;
+    font-size: 16px; font-weight: 800; color: #fff;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    letter-spacing: -0.4px; line-height: 1.2;
+  }
+  .fs-next-popup-artist {
+    font-size: 12px; color: rgba(255,255,255,0.45);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    margin-top: 3px; font-weight: 500;
+  }
+  /* Progress ring */
+  .fs-next-popup-ring {
+    position: relative; width: 48px; height: 48px; flex-shrink: 0;
+  }
+  .fs-next-popup-ring svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+  .fs-next-popup-ring-bg { stroke: rgba(255,255,255,0.1); fill: none; stroke-width: 3; }
+  .fs-next-popup-ring-fill {
+    fill: none; stroke-width: 3;
+    stroke: rgb(var(--dyn2-r,var(--dyn-r)),var(--dyn2-g,var(--dyn-g)),var(--dyn2-b,var(--dyn-b)));
+    stroke-linecap: round;
+    stroke-dasharray: 113; stroke-dashoffset: 113;
+    transition: stroke-dashoffset 0.9s linear;
+  }
+  .fs-next-popup-ring-num {
+    position: absolute; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Space Mono', monospace; font-size: 15px; font-weight: 700;
+    color: #fff;
+  }
+
+  /* Fullscreen-enter button in the dnp topbar */
+  .dnp-fullscreen-btn {
+    background: none; border: none; color: rgba(255,255,255,0.4);
+    cursor: pointer; padding: 6px; border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    transition: color 0.15s, background 0.15s;
+  }
+  .dnp-fullscreen-btn:hover { color: #fff; background: rgba(255,255,255,0.07); }
+  .dnp-fullscreen-btn svg { width: 15px; height: 15px; }
 
   /* EQ tab */
   .dnp-eq-presets {
@@ -2091,19 +2406,11 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   .dnp-preset-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
   .dnp-preset-btn:hover:not(.active) { background: rgba(255,255,255,0.1); color: #fff; }
 
-  /* Fix EQ presets scroll in studio panel */
+  /* Desktop EQ presets: same wrapping chip layout as mobile */
   #eq-presets-desk {
-    flex-wrap: nowrap !important;
-    overflow-x: auto !important;
-    scrollbar-width: none !important;
-    min-width: 0 !important;
-  }
-  #eq-presets-desk::-webkit-scrollbar { display: none; }
-  .studio-section .eq-presets-wrap { overflow: hidden; margin: 0 0 8px !important; }
-  /* The wrapper div around eq-presets-desk needs min-width:0 */
-  .studio-section > div > div[style*="overflow-x"] {
-    min-width: 0 !important;
-    overflow: hidden !important;
+    flex-wrap: wrap !important;
+    overflow: visible !important;
+    flex: 1;
   }
 
   /* ── NP PANEL ── */
@@ -2168,7 +2475,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
     padding: 12px 14px 10px;
     border-bottom: 1px solid var(--border);
     display: flex; align-items: center; gap: 10px;
-    flex-shrink: 0; background: rgba(29,185,84,0.03);
+    flex-shrink: 0; background: rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.03);
   }
   .studio-np-cover {
     width: 38px; height: 38px; border-radius: 7px;
@@ -2544,7 +2851,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
 }
 .lib-new-pl-btn:hover { background: rgba(255,255,255,0.1); color: var(--text); }
 .lib-new-pl-btn.accent { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
-.lib-new-pl-btn.accent:hover { background: rgba(29,185,84,0.25); }
+.lib-new-pl-btn.accent:hover { background: rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.25); }
 .lib-new-pl-btn svg { width: 14px; height: 14px; }
 
 /* Desktop: larger grid cols */
@@ -3412,7 +3719,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   background: rgba(255,255,255,0.05);
   outline: none;
 }
-.search-dropdown-item:active { background: rgba(29,185,84,0.08); }
+.search-dropdown-item:active { background: rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.08); }
 .search-dropdown-thumb {
   width: 36px; height: 36px;
   border-radius: 7px;
@@ -3461,7 +3768,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   font-weight: 600;
   transition: background 0.12s;
 }
-.search-dropdown-footer:hover { background: rgba(29,185,84,0.07); }
+.search-dropdown-footer:hover { background: rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.07); }
 .search-dropdown-footer svg { width:14px; height:14px; }
 
 /* ============================================================
@@ -3516,7 +3823,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
 }
 .mini-bar.is-playing .mini-cover {
   animation-play-state: running;
-  box-shadow: 0 0 16px rgba(29,185,84,0.3) !important;
+  box-shadow: 0 0 16px rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.3) !important;
 }
 
 /* Play button springy press */
@@ -3554,7 +3861,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   transition: border-color 0.2s, background 0.2s, box-shadow 0.2s !important;
 }
 .desktop-topbar-search:focus-within {
-  box-shadow: 0 0 0 3px rgba(29,185,84,0.12) !important;
+  box-shadow: 0 0 0 3px rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.12) !important;
 }
 
 /* Search dropdown items stagger in */
@@ -3586,7 +3893,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
 }
 .pl-play-all-btn:hover {
   transform: scale(1.04) !important;
-  box-shadow: 0 4px 16px rgba(29,185,84,0.35) !important;
+  box-shadow: 0 4px 16px rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.35) !important;
 }
 
 /* ====== PERFORMANCE HINTS ====== */
@@ -5317,6 +5624,9 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
           Playlist
         </button>
+        <button class="dnp-fullscreen-btn" onclick="openDeskNPFullscreen()" title="TV mode">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>
+        </button>
         <button class="dnp-close-btn" onclick="closeDeskNP()" title="Close">
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="6 9 12 15 18 9"/></svg>
         </button>
@@ -5359,6 +5669,74 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
       </div>
     </div>
   </div>
+
+  <!-- TV / Fullscreen view -->
+  <div class="dnp-fs-view" id="dnp-fs-view">
+    <button class="dnp-fs-exit-btn" onclick="exitDeskNPFullscreen()" title="Exit TV mode">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M8 3H5a2 2 0 00-2 2v3m18 0V5a2 2 0 00-2-2h-3m0 18h3a2 2 0 002-2v-3M3 16v3a2 2 0 002 2h3"/></svg>
+    </button>
+    <!-- Next song countdown popup -->
+    <div class="fs-next-popup" id="fs-next-popup">
+      <div class="fs-next-popup-thumb" id="fs-next-popup-thumb">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+      </div>
+      <div class="fs-next-popup-info">
+        <div class="fs-next-popup-label">Up Next</div>
+        <div class="fs-next-popup-title" id="fs-next-popup-title">—</div>
+        <div class="fs-next-popup-artist" id="fs-next-popup-artist">—</div>
+      </div>
+      <div class="fs-next-popup-ring" id="fs-next-popup-ring">
+        <svg viewBox="0 0 48 48" width="48" height="48">
+          <circle class="fs-next-popup-ring-bg" cx="24" cy="24" r="18"/>
+          <circle class="fs-next-popup-ring-fill" id="fs-next-ring-fill" cx="24" cy="24" r="18"/>
+        </svg>
+        <div class="fs-next-popup-ring-num" id="fs-next-popup-num">5</div>
+      </div>
+    </div>
+    <div class="dnp-fs-cover" id="dnp-fs-cover">
+      <div class="dnp-fs-cover-ph">
+        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+      </div>
+    </div>
+    <div class="dnp-fs-meta">
+      <div class="dnp-fs-title" id="dnp-fs-title">No Track</div>
+      <div class="dnp-fs-artist" id="dnp-fs-artist">—</div>
+    </div>
+    <div class="dnp-fs-bottom">
+      <div class="dnp-fs-above-seek">
+        <div class="dnp-fs-times">
+          <span id="dnp-fs-current">0:00</span>
+          <span class="dnp-fs-times-sep">/</span>
+          <span id="dnp-fs-dur">0:00</span>
+        </div>
+        <div class="dnp-fs-controls">
+          <button class="dnp-fs-ctrl-btn" id="dnp-fs-shuf-btn" onclick="toggleShuffle()" title="Shuffle">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="16 3 21 3 21 8"/><line x1="4" y1="20" x2="21" y2="3"/><polyline points="21 16 21 21 16 21"/><line x1="4" y1="4" x2="9" y2="9"/></svg>
+          </button>
+          <button class="dnp-fs-ctrl-btn" onclick="prevTrack()">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polygon points="19 20 9 12 19 4" fill="currentColor" stroke="none"/><line x1="5" y1="19" x2="5" y2="5"/></svg>
+          </button>
+          <button class="dnp-fs-play-btn" id="dnp-fs-play-btn" onclick="togglePlay()">
+            <svg fill="currentColor" viewBox="0 0 24 24" id="dnp-fs-play-icon"><polygon points="5,3 19,12 5,21"/></svg>
+          </button>
+          <button class="dnp-fs-ctrl-btn" onclick="nextTrack()">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polygon points="5 4 15 12 5 20" fill="currentColor" stroke="none"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
+          </button>
+          <button class="dnp-fs-ctrl-btn" id="dnp-fs-rep-btn" onclick="cycleRepeat()" title="Repeat">
+            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 014-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+          </button>
+        </div>
+      </div>
+      <div class="dnp-fs-seek-wrap">
+        <div class="dnp-fs-seek-track">
+          <div class="dnp-fs-seek-fill" id="dnp-fs-seek-fill">
+            <div class="dnp-fs-seek-thumb"></div>
+          </div>
+        </div>
+        <input type="range" class="dnp-fs-seek-input" id="dnp-fs-seek-input" min="0" max="100" value="0" step="0.1" oninput="seekTo(this.value)">
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- SEE-ALL OVERLAY -->
@@ -5398,6 +5776,10 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
 // ============================================================
 //  VOID PLAYER V5 — JAVASCRIPT
 // ============================================================
+
+// Global dynamic accent color state — declared here so IIFEs lower in the
+// file (like initAudioStudio) can reference them before setDynColor is defined
+var _dynR = 29, _dynG = 185, _dynB = 84;
 
 // ==============================
 // CONSTANTS
@@ -5630,6 +6012,7 @@ let appSettings = {
   streamQuality: 'high',
   cacheEnabled: true,
   lowEndFullStudio: false,
+  dynamicAccent: true,
 };
 
 // YouTube state
@@ -6902,7 +7285,8 @@ function updateUI() {
     document.getElementById('mini-bar').classList.add('visible');
     updateHomeCard(); updateFavBtn(); setupMediaSession();
     // Extract dominant color from cover art for dynamic theming
-    if (thumb) setTimeout(() => extractDynColor(thumb), 50);
+    // Start immediately (no delay) so the lerp begins in parallel with the cover image loading
+    if (thumb) extractDynColor(thumb);
     else resetDynColor();
     // Refresh desk NP overlay if open
     if (typeof deskNPSync === 'function') setTimeout(deskNPSync, 50);
@@ -7962,7 +8346,7 @@ function renderHomePlaylists() {
 
   // Favorites card
   let html = `<div class="feed-card" onclick="showFavorites()">
-    <div class="feed-card-art" style="background:rgba(29,185,84,0.12);border:1px solid rgba(29,185,84,0.2)">
+    <div class="feed-card-art" style="background:rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.12);border:1px solid rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.2)">
       <svg fill="var(--accent)" viewBox="0 0 24 24" style="width:44px;height:44px"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
     </div>
     <div class="feed-card-label" style="color:var(--accent)">Favorites</div>
@@ -8588,7 +8972,7 @@ function renderSpecialGrid() {
   const localCount = localPl ? (localPl.trackIds || []).length : 0;
   const localCard = localCount > 0 ? `
     <div class="lib-spotify-item" onclick="openPlaylist('void_local_songs')">
-      <div class="lib-spotify-cover" style="background:rgba(29,185,84,0.1);border:1px solid rgba(29,185,84,0.2)">
+      <div class="lib-spotify-cover" style="background:rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.1);border:1px solid rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.2)">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:var(--accent)"><path d="M3 18v-6a9 9 0 0118 0v6"/><path d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z"/></svg>
       </div>
       <div class="lib-spotify-name" style="color:var(--accent)">Local Songs</div>
@@ -8596,7 +8980,7 @@ function renderSpecialGrid() {
     </div>` : '';
   grid.innerHTML = `
     <div class="lib-spotify-item" onclick="showFavorites()">
-      <div class="lib-spotify-cover" style="background:rgba(29,185,84,0.15);border:1px solid rgba(29,185,84,0.25)">
+      <div class="lib-spotify-cover" style="background:rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.15);border:1px solid rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.25)">
         <svg fill="var(--accent)" viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
       </div>
       <div class="lib-spotify-name">Favorites</div>
@@ -9133,6 +9517,23 @@ function addCurrentToPlaylist() {
 function buildSettingsPage() {
   const wrap = document.getElementById('settings-wrap');
   wrap.innerHTML = `
+    <!-- APPEARANCE -->
+    <div class="settings-section">
+      <div class="settings-section-title">Appearance</div>
+      <div class="settings-row">
+        <div class="settings-row-info">
+          <div class="settings-row-label">Dynamic Accent Color</div>
+          <div class="settings-row-desc">Extract accent color from album art — changes UI tint per track</div>
+        </div>
+        <div class="settings-row-control">
+          <label class="toggle-switch">
+            <input type="checkbox" ${appSettings.dynamicAccent !== false ? 'checked' : ''} onchange="toggleDynamicAccent(this.checked)">
+            <span class="toggle-track"></span><span class="toggle-thumb"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
     <!-- AUDIO -->
     <div class="settings-section">
       <div class="settings-section-title">Audio</div>
@@ -9271,7 +9672,7 @@ function buildSettingsPage() {
     <div class="settings-section">
       <div class="settings-section-title" style="color:var(--accent)">⚡ Low-End Device Mode</div>
       <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:8px;padding-bottom:12px">
-        <div style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace;line-height:1.6;background:rgba(29,185,84,0.06);border:1px solid rgba(29,185,84,0.15);border-radius:10px;padding:10px 12px">
+        <div style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace;line-height:1.6;background:rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.06);border:1px solid rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.15);border-radius:10px;padding:10px 12px">
           VOID detected this device has less than 4GB RAM. Studio effects like Compressor and Reverb require significant CPU power and can cause audio skipping — especially over Bluetooth.<br><br>
           You can enable full Studio mode below, but audio lag is <strong style="color:#f1c40f">not a bug</strong> — it's a hardware limitation.
         </div>
@@ -9304,7 +9705,25 @@ function buildSettingsPage() {
   if (guide) guide.style.display = isDesktop() ? 'block' : 'none';
 }
 
-// ── Low-End Full Studio Toggle ────────────────────────────────────────────────
+// ── Dynamic Accent Toggle ─────────────────────────────────────────────────────
+function toggleDynamicAccent(enabled) {
+  appSettings.dynamicAccent = enabled;
+  saveSettings();
+  if (enabled) {
+    // Re-extract color from current track
+    const t = tracks[currentIndex];
+    const thumb = t ? ((t.ytMeta && t.ytMeta.thumbnail) ? t.ytMeta.thumbnail : t.cover) : null;
+    if (thumb) extractDynColor(thumb);
+    else _applyDynColor(29, 185, 84);
+    showToast('Dynamic accent on');
+  } else {
+    // Reset to VOID green immediately
+    _applyDynColor(29, 185, 84);
+    showToast('Dynamic accent off — using VOID green');
+  }
+}
+
+
 function toggleLowEndFullStudio(enabled) {
   if (enabled) {
     // Show warning before enabling
@@ -11808,7 +12227,7 @@ function toggleNPPanel() {
         <button class="studio-fx-btn on" id="eq-toggle-btn-desk" onclick="toggleEQ()">ON</button>
       </div>
       <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;min-width:0">
-        <div id="eq-presets-desk" style="flex:1;min-width:0;display:flex;flex-wrap:wrap;gap:4px"></div>
+        <div class="eq-presets" id="eq-presets-desk"></div>
         <button class="studio-fx-btn" style="flex-shrink:0;white-space:nowrap" onclick="saveCustomEQPreset()">+ SAVE</button>
       </div>
       <div class="eq-bars" id="eq-bars-desk"></div>
@@ -11901,11 +12320,14 @@ function toggleNPPanel() {
     const totalW = (barW + gap) * BAR_COUNT - gap;
     const xOff   = (w - totalW) / 2;
 
-    // Gradient: green at bottom → teal mid → bright at top
+    // Gradient uses dynamic accent color
+    const dr = typeof _dynR !== 'undefined' ? _dynR : 29;
+    const dg = typeof _dynG !== 'undefined' ? _dynG : 185;
+    const db = typeof _dynB !== 'undefined' ? _dynB : 84;
     const grad = specCtx2d.createLinearGradient(0, h, 0, 0);
-    grad.addColorStop(0,    '#1db954');
-    grad.addColorStop(0.6,  '#1ed760');
-    grad.addColorStop(1.0,  '#a8ffcb');
+    grad.addColorStop(0,    `rgb(${dr},${dg},${db})`);
+    grad.addColorStop(0.6,  `rgb(${Math.min(255,dr+30)},${Math.min(255,dg+30)},${Math.min(255,db+30)})`);
+    grad.addColorStop(1.0,  `rgb(${Math.min(255,dr+80)},${Math.min(255,dg+80)},${Math.min(255,db+80)})`);
 
     for (let i = 0; i < BAR_COUNT; i++) {
       const x      = xOff + i * (barW + gap);
@@ -11929,7 +12351,7 @@ function toggleNPPanel() {
 
     // Idle glow when no audio
     if (!hasAudio) {
-      specCtx2d.fillStyle = 'rgba(29,185,84,0.07)';
+      specCtx2d.fillStyle = `rgba(${dr},${dg},${db},0.07)`;
       specCtx2d.fillRect(0, 0, w, h);
     }
   }
@@ -12654,7 +13076,7 @@ function syncDesktopEQ() {
     const isCustom = !builtInEQ.includes(name);
     const isActive = name === currentPreset;
     return `<div class="preset-chip-wrap">
-      <button class="studio-fx-btn${isActive ? ' on' : ''}" onclick="applyPresetDesk('${name}')">${name}</button>
+      <button class="preset-btn${isActive ? ' active' : ''}" onclick="applyPresetDesk('${name}')">${name}</button>
       ${isCustom ? `<button class="preset-chip-del" onclick="event.stopPropagation();deleteCustomEQPreset('${name}')" title="Delete">×</button>` : ''}
     </div>`;
   }).join('');
@@ -12705,36 +13127,103 @@ function updateEQBandDesk(i, val) {
 
 // ── Dynamic color extraction from album art ─────────────────────────────────
 function extractDynColor(src) {
+  // Immediately start fading toward a dim neutral — this gives instant visual feedback
+  // while the CORS image loads. The real color lerp will interrupt and take over from
+  // wherever this ends up, keeping the whole transition smooth with no snap.
+  _applyDynColor(72, 72, 96);
+
   const img = new Image();
   img.crossOrigin = 'anonymous';
   img.onload = function() {
     try {
       const canvas = document.createElement('canvas');
-      canvas.width = canvas.height = 24;
+      canvas.width = canvas.height = 48;
       const ctx = canvas.getContext('2d');
-      ctx.drawImage(img, 0, 0, 24, 24);
-      const data = ctx.getImageData(0, 0, 24, 24).data;
-      let r=0,g=0,b=0,count=0;
-      for (let i=0; i<data.length; i+=16) {
-        const pr=data[i], pg=data[i+1], pb=data[i+2];
-        // Skip near-black, near-white, near-grey pixels
-        const max=Math.max(pr,pg,pb), min=Math.min(pr,pg,pb);
-        const sat = max === 0 ? 0 : (max-min)/max;
-        if (sat > 0.25 && max > 40 && max < 240) { r+=pr; g+=pg; b+=pb; count++; }
+      ctx.drawImage(img, 0, 0, 48, 48);
+      const data = ctx.getImageData(0, 0, 48, 48).data;
+
+      // Bucket pixels by hue (36 buckets = 10° each), weighted by saturation×vibrance
+      const buckets = new Array(36).fill(null).map(() => ({r:0,g:0,b:0,w:0}));
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i], g = data[i+1], b = data[i+2];
+        const max = Math.max(r,g,b), min = Math.min(r,g,b), delta = max - min;
+        if (delta < 30 || max < 30 || max > 248) continue; // skip grey/black/white
+        const sat = delta / max;
+        if (sat < 0.3) continue;
+        // Hue bucket
+        let h = 0;
+        if (max === r) h = ((g - b) / delta + 6) % 6;
+        else if (max === g) h = (b - r) / delta + 2;
+        else h = (r - g) / delta + 4;
+        const bucket = Math.floor(h * 6) % 36; // 36 buckets
+        const weight = sat * (max / 255);
+        buckets[bucket].r += r * weight;
+        buckets[bucket].g += g * weight;
+        buckets[bucket].b += b * weight;
+        buckets[bucket].w += weight;
       }
-      if (count > 0) {
-        r=Math.round(r/count); g=Math.round(g/count); b=Math.round(b/count);
-        // Boost saturation
-        const max=Math.max(r,g,b), min=Math.min(r,g,b);
-        if (max-min < 40) { resetDynColor(); return; }
-        const boost = 1.3;
-        const avg = (r+g+b)/3;
-        r = Math.min(255, Math.round(avg + (r-avg)*boost));
-        g = Math.min(255, Math.round(avg + (g-avg)*boost));
-        b = Math.min(255, Math.round(avg + (b-avg)*boost));
-        setDynColor(r,g,b);
+
+      // Find heaviest bucket
+      let best = null, bestW = 0;
+      for (const bk of buckets) {
+        if (bk.w > bestW) { bestW = bk.w; best = bk; }
+      }
+
+      if (!best || bestW < 0.5) { resetDynColor(); return; }
+
+      // Find 2nd dominant color — skip adjacent hue buckets to get a genuinely different color
+      let second = null, secondW = 0;
+      for (let bi = 0; bi < buckets.length; bi++) {
+        const bk = buckets[bi];
+        if (bk.w <= secondW) continue;
+        // Find index of best bucket
+        const bestIdx = buckets.indexOf(best);
+        const dist = Math.min(Math.abs(bi - bestIdx), 36 - Math.abs(bi - bestIdx));
+        if (dist < 4) continue; // must be >40° apart in hue
+        secondW = bk.w; second = bk;
+      }
+
+      let r = Math.round(best.r / best.w);
+      let g = Math.round(best.g / best.w);
+      let b = Math.round(best.b / best.w);
+
+      // Boost saturation aggressively so the color pops
+      const avg = (r + g + b) / 3;
+      const boost = 1.8;
+      r = Math.min(255, Math.max(0, Math.round(avg + (r - avg) * boost)));
+      g = Math.min(255, Math.max(0, Math.round(avg + (g - avg) * boost)));
+      b = Math.min(255, Math.max(0, Math.round(avg + (b - avg) * boost)));
+
+      // Ensure minimum brightness so it's readable on dark backgrounds
+      const lum = 0.299*r + 0.587*g + 0.114*b;
+      if (lum < 80) {
+        const lift = 80 / Math.max(lum, 1);
+        r = Math.min(255, Math.round(r * lift));
+        g = Math.min(255, Math.round(g * lift));
+        b = Math.min(255, Math.round(b * lift));
+      }
+
+      setDynColor(r, g, b);
+
+      // Apply 2nd dominant color (used in TV/fullscreen mode)
+      if (second && secondW > 0.3) {
+        let r2 = Math.round(second.r / second.w);
+        let g2 = Math.round(second.g / second.w);
+        let b2 = Math.round(second.b / second.w);
+        const avg2 = (r2+g2+b2)/3;
+        r2 = Math.min(255,Math.max(0,Math.round(avg2+(r2-avg2)*1.8)));
+        g2 = Math.min(255,Math.max(0,Math.round(avg2+(g2-avg2)*1.8)));
+        b2 = Math.min(255,Math.max(0,Math.round(avg2+(b2-avg2)*1.8)));
+        const lum2 = 0.299*r2+0.587*g2+0.114*b2;
+        if (lum2 < 80) { const l=80/Math.max(lum2,1); r2=Math.min(255,Math.round(r2*l)); g2=Math.min(255,Math.round(g2*l)); b2=Math.min(255,Math.round(b2*l)); }
+        document.documentElement.style.setProperty('--dyn2-r', r2);
+        document.documentElement.style.setProperty('--dyn2-g', g2);
+        document.documentElement.style.setProperty('--dyn2-b', b2);
       } else {
-        resetDynColor();
+        // fallback: slightly shifted version of primary
+        document.documentElement.style.setProperty('--dyn2-r', Math.min(255,r+60));
+        document.documentElement.style.setProperty('--dyn2-g', Math.min(255,g+20));
+        document.documentElement.style.setProperty('--dyn2-b', Math.min(255,b+80));
       }
     } catch(e) { resetDynColor(); }
   };
@@ -12742,15 +13231,92 @@ function extractDynColor(src) {
   img.src = src;
 }
 function setDynColor(r,g,b) {
-  const root = document.documentElement;
-  root.style.setProperty('--dyn-r', r);
-  root.style.setProperty('--dyn-g', g);
-  root.style.setProperty('--dyn-b', b);
+  // If dynamic accent is disabled, don't change the color
+  if (appSettings && appSettings.dynamicAccent === false) return;
+  _applyDynColor(r, g, b);
 }
-function resetDynColor() { setDynColor(29,185,84); }
+// Current displayed color (starts at default green)
+var _curDynR = 29, _curDynG = 185, _curDynB = 84;
+var _dynRafId = null;
+
+function _applyDynColor(r, g, b) {
+  // Cancel any in-flight transition
+  if (_dynRafId) { cancelAnimationFrame(_dynRafId); _dynRafId = null; }
+
+  const DURATION = 2000; // ms — slow, cinematic crossfade
+  const startR = _curDynR, startG = _curDynG, startB = _curDynB;
+  const endR = r, endG = g, endB = b;
+  let startTime = null;
+
+  function ease(t) {
+    // Cubic ease-in-out for extra smoothness
+    return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
+  }
+
+  function step(ts) {
+    if (!startTime) startTime = ts;
+    const elapsed = ts - startTime;
+    const progress = Math.min(elapsed / DURATION, 1);
+    const e = ease(progress);
+
+    const cr = Math.round(startR + (endR - startR) * e);
+    const cg = Math.round(startG + (endG - startG) * e);
+    const cb = Math.round(startB + (endB - startB) * e);
+
+    const root = document.documentElement;
+    root.style.setProperty('--dyn-r', cr);
+    root.style.setProperty('--dyn-g', cg);
+    root.style.setProperty('--dyn-b', cb);
+    root.style.setProperty('--accent', `rgb(${cr},${cg},${cb})`);
+    root.style.setProperty('--accent-rgb', `${cr},${cg},${cb}`);
+    root.style.setProperty('--accent2', `rgb(${Math.min(255,cr+30)},${Math.min(255,cg+30)},${Math.min(255,cb+30)})`);
+    root.style.setProperty('--accent-dim', `rgba(${cr},${cg},${cb},0.14)`);
+    root.style.setProperty('--accent-glow', `rgba(${cr},${cg},${cb},0.3)`);
+    _dynR = cr; _dynG = cg; _dynB = cb;
+
+    if (progress < 1) {
+      _dynRafId = requestAnimationFrame(step);
+    } else {
+      _curDynR = endR; _curDynG = endG; _curDynB = endB;
+      _dynRafId = null;
+      updateFaviconAccent(endR, endG, endB);
+    }
+  }
+
+  // Snap current displayed values as start point
+  _curDynR = startR; _curDynG = startG; _curDynB = startB;
+  _dynRafId = requestAnimationFrame(step);
+}
+
+function resetDynColor() { _applyDynColor(29,185,84); }
+// Instant snap (no lerp) — use for init or when transitions are unwanted
+function _snapDynColor(r,g,b) {
+  _curDynR=r; _curDynG=g; _curDynB=b;
+  if (_dynRafId) { cancelAnimationFrame(_dynRafId); _dynRafId=null; }
+  const root=document.documentElement;
+  root.style.setProperty('--dyn-r',r); root.style.setProperty('--dyn-g',g); root.style.setProperty('--dyn-b',b);
+  root.style.setProperty('--accent',`rgb(${r},${g},${b})`);
+  root.style.setProperty('--accent-rgb',`${r},${g},${b}`);
+  root.style.setProperty('--accent2',`rgb(${Math.min(255,r+30)},${Math.min(255,g+30)},${Math.min(255,b+30)})`);
+  root.style.setProperty('--accent-dim',`rgba(${r},${g},${b},0.14)`);
+  root.style.setProperty('--accent-glow',`rgba(${r},${g},${b},0.3)`);
+  _dynR=r; _dynG=g; _dynB=b; updateFaviconAccent(r,g,b);
+}
 
 
-// ── Dynamic greeting ──────────────────────────────────────────────────────
+// Update SVG favicon with current accent color
+function updateFaviconAccent(r, g, b) {
+  try {
+    const color = `rgb(${r},${g},${b})`;
+    const svgData = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="8" fill="#050508"/><text x="16" y="22" text-anchor="middle" font-family="sans-serif" font-weight="900" font-size="18" fill="${color}">V</text></svg>`;
+    const encoded = 'data:image/svg+xml,' + encodeURIComponent(svgData);
+    let link = document.querySelector("link[rel='icon']");
+    if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
+    link.href = encoded;
+  } catch(e) {}
+}
+
+
 (function() {
   const el = document.getElementById('home-greeting');
   if (!el) return;
@@ -12793,7 +13359,7 @@ function renderSidebarPlaylists() {
       ? `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="color:var(--accent)"><path d="M3 18v-6a9 9 0 0118 0v6"/><path d="M21 19a2 2 0 01-2 2h-1a2 2 0 01-2-2v-3a2 2 0 012-2h3zM3 19a2 2 0 002 2h1a2 2 0 002-2v-3a2 2 0 00-2-2H3z"/></svg>`
       : pl.cover ? `<img src="${pl.cover}" alt="">` : thumb ? `<img src="${thumb}" alt="">` : `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
     return `<div class="sidebar-pl-item${isLocal?' pinned':''}" onclick="openPlaylist('${pl.id}')">
-      <div class="sidebar-pl-thumb" style="${isLocal?'background:rgba(29,185,84,0.1);border:1px solid rgba(29,185,84,0.2)':''}">
+      <div class="sidebar-pl-thumb" style="${isLocal?'background:rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.1);border:1px solid rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.2)':''}">
         ${thumbHTML}
       </div>
       <div class="sidebar-pl-info">
@@ -13041,24 +13607,124 @@ setTimeout(() => {
   window.closeDeskNP = function() {
     dnpOpen = false;
     overlay.classList.remove('open');
+    exitDeskNPFullscreen();
   };
 
-  // Close on Escape
+  // Close on Escape only
   document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && dnpOpen) closeDeskNP();
-  });
-
-  // Close on click outside the overlay (click on the main content area)
-  document.addEventListener('click', function(e) {
-    if (!dnpOpen) return;
-    // The overlay covers the main column; close if click is outside it
-    if (!overlay.contains(e.target)) {
-      // Also make sure it's not the track zone button that opens it
-      const trackZone = document.querySelector('.mini-bar .mini-track-zone');
-      if (trackZone && trackZone.contains(e.target)) return;
-      closeDeskNP();
+    if (e.key === 'Escape') {
+      if (overlay.classList.contains('dnp-fullscreen')) { exitDeskNPFullscreen(); return; }
+      if (dnpOpen) closeDeskNP();
     }
   });
+
+  // ── Fullscreen (TV mode) ──────────────────────────────────────────────────
+  let dnpFS = false;
+
+  window.openDeskNPFullscreen = function() {
+    dnpFS = true;
+    if (!dnpOpen) { dnpOpen = true; overlay.classList.add('open'); }
+    overlay.classList.add('dnp-fullscreen');
+    deskNPSyncFS();
+  };
+
+  window.exitDeskNPFullscreen = function() {
+    dnpFS = false;
+    overlay.classList.remove('dnp-fullscreen');
+    // clean up cursor idle timer
+    if (_fsIdleTimer) { clearTimeout(_fsIdleTimer); _fsIdleTimer = null; }
+    const fsv = document.getElementById('dnp-fs-view');
+    if (fsv) fsv.classList.remove('fs-controls-visible');
+  };
+
+  // ── YT-style cursor idle hide/show for fullscreen ────────────────────────
+  let _fsIdleTimer = null;
+
+  function _fsShowControls() {
+    const fsv = document.getElementById('dnp-fs-view');
+    if (!fsv) return;
+    fsv.classList.add('fs-controls-visible');
+    if (_fsIdleTimer) clearTimeout(_fsIdleTimer);
+    _fsIdleTimer = setTimeout(function() {
+      if (dnpFS) fsv.classList.remove('fs-controls-visible');
+    }, 3000);
+  }
+
+  overlay.addEventListener('mousemove', function() {
+    if (!dnpFS) return;
+    _fsShowControls();
+  });
+  overlay.addEventListener('mouseenter', function() {
+    if (!dnpFS) return;
+    _fsShowControls();
+  });
+  overlay.addEventListener('mouseleave', function() {
+    if (!dnpFS) return;
+    if (_fsIdleTimer) clearTimeout(_fsIdleTimer);
+    const fsv = document.getElementById('dnp-fs-view');
+    if (fsv) fsv.classList.remove('fs-controls-visible');
+  });
+  // Show on click or keypress while in FS
+  overlay.addEventListener('click', function() { if (dnpFS) _fsShowControls(); });
+  document.addEventListener('keydown', function(e) {
+    if (dnpFS && e.key !== 'Escape') _fsShowControls();
+  });
+
+  function deskNPSyncFS() {
+    const t = (typeof tracks !== 'undefined' && typeof currentIndex !== 'undefined') ? tracks[currentIndex] : null;
+    const thumb = t ? ((t.ytMeta && t.ytMeta.thumbnail) ? t.ytMeta.thumbnail : t.cover) : null;
+
+    const fsCover = document.getElementById('dnp-fs-cover');
+    if (fsCover) {
+      fsCover.innerHTML = thumb
+        ? `<img src="${thumb}" alt="" style="width:100%;height:100%;object-fit:cover">`
+        : `<div class="dnp-fs-cover-ph"><svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></div>`;
+      fsCover.className = 'dnp-fs-cover' + (typeof isPlaying !== 'undefined' && isPlaying ? ' playing' : '');
+    }
+
+    const fsBg = document.getElementById('dnp-bg');
+    if (fsBg) fsBg.style.backgroundImage = thumb ? `url(${thumb})` : 'none';
+
+    const fsTitle = document.getElementById('dnp-fs-title');
+    const fsArtist = document.getElementById('dnp-fs-artist');
+    if (fsTitle) fsTitle.textContent = t ? (t.title || 'No Track') : 'No Track';
+    if (fsArtist) fsArtist.textContent = t ? (t.artist || '—') : '—';
+
+    const fsDur = document.getElementById('dnp-fs-dur');
+    if (fsDur && typeof audioEl !== 'undefined' && audioEl.duration)
+      fsDur.textContent = fmtTime(audioEl.duration);
+
+    updateDeskNPFSPlayBtn();
+  }
+
+  function updateDeskNPFSPlayBtn() {
+    const ico = document.getElementById('dnp-fs-play-icon');
+    if (!ico) return;
+    const playing = typeof isPlaying !== 'undefined' && isPlaying;
+    ico.innerHTML = playing
+      ? '<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>'
+      : '<polygon points="5,3 19,12 5,21"/>';
+    const cover = document.getElementById('dnp-fs-cover');
+    if (cover) cover.className = 'dnp-fs-cover' + (playing ? ' playing' : '');
+  }
+
+  // Hook into updateProgress to keep FS seekbar in sync
+  const _origUpdateProgress = window.updateProgress;
+  window.updateProgress = function() {
+    if (typeof _origUpdateProgress === 'function') _origUpdateProgress.apply(this, arguments);
+    if (!dnpFS) return;
+    const pct = (typeof audioEl !== 'undefined' && audioEl.duration)
+      ? (audioEl.currentTime / audioEl.duration) * 100 : 0;
+    const fsFill = document.getElementById('dnp-fs-seek-fill');
+    if (fsFill) fsFill.style.width = pct + '%';
+    const fsInput = document.getElementById('dnp-fs-seek-input');
+    if (fsInput) fsInput.value = pct;
+    const fsCur = document.getElementById('dnp-fs-current');
+    if (fsCur && typeof audioEl !== 'undefined') fsCur.textContent = fmtTime(audioEl.currentTime);
+    const fsDur = document.getElementById('dnp-fs-dur');
+    if (fsDur && typeof audioEl !== 'undefined' && audioEl.duration) fsDur.textContent = fmtTime(audioEl.duration);
+    updateDeskNPFSPlayBtn();
+  };
 
   // ── Tab switching ────────────────────────────────────────────────────────
   window.switchDeskNPTab = function(tab) {
@@ -13194,10 +13860,131 @@ setTimeout(() => {
     if (!dnpOpen) return;
     deskNPSync();
     if (dnpActiveTab === 'queue') deskNPSyncQueue();
+    if (dnpFS) deskNPSyncFS();
   }, 2000);
 
   // Re-export so external callers can use it
   window.deskNPSync = deskNPSync;
+  window.deskNPSyncFS = deskNPSyncFS;
+
+  // ── FS shuffle/repeat: never sync active state to FS buttons ────────────
+  // We override deskNPSyncState so it doesn't touch dnp-fs-shuf-btn / dnp-fs-rep-btn
+  const _origSyncState = window.deskNPSyncState;
+  window.deskNPSyncState = function() {
+    if (typeof _origSyncState === 'function') _origSyncState.apply(this, arguments);
+    // Forcibly keep FS shuffle/repeat buttons visually neutral
+    const fsShuf = document.getElementById('dnp-fs-shuf-btn');
+    const fsRep  = document.getElementById('dnp-fs-rep-btn');
+    if (fsShuf) { fsShuf.classList.remove('active','smart-shuffle-active'); }
+    if (fsRep)  { fsRep.classList.remove('active'); }
+  };
+
+  // ── Next-song countdown popup ────────────────────────────────────────────
+  let _fsCountdownTimer  = null;
+  let _fsCountdownActive = false;
+  const COUNTDOWN_SECS   = 5;
+
+  // Non-destructive peek: mirrors getNextQueueIndex() without shifting the queue
+  function _peekNextTrack() {
+    if (typeof tracks === 'undefined' || typeof currentIndex === 'undefined') return null;
+    let nextIdx = null;
+    if (queue.manual.length)      nextIdx = queue.manual[0];
+    else if (queue.future.length) nextIdx = queue.future[0];
+    else if (typeof isSmartShuffle !== 'undefined' && isSmartShuffle) {
+      // Can't peek smart shuffle reliably — fall through to null
+      nextIdx = null;
+    } else if (typeof isShuffle !== 'undefined' && isShuffle) {
+      nextIdx = null; // shuffle queue exhausted, can't predict
+    } else {
+      const next = currentIndex + 1;
+      if (typeof repeatMode !== 'undefined' && repeatMode === 1) {
+        nextIdx = next % tracks.length; // repeat all wraps around
+      } else if (next < tracks.length) {
+        nextIdx = next;
+      }
+    }
+    return (nextIdx !== null && tracks[nextIdx]) ? tracks[nextIdx] : null;
+  }
+
+  function _showFSCountdown() {
+    if (_fsCountdownActive) return;
+    const nextT = _peekNextTrack();
+    if (!nextT) return; // nothing queued — don't show
+
+    _fsCountdownActive = true;
+
+    const popup    = document.getElementById('fs-next-popup');
+    const thumbEl  = document.getElementById('fs-next-popup-thumb');
+    const titleEl  = document.getElementById('fs-next-popup-title');
+    const artistEl = document.getElementById('fs-next-popup-artist');
+    const numEl    = document.getElementById('fs-next-popup-num');
+    const ringFill = document.getElementById('fs-next-ring-fill');
+    if (!popup) return;
+
+    const thumb = (nextT.ytMeta && nextT.ytMeta.thumbnail) ? nextT.ytMeta.thumbnail : nextT.cover;
+    if (thumbEl) {
+      thumbEl.innerHTML = thumb
+        ? `<img src="${thumb}" alt="">`
+        : `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
+    }
+    if (titleEl)  titleEl.textContent = nextT.title  || 'Unknown';
+    if (artistEl) artistEl.textContent = nextT.artist || '—';
+
+    const circ = 2 * Math.PI * 18; // strokeDasharray on r=18 circle
+    let sec = COUNTDOWN_SECS;
+
+    function tick() {
+      if (numEl) numEl.textContent = sec;
+      if (ringFill) {
+        const progress = 1 - (sec / COUNTDOWN_SECS);
+        ringFill.style.strokeDashoffset = circ * (1 - progress);
+      }
+      if (sec <= 0) { _hideFSCountdown(); return; }
+      sec--;
+      _fsCountdownTimer = setTimeout(tick, 1000);
+    }
+
+    // Reset ring then show
+    if (ringFill) ringFill.style.strokeDashoffset = circ;
+    popup.classList.add('visible');
+    tick();
+  }
+
+  function _hideFSCountdown() {
+    _fsCountdownActive = false;
+    if (_fsCountdownTimer) { clearTimeout(_fsCountdownTimer); _fsCountdownTimer = null; }
+    const popup = document.getElementById('fs-next-popup');
+    if (popup) popup.classList.remove('visible');
+  }
+
+  // Hook updateProgress — trigger at exactly <=5s remaining, reset if scrubbed back
+  const _origUpdateProgressFS = window.updateProgress;
+  window.updateProgress = function() {
+    if (typeof _origUpdateProgressFS === 'function') _origUpdateProgressFS.apply(this, arguments);
+    if (!dnpFS) { if (_fsCountdownActive) _hideFSCountdown(); return; }
+    if (typeof audioEl === 'undefined' || !audioEl.duration || isNaN(audioEl.duration)) return;
+    const remaining = audioEl.duration - audioEl.currentTime;
+    if (remaining <= COUNTDOWN_SECS && remaining > 0 && isPlaying) {
+      _showFSCountdown();
+    } else if (remaining > COUNTDOWN_SECS + 1) {
+      // User scrubbed back — reset so popup can re-trigger
+      if (_fsCountdownActive) _hideFSCountdown();
+    }
+  };
+
+  // Hide on exit fullscreen or track change
+  const _origExitFS2 = window.exitDeskNPFullscreen;
+  window.exitDeskNPFullscreen = function() {
+    if (typeof _origExitFS2 === 'function') _origExitFS2.apply(this, arguments);
+    _hideFSCountdown();
+  };
+
+  // Hide + reset when a new track starts (so it re-triggers on the new track)
+  const _origDeskNPSyncFS2 = window.deskNPSyncFS;
+  window.deskNPSyncFS = function() {
+    if (typeof _origDeskNPSyncFS2 === 'function') _origDeskNPSyncFS2.apply(this, arguments);
+    _hideFSCountdown();
+  };
 
 })();
 </script>
@@ -13386,7 +14173,7 @@ setTimeout(() => {
     if (driveUser) {
       authLabel.textContent = driveUser.displayName.split(' ')[0];
       authBtn.title = driveUser.email + ' — click to sign out';
-      authBtn.style.borderColor = 'rgba(29,185,84,0.4)';
+      authBtn.style.borderColor = `rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.4)`;
       authBtn.style.color = 'var(--accent)';
       if (driveUser.photo) {
         authBtn.querySelector('svg').style.display = 'none';
