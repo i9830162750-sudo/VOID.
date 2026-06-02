@@ -5810,7 +5810,7 @@ try {
 const DB_VER  = 5;
 
 // Built-in YouTube API key (legacy — kept for direct-client fallback)
-const VOID_YT_API_KEY = 'AIzaSyAyIzgLddMuiNayJcKWIlSYD5l3FL4BR1o';
+// YouTube API key is managed server-side via VOID_YT_API_KEY env var
 
 // ── Low-end device detection ─────────────────────────────────────────────────
 // Detects weak hardware to throttle animations and heavy renders
@@ -6019,7 +6019,7 @@ let appSettings = {
 let ytSearchTimer  = null;
 let ytLastQuery    = '';
 let ytActiveFilter = 'all';
-let ytApiKey       = localStorage.getItem('void_yt_api_key') || VOID_YT_API_KEY;
+let ytApiKey       = localStorage.getItem('void_yt_api_key') || '';
 let ytApiValid     = false;
 let ytDownloads    = {}; // trackId -> progress
 
@@ -11451,24 +11451,29 @@ async function ytImportPlaylistById(plId, knownTitle, inputEl) {
   try {
     let pl_title=knownTitle||'YouTube Import', videos=[];
 
-    if (ytApiKey) {
-      try {
-        const resp=await fetch(`https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${encodeURIComponent(plId)}&maxResults=50&key=${encodeURIComponent(ytApiKey)}`,{signal:AbortSignal.timeout(12000)});
-        if (resp.ok) {
-          const data=await resp.json();
-          const pResp=await fetch(`https://www.googleapis.com/youtube/v3/playlists?part=snippet&id=${encodeURIComponent(plId)}&key=${encodeURIComponent(ytApiKey)}`,{signal:AbortSignal.timeout(5000)});
-          if (pResp.ok) { const pData=await pResp.json(); if (pData.items&&pData.items[0]) pl_title=pData.items[0].snippet.title; }
-          videos=(data.items||[]).map(item=>({
-            videoId:item.snippet.resourceId?.videoId,
-            title:item.snippet.title||'',
-            artist:item.snippet.videoOwnerChannelTitle||'',
-            thumbnail:item.snippet.thumbnails?.medium?.url||item.snippet.thumbnails?.default?.url||null,
-            duration:0,
-          })).filter(v=>v.videoId&&v.videoId!=='Deleted video');
-        }
-      } catch(e) {}
-    }
+    // Build a full URL for the handler to resolve
+    const ytUrl = `https://www.youtube.com/playlist?list=${encodeURIComponent(plId)}`;
+    try {
+      const resp = await fetch(`${VOID_API_BASE}/handler/playlist/resolve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: ytUrl }),
+        signal: AbortSignal.timeout(30000),
+      });
+      if (resp.ok) {
+        const data = await resp.json();
+        if (data.title) pl_title = data.title;
+        videos = (data.tracks || []).map(t => ({
+          videoId: t.videoId || t.id,
+          title: t.title || '',
+          artist: t.artist || t.channelTitle || '',
+          thumbnail: t.thumbnail || null,
+          duration: t.duration || 0,
+        })).filter(v => v.videoId);
+      }
+    } catch(e) {}
 
+    // Invidious fallback if handler didn't return tracks
     if (!videos.length) {
       for (const inst of YT_INVIDIOUS) {
         try {
@@ -12021,7 +12026,7 @@ async function ytCheckApiStatus() {
 function ytSaveApiKey() {
   const input = document.getElementById('yt-api-key-input');
   if (!input) return;
-  ytApiKey = input.value.trim() || VOID_YT_API_KEY;
+  ytApiKey = input.value.trim() || '';
   localStorage.setItem('void_yt_api_key', ytApiKey);
   showToast('API key saved');
 }
