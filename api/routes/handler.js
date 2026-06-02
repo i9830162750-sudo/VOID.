@@ -20,7 +20,10 @@ router.post('/playlist/resolve', async (req, res, next) => {
       body: JSON.stringify({ url: req.body.url }),
       signal: AbortSignal.timeout(30000),
     });
-    const data = await upstream.json();
+    const data = await upstream.json().catch(() => ({ error: 'Non-JSON response from handler' }));
+    if (!upstream.ok) {
+      console.error('[handler/playlist/resolve] upstream error:', upstream.status, data);
+    }
     res.status(upstream.status).json(data);
   } catch (e) {
     console.error('[handler/playlist/resolve]', e.message);
