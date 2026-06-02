@@ -24,6 +24,7 @@ const session     = require('express-session');
 const passport    = require('./api/passport');
 
 const config    = require('./config');
+const HANDLER_URL = config.handler.url;
 const apiRouter = require('./api');
 
 const app = express();
@@ -79,6 +80,7 @@ app.use(
           'https://accounts.google.com',
           'https://oauth2.googleapis.com',
           'https://www.googleapis.com',
+          ...(HANDLER_URL ? [HANDLER_URL] : []),
         ],
         mediaSrc: [
           "'self'",
@@ -86,6 +88,7 @@ app.use(
           'https://*.saavncdn.com',
           'https://cf-media.sndcdn.com',
           'https://cf-preview-media.sndcdn.com',
+          ...(HANDLER_URL ? [HANDLER_URL] : []),
         ],
         frameSrc: [
           'https://accounts.google.com',
