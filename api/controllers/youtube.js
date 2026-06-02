@@ -474,9 +474,33 @@ exports.streamProxy = async (req, res, next) => {
       cacheSet(cacheKey, result);
       return res.json(result);
     } catch (e) {
-      console.error('[YouTube stream error]', e.message);
-      // Return a structured 502 so the frontend can show a useful message
-      return res.status(502).json({ error: 'Stream resolve failed', detail: e.message });
+      console.error('[YouTube stream error — handler failed, trying Invidious fallback]', e.message);
+
+      // Invidious fallback: try configured instances in order
+      const instances = config.youtube?.invidiousInstances || [];
+      for (const instance of instances) {
+        try {
+          const r = await fetch(`${instance}/api/v1/videos/${songId}`, {
+            signal: AbortSignal.timeout(8000),
+          });
+          if (!r.ok) continue;
+          const d = await r.json();
+          const stream =
+            d.adaptiveFormats?.find(f => f.type?.startsWith('audio/')) ||
+            d.formatStreams?.[0];
+          if (stream?.url) {
+            const result = { url: stream.url, mimeType: stream.type || 'audio/webm' };
+            cacheSet(`yt_stream:${songId}`, result);
+            console.log(`[YouTube stream] Invidious fallback succeeded via ${instance}`);
+            return res.json(result);
+          }
+        } catch (invErr) {
+          console.warn(`[YouTube stream] Invidious instance ${instance} failed:`, invErr.message);
+        }
+      }
+
+      // All sources exhausted
+      return res.status(502).json({ error: 'Stream resolve failed — all sources exhausted', detail: e.message });
     }
   }
 
