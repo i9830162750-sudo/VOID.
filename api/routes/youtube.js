@@ -34,4 +34,8 @@ router.get('/stream', controller.streamProxy);
 
 router.get('/audio', controller.audioProxy);
 
+// YouTube playlist import via server-side Invidious proxy (avoids CSP issues)
+// GET /api/youtube/yt-playlist?id=PLAYLIST_ID
+router.get('/yt-playlist', controller.ytPlaylistProxy);
+
 module.exports = router;
