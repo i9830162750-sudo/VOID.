@@ -70,4 +70,9 @@ module.exports = {
     windowMs: 15 * 60 * 1000,
     max: 200,
   },
+
+  // ── void-handler sidecar (yt-dlp + Spotify playlist resolver) ────────────
+  handler: {
+    url: process.env.VOID_HANDLER_URL || 'https://void-playlist-service.onrender.com',
+  },
 };
