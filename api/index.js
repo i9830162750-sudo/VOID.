@@ -15,5 +15,6 @@ router.use('/youtube',    require('./routes/youtube'));
 router.use('/soundcloud', require('./routes/soundcloud'));
 router.use('/auth',       require('./routes/auth'));
 router.use('/drive',      require('./routes/drive'));
+router.use('/handler',    require('./routes/handler'));
 
 module.exports = router;
