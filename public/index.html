@@ -9592,8 +9592,10 @@ function buildSettingsPage() {
           </div>
         </div>
         <div class="yt-api-row">
+          <form onsubmit="ytSaveApiKey();buildSettingsPage();return false;" style="display:contents">
           <input class="yt-api-input" id="yt-api-key-input" type="password" placeholder="AIzaSy… (leave blank for built-in)" autocomplete="off">
-          <button class="yt-api-save-btn" onclick="ytSaveApiKey();buildSettingsPage()">Save</button>
+          <button class="yt-api-save-btn" type="submit">Save</button>
+          </form>
         </div>
       </div>
       <div class="settings-row">
