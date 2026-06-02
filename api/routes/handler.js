@@ -22,7 +22,11 @@ router.post('/playlist/resolve', async (req, res, next) => {
     });
     const data = await upstream.json();
     res.status(upstream.status).json(data);
-  } catch (e) { next(e); }
+  } catch (e) {
+    console.error('[handler/playlist/resolve]', e.message);
+    // Return a structured error so the frontend can fall back gracefully
+    res.status(502).json({ error: 'Handler unavailable', detail: e.message });
+  }
 });
 
 // POST /api/handler/playlist/resolve-track
