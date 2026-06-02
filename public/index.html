@@ -11476,7 +11476,7 @@ async function ytImportPlaylistById(plId, knownTitle, inputEl) {
     // Invidious fallback via server-side proxy (avoids CSP violations)
     if (!videos.length) {
       try {
-        const resp=await fetch(`${VOID_API_BASE}/youtube/yt-playlist?id=${encodeURIComponent(plId)}`,{signal:AbortSignal.timeout(30000)});
+        const resp=await fetch(`${VOID_API_BASE}/invidious/playlist?id=${encodeURIComponent(plId)}`,{signal:AbortSignal.timeout(30000)});
         if (resp.ok) {
           const data=await resp.json();
           pl_title=data.title||pl_title;
