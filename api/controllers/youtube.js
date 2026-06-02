@@ -1,6 +1,12 @@
 'use strict';
 
+const config = require('../../config');
 const SAAVN_API = 'https://jiosaavn-api-h375.onrender.com/api';
+
+// YouTube videoId pattern: 11 chars, alphanumeric + _ + -
+function isYouTubeVideoId(id) {
+  return /^[A-Za-z0-9_-]{11}$/.test(id);
+}
 
 // ── Tiny in-memory cache ──────────────────────────────────────────────────────
 const cache = new Map();
@@ -437,11 +443,44 @@ exports.playlistItems = async (req, res, next) => {
   }
 };
 
-// GET /api/youtube/stream?id=SONG_ID
+// GET /api/youtube/stream?id=SONG_ID_or_YOUTUBE_VIDEOID
 exports.streamProxy = async (req, res, next) => {
   const songId = String(req.query.id || '').trim();
   if (!songId) return res.status(400).json({ error: 'Missing id' });
 
+  // YouTube videoIds are exactly 11 chars (alphanumeric + _ + -).
+  // JioSaavn IDs are shorter alpha strings like "wBh0UdkN".
+  // Forward YouTube IDs to the handler to get a real stream URL.
+  if (isYouTubeVideoId(songId)) {
+    const handlerUrl = config.handler.url;
+    if (!handlerUrl) return res.status(503).json({ error: 'VOID_HANDLER_URL not configured' });
+
+    try {
+      const cacheKey = `yt_stream:${songId}`;
+      const cached = cacheGet(cacheKey);
+      if (cached) return res.json(cached);
+
+      const upstream = await fetch(`${handlerUrl}/stream/info/${songId}`, {
+        signal: AbortSignal.timeout(20000),
+      });
+      if (!upstream.ok) throw new Error(`Handler returned HTTP ${upstream.status}`);
+      const data = await upstream.json();
+
+      // Handler returns { url, mimeType } or { audioUrl, ... }
+      const url = data.url || data.audioUrl;
+      if (!url) return res.status(502).json({ error: 'No stream URL from handler' });
+
+      const result = { url, mimeType: data.mimeType || 'audio/webm' };
+      cacheSet(cacheKey, result);
+      return res.json(result);
+    } catch (e) {
+      console.error('[YouTube stream error]', e.message);
+      // Return a structured 502 so the frontend can show a useful message
+      return res.status(502).json({ error: 'Stream resolve failed', detail: e.message });
+    }
+  }
+
+  // JioSaavn song ID path (unchanged)
   try {
     const cacheKey = `saavn_url:${songId}`;
     const cached = cacheGet(cacheKey);
