@@ -11480,9 +11480,9 @@ async function ytImportPlaylistById(plId, knownTitle, inputEl) {
         if (resp.ok) {
           const data=await resp.json();
           pl_title=data.title||pl_title;
-          videos=(data.videos||[]).slice(0,100).map(v=>({
+          videos=(data.videos||[]).map(v=>({
             videoId:v.videoId,title:v.title||'',artist:v.author||'',
-            thumbnail:(v.videoThumbnails&&v.videoThumbnails.length)?(v.videoThumbnails.find(t=>t.quality==='medium')?.url||v.videoThumbnails[0]?.url):null,
+            thumbnail:v._thumb||((v.videoThumbnails&&v.videoThumbnails.length)?(v.videoThumbnails.find(t=>t.quality==='medium')?.url||v.videoThumbnails[0]?.url):null),
             duration:v.lengthSeconds||0,
           }));
         }
