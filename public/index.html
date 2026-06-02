@@ -11473,12 +11473,11 @@ async function ytImportPlaylistById(plId, knownTitle, inputEl) {
       }
     } catch(e) {}
 
-    // Invidious fallback if handler didn't return tracks
+    // Invidious fallback via server-side proxy (avoids CSP violations)
     if (!videos.length) {
-      for (const inst of YT_INVIDIOUS) {
-        try {
-          const resp=await fetch(`${inst}/api/v1/playlists/${encodeURIComponent(plId)}?fields=title,videos`,{signal:AbortSignal.timeout(12000)});
-          if (!resp.ok) continue;
+      try {
+        const resp=await fetch(`${VOID_API_BASE}/youtube/yt-playlist?id=${encodeURIComponent(plId)}`,{signal:AbortSignal.timeout(30000)});
+        if (resp.ok) {
           const data=await resp.json();
           pl_title=data.title||pl_title;
           videos=(data.videos||[]).slice(0,100).map(v=>({
@@ -11486,9 +11485,8 @@ async function ytImportPlaylistById(plId, knownTitle, inputEl) {
             thumbnail:(v.videoThumbnails&&v.videoThumbnails.length)?(v.videoThumbnails.find(t=>t.quality==='medium')?.url||v.videoThumbnails[0]?.url):null,
             duration:v.lengthSeconds||0,
           }));
-          break;
-        } catch(e) { continue; }
-      }
+        }
+      } catch(e) { /* proxy failed, videos stays empty */ }
     }
 
     if (!videos.length) throw new Error('No videos found');
