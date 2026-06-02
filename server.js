@@ -68,6 +68,15 @@ app.use(
           'https://i2.sndcdn.com',
           'https://i3.sndcdn.com',
           'https://i4.sndcdn.com',
+          // YouTube alternate CDNs
+          'https://*.c.youtube.com',
+          'https://*.googlevideo.com',
+          // Invidious thumbnail mirrors
+          'https://invidious.materialio.us',
+          'https://*.invidious.io',
+          // Misc cover art CDNs
+          'https://c.saavncdn.com',
+          'https://c.jiosaavn.com',
         ],
         connectSrc: [
           "'self'",
@@ -201,6 +210,12 @@ app.listen(config.port, () => {
   }
   if (!config.google.clientId) {
     console.warn('[VOID] Warning: GOOGLE_CLIENT_ID not set — Google OAuth/Drive sync disabled');
+  }
+  // Warm up the sidecar so it isn't cold-sleeping on first playback request
+  if (config.handler.url) {
+    fetch(`${config.handler.url}/health`, { signal: AbortSignal.timeout(10000) })
+      .then(() => console.log('[VOID] Handler sidecar warmed up'))
+      .catch(e => console.warn('[VOID] Handler sidecar warm-up failed (may be starting):', e.message));
   }
 });
 
