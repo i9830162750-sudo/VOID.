@@ -1,78 +1,207 @@
 /**
- * config/index.js
- * Central configuration — reads from environment variables.
+ * server.js
+ * VOID Player — Express server entry point.
+ *
+ * v6.1 additions:
+ *   • express-session + passport for Google OAuth
+ *   • /api/auth/* — OAuth flow
+ *   • /api/drive/* — Google Drive sync (library JSON + audio files)
  */
+
 'use strict';
 
-module.exports = {
-  port: parseInt(process.env.PORT, 10) || 3000,
-  env:  process.env.NODE_ENV || 'development',
-  isDev: (process.env.NODE_ENV || 'development') === 'development',
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
 
-  // ── YouTube ───────────────────────────────────────────────────────────────
-  youtube: {
-    apiKey: process.env.VOID_YT_API_KEY || '',
-    searchEndpoint:   'https://www.googleapis.com/youtube/v3/search',
-    videosEndpoint:   'https://www.googleapis.com/youtube/v3/videos',
-    playlistEndpoint: 'https://www.googleapis.com/youtube/v3/playlistItems',
-    pipedInstances: (process.env.VOID_PIPED_INSTANCES || '')
-      .split(',').map(s => s.trim()).filter(Boolean).length
-        ? (process.env.VOID_PIPED_INSTANCES || '').split(',').map(s => s.trim()).filter(Boolean)
-        : [
-            'https://pipedapi.darkness.services',
-            'https://pipedapi.reallyaweso.me',
-            'https://pipedapi.aeong.one',
-            'https://pipedapi.syncpundit.io',
-            'https://api.piped.yt',
-            'https://pipedapi.tokhmi.xyz',
-            'https://pipedapi.moomoo.me',
-            'https://piped-api.cfe.re',
-          ],
-    invidiousInstances: (process.env.VOID_INVIDIOUS_INSTANCES || '')
-      .split(',').map(s => s.trim()).filter(Boolean).length
-        ? (process.env.VOID_INVIDIOUS_INSTANCES || '').split(',').map(s => s.trim()).filter(Boolean)
-        : [
-            'https://invidious.materialio.us',
-            'https://invidious.privacyredirect.com',
-            'https://invidious.dhusch.de',
-            'https://invidious.perennialte.ch',
-            'https://yt.drgnz.club',
-            'https://invidious.asir.dev',
-            'https://iv.nboeck.de',
-          ],
-  },
+const path        = require('path');
+const express     = require('express');
+const helmet      = require('helmet');
+const compression = require('compression');
+const cors        = require('cors');
+const rateLimit   = require('express-rate-limit');
+const session     = require('express-session');
+const passport    = require('./api/passport');
 
-  // ── Google OAuth + Drive ──────────────────────────────────────────────────
-  google: {
-    clientId:     process.env.GOOGLE_CLIENT_ID     || '',
-    clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
-    // In prod this should be your Render URL; in dev it's localhost
-    callbackUrl:  process.env.GOOGLE_CALLBACK_URL  || 'http://localhost:3000/api/auth/google/callback',
-    // Drive folder name where VOID stores user files
-    driveFolderName: 'VOID Player',
-  },
+const config    = require('./config');
+const HANDLER_URL = config.handler.url;
+const apiRouter = require('./api');
 
-  // ── Sessions ──────────────────────────────────────────────────────────────
-  session: {
-    secret:  process.env.SESSION_SECRET || 'void-dev-secret-change-in-prod',
-    maxAge:  30 * 24 * 60 * 60 * 1000, // 30 days
-  },
+const app = express();
+app.set('trust proxy', 1);
 
-  // ── CORS ──────────────────────────────────────────────────────────────────
-  cors: {
-    allowedOrigins: process.env.ALLOWED_ORIGINS
-      ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim())
-      : ['*'],
-  },
+// ── Security headers ────────────────────────────────────────────────────────
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        scriptSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          'https://cdn.jsdelivr.net',
+          'https://cdnjs.cloudflare.com',
+          'https://accounts.google.com',
+        ],
+        scriptSrcAttr: ["'unsafe-inline'"],
+        styleSrc: [
+          "'self'",
+          "'unsafe-inline'",
+          'https://fonts.googleapis.com',
+        ],
+        fontSrc: [
+          "'self'",
+          'https://fonts.gstatic.com',
+        ],
+        imgSrc: [
+          "'self'",
+          'data:',
+          'blob:',
+          'https://*.ytimg.com',
+          'https://*.ggpht.com',
+          'https://*.saavncdn.com',
+          'https://*.jiosaavn.com',
+          'https://*.sndcdn.com',
+          'https://lh3.googleusercontent.com', // Google profile photos
+          'https://*.googleusercontent.com',
+          'https://i1.sndcdn.com',
+          'https://i2.sndcdn.com',
+          'https://i3.sndcdn.com',
+          'https://i4.sndcdn.com',
+        ],
+        connectSrc: [
+          "'self'",
+          'https://cdnjs.cloudflare.com',
+          'https://*.saavncdn.com',
+          'https://aac.saavncdn.com',
+          'https://*.sndcdn.com',
+          'https://cf-media.sndcdn.com',
+          'https://cf-preview-media.sndcdn.com',
+          'https://accounts.google.com',
+          'https://oauth2.googleapis.com',
+          'https://www.googleapis.com',
+          ...(HANDLER_URL ? [HANDLER_URL] : []),
+        ],
+        mediaSrc: [
+          "'self'",
+          'blob:',
+          'https://*.saavncdn.com',
+          'https://cf-media.sndcdn.com',
+          'https://cf-preview-media.sndcdn.com',
+          ...(HANDLER_URL ? [HANDLER_URL] : []),
+        ],
+        frameSrc: [
+          'https://accounts.google.com',
+        ],
+        workerSrc: ["'self'"],
+        manifestSrc: ["'self'"],
+      },
+    },
+  })
+);
 
-  // ── Rate limiting ─────────────────────────────────────────────────────────
-  rateLimit: {
-    windowMs: 15 * 60 * 1000,
-    max: 200,
-  },
+// ── Compression ─────────────────────────────────────────────────────────────
+app.use(compression());
 
-  // ── void-handler sidecar (yt-dlp + Spotify playlist resolver) ────────────
-  handler: {
-    url: process.env.VOID_HANDLER_URL || 'https://void-playlist-service.onrender.com',
-  },
-};
+// ── CORS ─────────────────────────────────────────────────────────────────────
+app.use(
+  cors({
+    origin: config.cors.allowedOrigins.includes('*')
+      ? '*'
+      : config.cors.allowedOrigins,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+  })
+);
+
+// ── Body parsing ─────────────────────────────────────────────────────────────
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ extended: true, limit: '5mb' }));
+
+// ── Sessions (required for Passport) ─────────────────────────────────────────
+app.use(
+  session({
+    secret:            config.session.secret,
+    resave:            false,
+    saveUninitialized: false,
+    cookie: {
+      secure:   !config.isDev, // HTTPS only in production
+      httpOnly: true,
+      maxAge:   config.session.maxAge,
+      sameSite: 'lax',
+    },
+  })
+);
+
+// ── Passport ─────────────────────────────────────────────────────────────────
+app.use(passport.initialize());
+app.use(passport.session());
+
+// ── Rate limiting (API only) ─────────────────────────────────────────────────
+const limiter = rateLimit({
+  windowMs: config.rateLimit.windowMs,
+  max:      config.rateLimit.max,
+  standardHeaders: true,
+  legacyHeaders:   false,
+  message: { error: 'Too many requests, please try again later.' },
+});
+app.use('/api', limiter);
+
+// ── API routes ───────────────────────────────────────────────────────────────
+app.use('/api', apiRouter);
+
+// ── Static files (PWA shell) ─────────────────────────────────────────────────
+app.use(
+  express.static(path.join(__dirname, 'public'), {
+    maxAge:  config.isDev ? '0' : '1d',
+    etag:    true,
+    setHeaders(res, filePath) {
+      // index.html must never be browser-cached — it carries CSP headers from
+      // helmet that must always be served fresh so security policy changes
+      // (imgSrc, mediaSrc, connectSrc etc.) take effect immediately.
+      if (filePath.endsWith('index.html')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Pragma', 'no-cache');
+        res.setHeader('Expires', '0');
+      }
+      if (filePath.endsWith('sw.js')) {
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.setHeader('Service-Worker-Allowed', '/');
+      }
+    },
+  })
+);
+
+// ── SPA fallback — also no-cache so CSP headers always come from server ──────
+// This handles the case where express.static doesn't match (e.g. direct nav to /)
+
+app.get('*', (req, res) => {
+  res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  res.sendFile(path.join(__dirname, 'public', 'index.html'));
+});
+
+// ── Error handler ─────────────────────────────────────────────────────────────
+// eslint-disable-next-line no-unused-vars
+app.use((err, req, res, _next) => {
+  const status = err.status || err.statusCode || 500;
+  const message = config.isDev ? err.message : 'Internal server error';
+  if (status >= 500) console.error('[VOID] Server error:', err);
+  res.status(status).json({ error: message });
+});
+
+// ── Start ─────────────────────────────────────────────────────────────────────
+app.listen(config.port, () => {
+  console.log(`[VOID] Server running on port ${config.port} (${config.env})`);
+  if (config.isDev) console.log(`[VOID] http://localhost:${config.port}`);
+  if (!config.youtube.apiKey) {
+    console.warn('[VOID] Warning: VOID_YT_API_KEY not set — YouTube API proxy will use Invidious fallback');
+  }
+  if (!config.google.clientId) {
+    console.warn('[VOID] Warning: GOOGLE_CLIENT_ID not set — Google OAuth/Drive sync disabled');
+  }
+});
+
+module.exports = app;
