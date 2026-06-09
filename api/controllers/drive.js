@@ -68,7 +68,9 @@ async function downloadJSON(drive, fileId) {
 // ── Upload / overwrite a JSON file in Drive ───────────────────────────────
 async function uploadJSON(drive, name, data, folderId, existingFileId = null) {
   const content = Buffer.from(JSON.stringify(data, null, 2));
-  const media   = { mimeType: 'application/json', body: require('stream').Readable.from(content) };
+  // Use Buffer directly — googleapis accepts Buffer as media body and handles it correctly.
+  // Using Readable.from() created a one-shot stream that failed on any internal Drive retry.
+  const media = { mimeType: 'application/json', body: content };
 
   if (existingFileId) {
     await drive.files.update({ fileId: existingFileId, media });
@@ -172,6 +174,10 @@ exports.streamAudio = async (req, res) => {
     const mimeType = meta.data.mimeType || 'audio/mpeg';
     const size     = parseInt(meta.data.size || '0', 10);
 
+    // Cache aggressively — audio files don't change after upload
+    res.setHeader('Cache-Control', 'private, max-age=86400');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
+
     // Range request support (needed for <audio> seeking)
     const rangeHeader = req.headers.range;
     if (rangeHeader && size > 0) {
@@ -185,6 +191,7 @@ exports.streamAudio = async (req, res) => {
         'Accept-Ranges':  'bytes',
         'Content-Length': chunkSize,
         'Content-Type':   mimeType,
+        'Cache-Control':  'private, max-age=86400',
       });
 
       const stream = await drive.files.get(
