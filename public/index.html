@@ -6647,15 +6647,31 @@ async function playTrack(idx, pushHistory=true) {
     // Drive-hosted audio: fetch as blob so the audio element can seek/play it
     if (t.url.startsWith('/api/drive/audio/')) {
       showToast('Loading from Google Drive…');
+      const driveUrl = t.url; // keep original in case we need to retry
       try {
-        const resp = await fetch(t.url, { credentials: 'include' });
-        if (!resp.ok) throw new Error('Drive fetch failed');
+        const resp = await fetch(driveUrl, { credentials: 'include' });
+        if (!resp.ok) {
+          // 401/403 = session expired, bounce to re-auth
+          if (resp.status === 401 || resp.status === 403) {
+            showToast('Session expired — please sign in again');
+            return;
+          }
+          throw new Error('Drive fetch failed: ' + resp.status);
+        }
         const blob = await resp.blob();
+        if (blob.size === 0) throw new Error('Empty blob received from Drive');
         const blobUrl = URL.createObjectURL(blob);
-        t.url = blobUrl; // cache it so next play is instant
+        t.url = blobUrl; // cache for instant replay this session
+        // Also persist to IndexedDB so it survives page reload
+        if (t.blobId) {
+          dbPut('blobs', { id: t.blobId, blob: blob }).catch(function(){});
+        }
         audioEl.src = blobUrl;
       } catch(e) {
-        showToast('Could not load track from Drive');
+        console.error('[Drive] playTrack fetch error:', e);
+        // Reset url so the next tap retries from Drive rather than using a broken blob URL
+        t.url = driveUrl;
+        showToast('Could not load track from Drive — tap to retry');
         return;
       }
     } else {
@@ -14378,25 +14394,51 @@ setTimeout(() => {
     if (!tracksToFetch || !tracksToFetch.length) return;
     xferStart(tracksToFetch.length, 'download');
     showToast('Caching ' + tracksToFetch.length + ' track' + (tracksToFetch.length !== 1 ? 's' : '') + ' from Drive…');
-    var cached = 0;
-    for (var i = 0; i < tracksToFetch.length; i++) {
-      var t = tracksToFetch[i];
-      xferTick(t.title, t.id);
-      try {
-        var resp = await fetch('/api/drive/audio/' + t.driveFileId, { credentials: 'include' });
-        if (!resp.ok) { console.warn('[Drive] download failed for', t.title, resp.status); xferDone(t.id); continue; }
-        var blob = await resp.blob();
-        await dbPut('blobs', { id: t.blobId, blob: blob }).catch(function(){});
-        var localUrl = URL.createObjectURL(blob);
-        var allTracks = (typeof tracks !== 'undefined' && tracks.length) ? tracks : (window.tracks || []);
-        var live = allTracks.find(function(x) { return x.id === t.id; });
-        if (live) { live.url = localUrl; live._needsDriveFetch = false; }
-        cached++;
-      } catch(e) {
-        console.warn('[Drive] driveDownloadToIndexedDB error for', t.title, e);
+
+    // Fetch with retry — handles tab backgrounding killing the request
+    async function fetchWithRetry(url, retries) {
+      for (var attempt = 0; attempt <= retries; attempt++) {
+        try {
+          var resp = await fetch(url, { credentials: 'include' });
+          if (resp.ok) return resp;
+          if (resp.status === 401 || resp.status === 403) throw new Error('auth'); // don't retry auth errors
+        } catch(e) {
+          if (e.message === 'auth' || attempt === retries) throw e;
+          await new Promise(function(r) { setTimeout(r, 1000 * (attempt + 1)); }); // back-off
+        }
       }
-      xferDone(t.id);
     }
+
+    // Run up to 3 downloads in parallel instead of one-at-a-time
+    var CONCURRENCY = 3;
+    var queue = tracksToFetch.slice();
+    var cached = 0;
+
+    async function worker() {
+      while (queue.length) {
+        var t = queue.shift();
+        if (!t) return;
+        xferTick(t.title, t.id);
+        try {
+          var resp = await fetchWithRetry('/api/drive/audio/' + t.driveFileId, 2);
+          var blob = await resp.blob();
+          await dbPut('blobs', { id: t.blobId, blob: blob }).catch(function(){});
+          var localUrl = URL.createObjectURL(blob);
+          var allTracks = (typeof tracks !== 'undefined' && tracks.length) ? tracks : (window.tracks || []);
+          var live = allTracks.find(function(x) { return x.id === t.id; });
+          if (live) { live.url = localUrl; live._needsDriveFetch = false; }
+          cached++;
+        } catch(e) {
+          console.warn('[Drive] driveDownloadToIndexedDB error for', t.title, e);
+        }
+        xferDone(t.id);
+      }
+    }
+
+    var workers = [];
+    for (var w = 0; w < CONCURRENCY; w++) workers.push(worker());
+    await Promise.all(workers);
+
     xferEnd();
     if (cached > 0) {
       showToast('✓ Cached ' + cached + ' track' + (cached !== 1 ? 's' : '') + ' offline');
@@ -14414,27 +14456,50 @@ setTimeout(() => {
     if (!localTracks.length) return;
     xferStart(localTracks.length, 'upload');
     showToast('Uploading ' + localTracks.length + ' existing track' + (localTracks.length !== 1 ? 's' : '') + ' to Drive…');
+
+    var CONCURRENCY = 2; // keep at 2 for uploads — audio files are large
+    var queue = localTracks.slice();
     var uploaded = 0;
-    for (var i = 0; i < localTracks.length; i++) {
-      var t = localTracks[i];
-      xferTick(t.title, t.id);
-      try {
-        var blob = await dbGet('blobs', t.blobId).catch(function() { return null; });
-        if (!blob || !blob.blob) { xferDone(t.id); continue; }
-        var fd = new FormData();
-        fd.append('audio', blob.blob, t.blobId);
-        fd.append('blobId', t.blobId);
-        var resp = await fetch('/api/drive/upload-audio', { method: 'POST', credentials: 'include', body: fd });
-        var data = await resp.json();
-        if (data.ok) {
-          t.driveFileId = data.fileId;
-          uploaded++;
+
+    async function worker() {
+      while (queue.length) {
+        var t = queue.shift();
+        if (!t) return;
+        xferTick(t.title, t.id);
+        try {
+          var blob = await dbGet('blobs', t.blobId).catch(function() { return null; });
+          if (!blob || !blob.blob) { xferDone(t.id); continue; }
+          var fd = new FormData();
+          fd.append('audio', blob.blob, t.blobId);
+          fd.append('blobId', t.blobId);
+          // keepalive has a 64KB body limit in some browsers — for large audio files we
+          // use a regular fetch but add retry logic instead
+          var resp = await fetch('/api/drive/upload-audio', {
+            method: 'POST',
+            credentials: 'include',
+            body: fd,
+          });
+          var data = await resp.json();
+          if (data.ok) {
+            t.driveFileId = data.fileId;
+            uploaded++;
+          }
+        } catch(e) {
+          console.warn('[Drive] backfill error for', t.title, e);
+          // Put the track back at the end of the queue for one retry
+          if (!t._retried) {
+            t._retried = true;
+            queue.push(t);
+          }
         }
-      } catch(e) {
-        console.warn('[Drive] backfill error for', t.title, e);
+        xferDone(t.id);
       }
-      xferDone(t.id);
     }
+
+    var workers = [];
+    for (var w = 0; w < CONCURRENCY; w++) workers.push(worker());
+    await Promise.all(workers);
+
     xferEnd();
     if (uploaded > 0) {
       showToast('✓ Backed up ' + uploaded + ' track' + (uploaded !== 1 ? 's' : '') + ' to Drive');
@@ -14445,22 +14510,29 @@ setTimeout(() => {
   // ── Upload a local audio file to Drive ────────────────────────────────
   window.voidDriveUploadTrack = async function(track, fileBlob) {
     if (!driveUser || !fileBlob) return null;
-    try {
-      var fd = new FormData();
-      fd.append('audio', fileBlob, track.blobId);
-      fd.append('blobId', track.blobId);
-      var resp = await fetch('/api/drive/upload-audio', {
-        method: 'POST',
-        credentials: 'include',
-        body: fd,
-      });
-      var data = await resp.json();
-      if (data.ok) {
-        track.driveFileId = data.fileId;
-        return data.fileId;
+    for (var attempt = 0; attempt < 3; attempt++) {
+      try {
+        var fd = new FormData();
+        fd.append('audio', fileBlob, track.blobId);
+        fd.append('blobId', track.blobId);
+        var resp = await fetch('/api/drive/upload-audio', {
+          method: 'POST',
+          credentials: 'include',
+          body: fd,
+        });
+        if (!resp.ok) {
+          if (resp.status === 401 || resp.status === 403) break; // no point retrying auth errors
+          throw new Error('HTTP ' + resp.status);
+        }
+        var data = await resp.json();
+        if (data.ok) {
+          track.driveFileId = data.fileId;
+          return data.fileId;
+        }
+      } catch(e) {
+        console.warn('[Drive] upload track error (attempt ' + (attempt+1) + '):', e);
+        if (attempt < 2) await new Promise(function(r) { setTimeout(r, 1500 * (attempt + 1)); });
       }
-    } catch(e) {
-      console.warn('[Drive] upload track error:', e);
     }
     return null;
   };
