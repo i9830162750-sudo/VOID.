@@ -1303,7 +1303,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   /* Studio panel hidden on mobile ONLY when inside the np-overlay (desktop placement) */
   #np-overlay #studio-panel { display: none !important; }
   /* When inside mobile page, show it normally */
-  #mobile-studio-scroll #studio-panel { display: block !important; }
+  #mobile-studio-scroll #studio-panel { display: flex !important; flex-direction: column; }
 
   /* Desktop playbar transport zones — hide on mobile */
   .transport-eq-chips { display: none !important; }
@@ -6049,6 +6049,7 @@ let deferredInstallPrompt = null;
 // Settings state
 let appSettings = {
   crossfade: false,
+  crossfadeDuration: 5,
   gapless: false,
   normalize: false,
   autoplay: true,
@@ -6626,6 +6627,16 @@ function updateProgress() {
   const hf = _prog('home-hero-fill');
   if (hf) hf.style.width = pct+'%';
   updateBufferBar();
+
+  // Early crossfade trigger: start fading fadeDur seconds before track ends
+  if (appSettings.crossfade && !isOnlineTrack(currentIndex) && audioEl.duration && !audioEl._xfadeFired) {
+    const fadeDur = Math.max(1, Math.min(12, appSettings.crossfadeDuration || 5));
+    const remaining = audioEl.duration - audioEl.currentTime;
+    if (remaining > 0 && remaining <= fadeDur) {
+      audioEl._xfadeFired = true;
+      if (repeatMode !== 2) _doCrossfade(remaining);
+    }
+  }
 }
 
 function fmtTime(s) {
@@ -6636,7 +6647,76 @@ function fmtTime(s) {
 
 function onTrackEnd() {
   if (repeatMode===2) { audioEl.currentTime=0; audioEl.play().catch(()=>{}); return; }
+
+  // ── Crossfade implementation ──────────────────────────────────────────────
+  if (appSettings.crossfade && !isOnlineTrack(currentIndex)) {
+    const fadeDur = Math.max(1, Math.min(12, appSettings.crossfadeDuration || 5));
+    _doCrossfade(fadeDur);
+    return;
+  }
+
   nextTrack();
+}
+
+function isOnlineTrack(idx) {
+  const t = tracks[idx];
+  return !!(t && t.isOnline);
+}
+
+// Crossfade: fade out current audioEl while fading in a clone playing the next track
+let _xfadeOutEl = null;
+function _doCrossfade(fadeDur) {
+  if (!tracks.length) return;
+  if (!isShuffle && !isSmartShuffle && !queue.future.length && !queue.manual.length) {
+    queue.future = buildLinearQueue(currentIndex);
+  }
+  const next = getNextQueueIndex();
+  if (next === null) { nextTrack(); return; }
+  const nextT = tracks[next];
+  if (!nextT || !nextT.url || nextT.isOnline) { nextTrack(); return; }
+
+  // Clone current audioEl as the fade-out element
+  if (_xfadeOutEl) { _xfadeOutEl.pause(); _xfadeOutEl.src = ''; }
+  _xfadeOutEl = new Audio();
+  _xfadeOutEl.src = audioEl.src;
+  _xfadeOutEl.currentTime = audioEl.currentTime;
+  _xfadeOutEl.volume = audioEl.volume;
+  _xfadeOutEl.playbackRate = audioEl.playbackRate;
+  _xfadeOutEl.play().catch(()=>{});
+
+  // Fade out the clone over fadeDur seconds
+  const steps = fadeDur * 20;
+  const startVol = _xfadeOutEl.volume;
+  let step = 0;
+  const fadeOutInterval = setInterval(() => {
+    step++;
+    const t = step / steps;
+    _xfadeOutEl.volume = Math.max(0, startVol * (1 - t));
+    if (step >= steps) { clearInterval(fadeOutInterval); _xfadeOutEl.pause(); _xfadeOutEl.src = ''; _xfadeOutEl = null; }
+  }, 50);
+
+  // Start the next track immediately at volume 0 and ramp it up
+  currentIndex = next;
+  updateUI();
+  audioEl._xfadeFired = false;
+  audioEl.currentTime = 0;
+  audioEl.src = nextT.url;
+  audioEl.volume = 0;
+  audioEl.playbackRate = playbackSpeed;
+  audioEl.play().catch(()=>{});
+  isPlaying = true;
+  updatePlayButtons();
+  addToRecent(nextT.id); saveSettings();
+  setTimeout(function() { renderTrackList(document.getElementById('search-input')?.value || ''); renderQueueList(); }, 150);
+
+  const targetVol = 1;
+  let inStep = 0;
+  const fadeInInterval = setInterval(() => {
+    inStep++;
+    const t = inStep / steps;
+    audioEl.volume = Math.min(targetVol, targetVol * t);
+    if (inStep >= steps) { clearInterval(fadeInInterval); audioEl.volume = targetVol; }
+  }, 50);
 }
 
 // ==============================
@@ -6679,8 +6759,10 @@ function getNextQueueIndex() {
 
 async function playTrack(idx, pushHistory=true) {
   if (idx<0||idx>=tracks.length) return;
-  if (pushHistory && currentIndex>=0) queue.history.push(currentIndex);
+  if (pushHistory && currentIndex>=0 && currentIndex!==idx) queue.history.push(currentIndex);
+  const alreadyUpdated = (currentIndex === idx);
   currentIndex = idx;
+  audioEl._xfadeFired = false; // reset crossfade trigger for new track
   const t = tracks[idx];
   if (t.isOnline) {
     // No direct streaming — download & cache the audio first, then play.
@@ -6732,9 +6814,10 @@ async function playTrack(idx, pushHistory=true) {
   // Await resume so AudioContext is running before play() — prevents silent gap on low-end
   if (audioCtx && audioCtx.state==='suspended') await audioCtx.resume();
   audioEl.playbackRate = playbackSpeed;
-  // Update UI first so the visual change is instant (same frame as the tap)
+  // Update UI immediately unless nextTrack/prevTrack already did it (alreadyUpdated flag)
   isPlaying = true;
-  updateUI();
+  if (!alreadyUpdated) updateUI();
+  else updatePlayButtons();
   audioEl.play().catch(e => {
     showToast('Playback blocked — tap play');
     isPlaying = false; updatePlayButtons();
@@ -6796,7 +6879,10 @@ function prevTrack() {
   if (queue.history.length) {
     if (currentIndex>=0) queue.future.unshift(currentIndex);
     const prev = queue.history.pop();
-    setTimeout(() => playTrack(prev, false), 0);
+    // Snap UI immediately so the transition feels instant
+    currentIndex = prev;
+    updateUI();
+    playTrack(prev, false);
   } else {
     audioEl.currentTime=0;
   }
@@ -6814,8 +6900,10 @@ function nextTrack() {
     else if (isShuffle) buildShuffleQueue();
     nextTrack(); return;
   }
-  // Defer playTrack so the browser can paint the button press before heavy work
-  setTimeout(() => playTrack(next), 0);
+  // Snap UI immediately so the transition feels instant, then load audio
+  currentIndex = next;
+  updateUI();
+  playTrack(next);
 }
 
 function addToManualQueue(idx) {
@@ -9640,6 +9728,23 @@ function buildSettingsPage() {
           <button class="speed-btn active" onclick="toggleRepeat();buildSettingsPage()">${['Off','All','One'][repeatMode]}</button>
         </div>
       </div>
+      <div class="settings-row">
+        <div class="settings-row-info"><div class="settings-row-label">Crossfade</div><div class="settings-row-desc">Fade between tracks — ${appSettings.crossfade ? (appSettings.crossfadeDuration||5)+'s overlap' : 'off'}</div></div>
+        <div class="settings-row-control">
+          <label class="toggle-switch">
+            <input type="checkbox" ${appSettings.crossfade ? 'checked' : ''} onchange="toggleCrossfade(this.checked);buildSettingsPage()">
+            <span class="toggle-track"></span><span class="toggle-thumb"></span>
+          </label>
+        </div>
+      </div>
+      ${appSettings.crossfade ? `
+      <div class="settings-row">
+        <div class="settings-row-info"><div class="settings-row-label">Crossfade Duration</div><div class="settings-row-desc">Overlap length between tracks</div></div>
+        <div class="settings-row-control" style="display:flex;align-items:center;gap:8px">
+          <input type="range" class="settings-slider" min="1" max="12" value="${appSettings.crossfadeDuration||5}" oninput="appSettings.crossfadeDuration=parseInt(this.value);saveSettings();this.nextElementSibling.textContent=this.value+'s'">
+          <span class="settings-val">${appSettings.crossfadeDuration||5}s</span>
+        </div>
+      </div>` : ''}
     </div>
 
     <!-- INTERNET -->
@@ -9818,6 +9923,12 @@ function toggleDynamicAccent(enabled) {
     _applyDynColor(29, 185, 84);
     showToast('Dynamic accent off — using VOID green');
   }
+}
+
+function toggleCrossfade(enabled) {
+  appSettings.crossfade = enabled;
+  saveSettings();
+  showToast(enabled ? 'Crossfade on — ' + (appSettings.crossfadeDuration||5) + 's' : 'Crossfade off');
 }
 
 
@@ -11658,8 +11769,7 @@ function buildEQ() {
   const pc=document.getElementById('eq-presets');
   if (pc) pc.innerHTML = eqPresetHTML('applyPreset');
 
-  const mobPc = document.getElementById('mob-eq-presets');
-  if (mobPc) mobPc.innerHTML = eqPresetHTML('applyPreset');
+  // Mobile studio uses eq-presets-desk (same panel element) — populated by syncDesktopEQ()
 
   const bc=document.getElementById('eq-bars');
   const eqBandHTML = EQ_ALL_FREQS.map((freq,i)=>`
@@ -11673,8 +11783,7 @@ function buildEQ() {
     </div>`).join('');
   bc.innerHTML = eqBandHTML;
 
-  const mobBc = document.getElementById('mob-eq-bars');
-  if (mobBc) mobBc.innerHTML = eqBandHTML;
+  // Mobile studio uses eq-bars-desk (same panel element) — populated by syncDesktopEQ()
 }
 
 function updateEQBand(i,val) {
@@ -11683,8 +11792,7 @@ function updateEQBand(i,val) {
   // Update all eq-db labels (eq-bars and mob-eq-bars share the same id pattern)
   document.querySelectorAll('#eq-db-'+i).forEach(el=>el.textContent=label);
   const ddb=document.getElementById('eq-db-desk-'+i); if(ddb) ddb.textContent=label;
-  // Sync mob-eq-bars slider
-  const mobSl=document.querySelector(`#mob-eq-bars .eq-band:nth-child(${i+1}) input`); if(mobSl) mobSl.value=val;
+  // Mobile studio uses eq-bars-desk — already updated above
   // Sync eq-bars slider (if triggered from mob-eq-bars)
   const mainSl=document.querySelector(`#eq-bars .eq-band:nth-child(${i+1}) input`); if(mainSl) mainSl.value=val;
   if (eqNodes[i]) eqNodes[i].gain.value=eqEnabled?val:0;
@@ -11697,9 +11805,7 @@ function applyPreset(name) {
     if (eqNodes[i]) eqNodes[i].gain.value=eqEnabled?v:0;
     const label = (v>0?'+':'')+v;
     // Update all panels: main, desktop studio, mobile studio
-    ['#eq-bars','#mob-eq-bars'].forEach(sel=>{
-      const sl=document.querySelector(`${sel} .eq-band:nth-child(${i+1}) input`); if(sl) sl.value=v;
-    });
+    const mainSl2=document.querySelector(`#eq-bars .eq-band:nth-child(${i+1}) input`); if(mainSl2) mainSl2.value=v;
     document.querySelectorAll('#eq-db-'+i).forEach(el=>el.textContent=label);
     const dsl=document.querySelector(`#eq-bars-desk .eq-band:nth-child(${i+1}) input`); if(dsl) dsl.value=v;
     const ddb=document.getElementById('eq-db-desk-'+i); if(ddb) ddb.textContent=label;
@@ -11714,8 +11820,7 @@ function toggleEQ() {
   if(btn){ btn.textContent=eqEnabled?'ON':'OFF'; btn.className='eq-toggle'+(eqEnabled?' on':''); }
   const deskBtn=document.getElementById('eq-toggle-btn-desk');
   if(deskBtn){ deskBtn.textContent=eqEnabled?'ON':'OFF'; deskBtn.className='studio-fx-btn'+(eqEnabled?' on':''); }
-  const mobBtn=document.getElementById('mob-eq-toggle-btn');
-  if(mobBtn){ mobBtn.textContent=eqEnabled?'ON':'OFF'; mobBtn.className='studio-fx-btn'+(eqEnabled?' on':''); }
+  // Mobile studio uses eq-toggle-btn-desk (same panel element) — already updated above
   eqNodes.forEach((n,i)=>{ n.gain.value=eqEnabled?eqValues[i]:0; });
   // On low-end, rebuild graph so EQ nodes are physically removed when not needed
   if (_isLowEnd && typeof window._lowEndRebuildGraph === 'function') window._lowEndRebuildGraph();
@@ -11842,6 +11947,7 @@ function isDesktop() { return window.matchMedia('(min-width:1025px)').matches; }
     queue:     () => renderQueueList(),
     playlists: () => renderPlaylistsPage(),
     settings:  () => { buildSettingsPage(); setTimeout(() => ytCheckApiStatus(), 50); },
+    studio:    () => { if (typeof syncDesktopEQ === 'function') syncDesktopEQ(); if (typeof window._restartSpectrumAnim === 'function') window._restartSpectrumAnim(); },
   };
 
   // Pages whose innerHTML we clear when navigating away (to free DOM nodes & images)
@@ -12624,8 +12730,9 @@ function toggleNPPanel() {
 
   function animateStudio() {
     animId = requestAnimationFrame(animateStudio);
-    // Skip all work when studio panel is hidden
-    if (_studioPanel && _studioPanel.offsetParent === null) return;
+    // Skip all work when studio panel is hidden AND we're not actively playing
+    // (offsetParent === null when the studio page/overlay is not active)
+    if (_studioPanel && _studioPanel.offsetParent === null && !isPlaying) return;
 
     // On low-end: stop the loop entirely when not playing — saves significant CPU/battery
     if (_isLowEnd && !isPlaying) {
@@ -13087,7 +13194,7 @@ function toggleNPPanel() {
     if (!n.analyserNode || !audioCtx) return;
     currentOutputMode = mode;
     // Sync both desktop and mobile output mode buttons
-    document.querySelectorAll('#studio-output-modes .studio-fx-btn, #mob-studio-output-modes .studio-fx-btn').forEach(b => {
+    document.querySelectorAll('#studio-output-modes .studio-fx-btn').forEach(b => {
       b.classList.toggle('on', b.dataset.mode === mode);
     });
 
@@ -13127,15 +13234,11 @@ function toggleNPPanel() {
         splitterNode.connect(mergerNode, 1, 1); // R→R
         break;
     }
-    // Update buttons
-    document.querySelectorAll('#studio-output-modes .studio-fx-btn').forEach(b => {
-      b.classList.toggle('on', b.dataset.mode === mode);
-    });
   }
   window.studioSetOutputMode = function(mode) {
     if (!nodes().analyserNode) {
       currentOutputMode = mode;
-      document.querySelectorAll('#studio-output-modes .studio-fx-btn, #mob-studio-output-modes .studio-fx-btn').forEach(b => {
+      document.querySelectorAll('#studio-output-modes .studio-fx-btn').forEach(b => {
         b.classList.toggle('on', b.dataset.mode === mode);
       });
       return;
@@ -13157,14 +13260,11 @@ function toggleNPPanel() {
   // ── Toggle FX ─────────────────────────────────────────────────────────────
   window.studioToggleFx = function(key) {
     const btnId = { compressor: 'studio-comp-btn', reverb: 'studio-reverb-btn' }[key];
-    const mobBtnId = { compressor: 'mob-studio-comp-btn', reverb: 'mob-studio-reverb-btn' }[key];
     const btn = document.getElementById(btnId); if (!btn) return;
     enabled[key] = !enabled[key];
     const on = enabled[key];
     btn.classList.toggle('on', on);
     btn.textContent = on ? 'ON' : 'OFF';
-    const mobBtn = document.getElementById(mobBtnId);
-    if (mobBtn) { mobBtn.classList.toggle('on', on); mobBtn.textContent = on ? 'ON' : 'OFF'; }
 
     // On low-end: physically rebuild the audio graph instead of just setting params
     if (_isLowEnd && typeof window._lowEndRebuildGraph === 'function') {
@@ -13229,13 +13329,7 @@ function toggleNPPanel() {
     const npArtist = (document.getElementById('np-artist') || {}).textContent || '\u2014';
     if (title)  title.textContent  = npTitle;
     if (artist) artist.textContent = npArtist;
-    // Sync mobile studio NP strip
-    const mobCover  = document.getElementById('mob-studio-np-cover');
-    const mobTitle  = document.getElementById('mob-studio-np-title');
-    const mobArtist = document.getElementById('mob-studio-np-artist');
-    if (mobCover && imgEl) { mobCover.innerHTML = ''; mobCover.appendChild(imgEl.cloneNode(true)); }
-    if (mobTitle)  mobTitle.textContent  = npTitle;
-    if (mobArtist) mobArtist.textContent = npArtist;
+    // Mobile uses the same studio-panel element, so studio-np-cover/title/artist are already synced above
   }
   setInterval(syncStudioNP, _isLowEnd ? 4000 : 1500);
   syncStudioNP();
@@ -13266,21 +13360,16 @@ function toggleNPPanel() {
     setSlider('studio-reverb-wet',   st.reverbWet);
     setSlider('studio-reverb-size',  st.reverbSize);
     setSlider('studio-reverb-damp',  st.reverbDamp);
-    // Sync toggle button UI only (don't call studioToggleFx — nodes are null)
+    // Sync toggle button UI AND the enabled object (source of truth) — both must match.
+    // If they diverge, the first tap inverts the intended state (the cooked ON/OFF bug).
     const compBtn   = document.getElementById('studio-comp-btn');
     const reverbBtn = document.getElementById('studio-reverb-btn');
-    if (compBtn) {
-      const on = !!st.compOn;
-      enabled.compressor = on;
-      compBtn.classList.toggle('on', on);
-      compBtn.textContent = on ? 'ON' : 'OFF';
-    }
-    if (reverbBtn) {
-      const on = !!st.reverbOn;
-      enabled.reverb = on;
-      reverbBtn.classList.toggle('on', on);
-      reverbBtn.textContent = on ? 'ON' : 'OFF';
-    }
+    const compOn   = st.compOn  !== undefined ? !!st.compOn  : true;
+    const reverbOn = st.reverbOn !== undefined ? !!st.reverbOn : false;
+    enabled.compressor = compOn;
+    enabled.reverb     = reverbOn;
+    if (compBtn)   { compBtn.classList.toggle('on', compOn);     compBtn.textContent   = compOn   ? 'ON' : 'OFF'; }
+    if (reverbBtn) { reverbBtn.classList.toggle('on', reverbOn); reverbBtn.textContent = reverbOn ? 'ON' : 'OFF'; }
     // Keep _savedStudioState alive — initAudioContext will consume it when nodes exist
   })();
 })();
@@ -13511,6 +13600,10 @@ function _applyDynColor(r, g, b) {
   const startR = _curDynR, startG = _curDynG, startB = _curDynB;
   const endR = r, endG = g, endB = b;
   let startTime = null;
+
+  // Update favicon immediately with target color so background tabs get it
+  // (RAF is throttled/paused in background tabs so the loop-end call never fires)
+  updateFaviconAccent(r, g, b);
 
   function ease(t) {
     // Cubic ease-in-out for extra smoothness
