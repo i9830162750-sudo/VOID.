@@ -229,3 +229,40 @@ exports.deleteAudio = async (req, res) => {
     res.status(502).json({ error: 'Could not delete from Google Drive' });
   }
 };
+
+// ── Controller: POST /api/drive/prune-audio ───────────────────────────────
+// Body: { knownBlobIds: ['blob_...', ...] }
+// Lists all files in the Drive audio folder and deletes any whose name is NOT
+// in knownBlobIds. Call this after saveLibrary to keep Drive tidy.
+exports.pruneAudio = async (req, res) => {
+  try {
+    const { knownBlobIds } = req.body;
+    if (!Array.isArray(knownBlobIds)) {
+      return res.status(400).json({ error: 'knownBlobIds must be an array' });
+    }
+
+    const known = new Set(knownBlobIds);
+    const drive   = getDriveClient(req.user);
+    const rootId  = await ensureFolder(drive, FOLDER_NAME);
+    const audioId = await ensureFolder(drive, AUDIO_FOLDER, rootId);
+
+    // List every file in the audio folder
+    const q   = `'${audioId}' in parents and trashed=false`;
+    const res2 = await drive.files.list({ q, fields: 'files(id,name)', spaces: 'drive' });
+    const files = res2.data.files || [];
+
+    // Delete anything not in the known set
+    const toDelete = files.filter(f => !known.has(f.name));
+    await Promise.all(toDelete.map(f =>
+      drive.files.delete({ fileId: f.id }).catch(e =>
+        console.warn('[Drive] pruneAudio: could not delete', f.name, e.message)
+      )
+    ));
+
+    console.log(`[Drive] pruneAudio: ${toDelete.length} orphaned file(s) deleted out of ${files.length} total`);
+    res.json({ ok: true, deleted: toDelete.length, total: files.length });
+  } catch (err) {
+    console.error('[Drive] pruneAudio error:', err.message);
+    res.status(502).json({ error: 'Could not prune Drive audio folder', detail: err.message });
+  }
+};
