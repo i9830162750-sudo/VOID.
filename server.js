@@ -23,7 +23,7 @@ const helmet      = require('helmet');
 const compression = require('compression');
 const cors        = require('cors');
 const rateLimit   = require('express-rate-limit');
-const session     = require('express-session');
+const session     = require('cookie-session');
 const passport    = require('./api/passport');
 
 const config    = require('./config');
@@ -132,19 +132,29 @@ app.use(express.json({ limit: '5mb' }));
 app.use(express.urlencoded({ extended: true, limit: '5mb' }));
 
 // ── Sessions (required for Passport) ─────────────────────────────────────────
+// cookie-session stores the session entirely in a signed cookie — no server-side
+// store needed, so auth persists across Render restarts and redeploys.
 app.use(
   session({
-    secret:            config.session.secret,
-    resave:            false,
-    saveUninitialized: false,
-    cookie: {
-      secure:   !config.isDev, // HTTPS only in production
-      httpOnly: true,
-      maxAge:   config.session.maxAge,
-      sameSite: 'lax',
-    },
+    name:   'void.sess',
+    secret: config.session.secret,
+    maxAge: config.session.maxAge,
+    secure: !config.isDev,   // HTTPS only in prod
+    httpOnly: true,
+    sameSite: 'lax',
   })
 );
+
+// cookie-session doesn't have req.session.save() — patch it in for passport compat
+app.use(function(req, _res, next) {
+  if (req.session && !req.session.save) {
+    req.session.save = function(cb) { if (cb) cb(); };
+  }
+  if (req.session && !req.session.regenerate) {
+    req.session.regenerate = function(cb) { if (cb) cb(); };
+  }
+  next();
+});
 
 // ── Passport ─────────────────────────────────────────────────────────────────
 app.use(passport.initialize());
