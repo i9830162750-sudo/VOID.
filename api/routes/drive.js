@@ -31,6 +31,9 @@ router.use(requireAuth);
 router.get('/library',       controller.getLibrary);
 router.post('/library',      express.json({ limit: '5mb' }), controller.saveLibrary);
 
+// Audio file listing (for import/rescan without needing the library JSON)
+router.get('/audio-files',   controller.listAudioFiles);
+
 // Audio file upload/stream/delete
 router.post('/upload-audio', upload.single('audio'), controller.uploadAudio);
 router.get('/audio/:fileId', controller.streamAudio);
