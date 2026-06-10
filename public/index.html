@@ -14695,6 +14695,59 @@ setTimeout(() => {
     return snapshot;
   }
 
+  // ── Upload any local tracks that are missing a driveFileId ───────────────
+  async function driveUploadPendingAudio() {
+    if (!driveUser) return 0;
+    var allTracks = (typeof tracks !== 'undefined' && tracks.length) ? tracks : (window.tracks || []);
+    var pending = allTracks.filter(function(t) {
+      return t.blobId && !t.driveFileId && !t.isOnline;
+    });
+    if (!pending.length) return 0;
+
+    xferStart(pending.length, 'upload');
+    showToast('Uploading ' + pending.length + ' track' + (pending.length !== 1 ? 's' : '') + ' to Drive…');
+
+    var CONCURRENCY = 2;
+    var queue = pending.slice();
+    var uploaded = 0;
+
+    async function worker() {
+      while (queue.length) {
+        var t = queue.shift();
+        if (!t) return;
+        xferTick(t.title, t.id);
+        try {
+          var blob = await dbGet('blobs', t.blobId).catch(function() { return null; });
+          if (!blob || !blob.blob) { xferDone(t.id); continue; }
+          var fd = new FormData();
+          fd.append('audio', blob.blob, t.blobId);
+          fd.append('blobId', t.blobId);
+          var resp = await fetch('/api/drive/upload-audio', {
+            method: 'POST',
+            credentials: 'include',
+            body: fd,
+          });
+          if (!resp.ok) throw new Error('HTTP ' + resp.status);
+          var data = await resp.json();
+          if (data.ok) {
+            t.driveFileId = data.fileId;
+            uploaded++;
+          }
+        } catch(e) {
+          console.warn('[Drive] pending upload error for', t.title, e);
+          if (!t._retried) { t._retried = true; queue.push(t); }
+        }
+        xferDone(t.id);
+      }
+    }
+
+    var workers = [];
+    for (var w = 0; w < CONCURRENCY; w++) workers.push(worker());
+    await Promise.all(workers);
+    xferEnd();
+    return uploaded;
+  }
+
   // ── Save library to Drive ──────────────────────────────────────────────
   async function driveSaveLibrary(manual) {
     if (!driveUser) return;
@@ -14706,6 +14759,9 @@ setTimeout(() => {
     driveSyncing = true;
     updateDriveUI();
     try {
+      // First upload any audio files that haven't been uploaded to Drive yet
+      var pendingUploaded = await driveUploadPendingAudio();
+
       var snap = buildLibrarySnapshot();
       var resp = await fetch('/api/drive/library', {
         method: 'POST',
@@ -14716,7 +14772,13 @@ setTimeout(() => {
       var data = await resp.json();
       if (data.ok) {
         driveLastSaved = new Date();
-        if (manual) showToast('✓ Library saved to Google Drive');
+        if (manual) {
+          if (pendingUploaded > 0) {
+            showToast('✓ Uploaded ' + pendingUploaded + ' track' + (pendingUploaded !== 1 ? 's' : '') + ' & saved library to Drive');
+          } else {
+            showToast('✓ Library saved to Google Drive');
+          }
+        }
       } else {
         if (manual) showToast('Drive save failed: ' + (data.error || 'unknown'));
       }
@@ -14951,6 +15013,7 @@ setTimeout(() => {
   };
 
   // ── Auto-save hook — call after any library mutation ──────────────────
+  // driveSaveLibrary now also uploads any pending audio, so this covers both.
   window.voidDriveScheduleSave = function() {
     if (!driveUser) return;
     clearTimeout(driveAutoSave);
