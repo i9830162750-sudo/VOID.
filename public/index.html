@@ -14490,7 +14490,7 @@ setTimeout(() => {
     xferState.songLoaded = 0;
     xferState.songTotal  = 0;
     if (trackId) _xferActive[trackId] = { mode: xferState.mode, loaded: 0, total: 0 };
-    _xferUpdateAll();
+    _xferUpdateAllThrottled();
     _xferStampBars();
   }
   // Called repeatedly during upload with byte counts for the current song
@@ -14507,11 +14507,11 @@ setTimeout(() => {
   }
   function xferDone(trackId) {
     if (!xferState) return;
-    xferState.done++;
+    xferState.done = Math.min(xferState.done + 1, xferState.total);
     xferState.songLoaded = 0;
     xferState.songTotal  = 0;
     if (trackId) delete _xferActive[trackId];
-    _xferUpdateAll();
+    _xferUpdateAllThrottled();
     if (trackId) _xferFadeTrackBar(trackId);
   }
   function xferEnd() {
@@ -14524,7 +14524,11 @@ setTimeout(() => {
       _xferUpdateAll();
     }
     clearTimeout(_xferHideTimer);
-    _xferHideTimer = setTimeout(function() { xferState = null; _xferUpdateAll(); }, 2200);
+    _xferHideTimer = setTimeout(function() {
+      xferState = null;
+      _pctRafPending = false;
+      _xferUpdateAll();
+    }, 2200);
   }
 
   // Overall pct: completed songs + fractional progress of current song
@@ -14889,7 +14893,10 @@ setTimeout(() => {
 
       // ── Helper: parse "Artist - Title.mp3" filename into {title, artist} ──
       function parseAudioFilename(name) {
-        var base = name.replace(/\.(mp3|m4a|flac|ogg|wav|aac|opus|weba)$/i, '');
+        // Decode any URI-percent-encoded characters (Drive API sometimes returns them)
+        var decoded = name;
+        try { decoded = decodeURIComponent(name.replace(/\+/g, ' ')); } catch(e) { decoded = name; }
+        var base = decoded.replace(/\.(mp3|m4a|flac|ogg|wav|aac|opus|weba)$/i, '');
         if (base.indexOf(' - ') !== -1) {
           var parts = base.split(' - ');
           return { artist: parts[0].trim(), title: parts.slice(1).join(' - ').trim() };
@@ -14952,7 +14959,7 @@ setTimeout(() => {
 
         showToast('✓ Imported ' + added + ' track' + (added !== 1 ? 's' : '') + ' from Drive audio folder');
 
-        // Cache audio files locally in background
+        // Cache audio files locally in background — use allNow so the live array is up to date
         var toFetch = allNow.filter(function(t) { return t._needsDriveFetch && t.driveFileId; });
         if (toFetch.length) driveDownloadToIndexedDB(toFetch);
         return;
@@ -14978,7 +14985,11 @@ setTimeout(() => {
 
       // Build a lookup of audio files by name for patching missing driveFileIds
       var audioByName = {};
-      audioFiles.forEach(function(f) { audioByName[f.name] = f; });
+      audioFiles.forEach(function(f) {
+        audioByName[f.name] = f;
+        // Also index by decoded name so percent-encoded Drive filenames still match
+        try { var dec = decodeURIComponent(f.name.replace(/\+/g, ' ')); if (dec !== f.name) audioByName[dec] = f; } catch(e) {}
+      });
 
       // Build the merged set starting from Drive tracks
       var merged = [];
@@ -15073,8 +15084,15 @@ setTimeout(() => {
   // doesn't require a network round-trip on the next load.
   async function driveDownloadToIndexedDB(tracksToFetch) {
     if (!tracksToFetch || !tracksToFetch.length) return;
-    xferStart(tracksToFetch.length, 'download');
-    showToast('Caching ' + tracksToFetch.length + ' track' + (tracksToFetch.length !== 1 ? 's' : '') + ' from Drive…');
+    // Filter out tracks already cached locally
+    var allTracks = (typeof tracks !== 'undefined' && tracks.length) ? tracks : (window.tracks || []);
+    var toProcess = tracksToFetch.filter(function(t) {
+      var live = allTracks.find(function(x) { return x.id === t.id; });
+      return live && live._needsDriveFetch && live.driveFileId;
+    });
+    if (!toProcess.length) return;
+    xferStart(toProcess.length, 'download');
+    showToast('Caching ' + toProcess.length + ' track' + (toProcess.length !== 1 ? 's' : '') + ' from Drive…');
 
     // Fetch with retry — handles tab backgrounding killing the request
     async function fetchWithRetry(url, retries) {
@@ -15092,7 +15110,7 @@ setTimeout(() => {
 
     // Run up to 3 downloads in parallel instead of one-at-a-time
     var CONCURRENCY = 3;
-    var queue = tracksToFetch.slice();
+    var queue = toProcess.slice();
     var cached = 0;
 
     async function worker() {
@@ -15106,11 +15124,38 @@ setTimeout(() => {
           // Wrap as a named file so the browser treats it as proper audio (not anonymous blob)
           var safeName = ((t.artist || 'Unknown') + ' - ' + (t.title || 'Unknown')).replace(/[/\\:*?"<>|]/g, '_') + '.mp3';
           var blob = new File([rawBlob], safeName, { type: rawBlob.type || 'audio/mpeg' });
+          // ── Extract embedded cover art from the downloaded audio file ──
+          var coverDataUrl = null;
+          try {
+            if (typeof readFileTags === 'function') {
+              var tags = await readFileTags(blob);
+              if (tags && tags.picture && tags.picture.data && tags.picture.data.length > 0) {
+                var picBlob = new Blob([tags.picture.data], { type: tags.picture.format || 'image/jpeg' });
+                coverDataUrl = await new Promise(function(res, rej) {
+                  var fr = new FileReader();
+                  fr.onload  = function() { res(fr.result); };
+                  fr.onerror = function() { rej(fr.error); };
+                  fr.readAsDataURL(picBlob);
+                });
+              }
+            }
+          } catch(coverErr) { coverDataUrl = null; }
+
           await dbPut('blobs', { id: t.blobId, blob: blob }).catch(function(){});
           var localUrl = URL.createObjectURL(blob);
-          var allTracks = (typeof tracks !== 'undefined' && tracks.length) ? tracks : (window.tracks || []);
-          var live = allTracks.find(function(x) { return x.id === t.id; });
-          if (live) { live.url = localUrl; live._needsDriveFetch = false; }
+          var allNow = (typeof tracks !== 'undefined' && tracks.length) ? tracks : (window.tracks || []);
+          var live = allNow.find(function(x) { return x.id === t.id; });
+          if (live) {
+            live.url = localUrl;
+            live._needsDriveFetch = false;
+            if (coverDataUrl && !live.cover) {
+              live.cover = coverDataUrl;
+              // Persist the newly-extracted cover to IndexedDB
+              dbPut('tracks', { id: live.id, blobId: live.blobId, title: live.title, artist: live.artist,
+                duration: live.duration, cover: live.cover, isFav: live.isFav, ytMeta: live.ytMeta || null,
+                isOnline: false, driveFileId: live.driveFileId }).catch(function(){});
+            }
+          }
           cached++;
         } catch(e) {
           console.warn('[Drive] driveDownloadToIndexedDB error for', t.title, e);
