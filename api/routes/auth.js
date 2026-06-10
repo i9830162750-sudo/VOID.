@@ -56,10 +56,9 @@ router.get('/me', (req, res) => {
 router.post('/logout', (req, res, next) => {
   req.logout((err) => {
     if (err) return next(err);
-    req.session.destroy(() => {
-      res.clearCookie('connect.sid');
-      res.json({ ok: true });
-    });
+    req.session = null; // cookie-session: clear by setting to null
+    res.clearCookie('void.sess');
+    res.json({ ok: true });
   });
 });
 
