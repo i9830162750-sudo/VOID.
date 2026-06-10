@@ -67,18 +67,22 @@ async function downloadJSON(drive, fileId) {
 
 // ── Upload / overwrite a JSON file in Drive ───────────────────────────────
 async function uploadJSON(drive, name, data, folderId, existingFileId = null) {
+  const { Readable } = require('stream');
   const content = Buffer.from(JSON.stringify(data, null, 2));
-  // Use Buffer directly — googleapis accepts Buffer as media body and handles it correctly.
-  // Using Readable.from() created a one-shot stream that failed on any internal Drive retry.
-  const media = { mimeType: 'application/json', body: content };
+  // Create a fresh stream each call — Readable.from() is one-shot so we can't
+  // reuse the same instance if googleapis retries internally.
+  const makeStream = () => Readable.from(content);
 
   if (existingFileId) {
-    await drive.files.update({ fileId: existingFileId, media });
+    await drive.files.update({
+      fileId: existingFileId,
+      media: { mimeType: 'application/json', body: makeStream() },
+    });
     return existingFileId;
   }
   const res = await drive.files.create({
     resource: { name, parents: [folderId] },
-    media,
+    media: { mimeType: 'application/json', body: makeStream() },
     fields: 'id',
   });
   return res.data.id;
