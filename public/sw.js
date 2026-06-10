@@ -1,4 +1,4 @@
-const CACHE = 'void-v11';
+const CACHE = 'void-v12';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/icon.svg'
