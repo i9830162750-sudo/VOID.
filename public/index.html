@@ -14568,6 +14568,7 @@ setTimeout(() => {
       var data = await resp.json();
       if (data.user) {
         driveUser = data.user;
+        localStorage.setItem('void_drive_user', JSON.stringify(data.user));
         updateDriveUI();
         _driveReadyResolve(driveUser);
         if (authResult === 'success') {
@@ -14576,6 +14577,11 @@ setTimeout(() => {
           await driveBackfillLocalTracks();
         }
       } else {
+        // Server session gone (Render restart) — check localStorage cache
+        var cached = localStorage.getItem('void_drive_user');
+        if (cached) {
+          try { driveUser = JSON.parse(cached); } catch(e) { driveUser = null; }
+        }
         updateDriveUI();
         _driveReadyResolve(null);
       }
@@ -14651,6 +14657,7 @@ setTimeout(() => {
     try {
       await fetch('/api/auth/logout', { method: 'POST', credentials: 'include' });
       driveUser = null;
+      localStorage.removeItem('void_drive_user');
       updateDriveUI();
       showToast('Signed out of Google Drive');
     } catch(e) {
