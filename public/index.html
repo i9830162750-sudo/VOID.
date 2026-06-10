@@ -14165,9 +14165,13 @@ setTimeout(() => {
         updateDriveUI();
         _driveReadyResolve(driveUser);
         if (authResult === 'success') {
-          // Fresh login — restore library from Drive, then upload any existing local tracks
+          // Fresh OAuth login — restore library from Drive, then upload any existing local tracks
           await driveRestoreLibrary();
           await driveBackfillLocalTracks();
+        } else {
+          // Normal page reload while already signed in — still restore from Drive
+          // so that tracks added on other devices / sessions show up
+          await driveRestoreLibrary();
         }
       } else {
         updateDriveUI();
