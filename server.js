@@ -14,6 +14,9 @@ if (process.env.NODE_ENV !== 'production') {
   require('dotenv').config();
 }
 
+const BUILD_TS = Date.now().toString(); // set once per deploy — changes on every Render restart
+const fs = require('fs');
+
 const path        = require('path');
 const express     = require('express');
 const helmet      = require('helmet');
@@ -159,6 +162,24 @@ app.use('/api', limiter);
 
 // ── API routes ───────────────────────────────────────────────────────────────
 app.use('/api', apiRouter);
+
+// ── Version endpoint — lets the client detect a new deploy immediately ────────
+app.get('/api/version', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ v: BUILD_TS });
+});
+
+// ── sw.js — served dynamically so __BUILD_TS__ is replaced each deploy ───────
+app.get('/sw.js', (_req, res) => {
+  const swPath = path.join(__dirname, 'public', 'sw.js');
+  const content = fs.readFileSync(swPath, 'utf8').replace('__BUILD_TS__', BUILD_TS);
+  res.set({
+    'Content-Type': 'application/javascript',
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Service-Worker-Allowed': '/',
+  });
+  res.send(content);
+});
 
 // ── Static files (PWA shell) ─────────────────────────────────────────────────
 app.use(
