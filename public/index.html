@@ -1027,13 +1027,31 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
 .pwa-banner.visible { display:flex; }
 .pwa-banner-text { flex:1; font-size:12px; line-height:1.4; }
 .pwa-banner-text strong { color:var(--accent); display:block; font-size:13px; margin-bottom:1px; }
-/* App update banner */
-.app-update-banner { display:none; align-items:center; gap:10px; background:rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.10); border-bottom:1px solid rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.20); padding:10px 14px; flex-shrink:0; }
-.app-update-banner.visible { display:flex; }
+/* App update banner — fixed top-center, slides in from above */
+@keyframes update-banner-in  { from { transform:translateX(-50%) translateY(-110%); opacity:0; } to { transform:translateX(-50%) translateY(0); opacity:1; } }
+@keyframes update-banner-out { from { transform:translateX(-50%) translateY(0); opacity:1; } to { transform:translateX(-50%) translateY(-110%); opacity:0; } }
+.app-update-banner {
+  display:none; align-items:center; gap:10px;
+  position:fixed; top:12px; left:50%; transform:translateX(-50%) translateY(-110%);
+  width:min(480px, calc(100vw - 24px));
+  background:rgba(12,12,12,0.92); backdrop-filter:blur(20px);
+  border:1px solid rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.35);
+  border-radius:14px; padding:12px 14px;
+  box-shadow:0 8px 32px rgba(0,0,0,0.5);
+  z-index:500;
+  opacity:0;
+}
+.app-update-banner.visible {
+  display:flex;
+  animation:update-banner-in 0.38s cubic-bezier(0.34,1.56,0.64,1) forwards;
+}
+.app-update-banner.hiding {
+  animation:update-banner-out 0.25s ease-in forwards;
+}
 .app-update-banner-text { flex:1; font-size:12px; line-height:1.4; }
 .app-update-banner-text strong { color:var(--accent); display:block; font-size:13px; margin-bottom:1px; }
-.app-update-btn { font-size:12px; font-weight:600; font-family:'Space Mono',monospace; background:rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.15); border:1px solid rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.3); color:var(--accent); border-radius:8px; padding:6px 14px; cursor:pointer; white-space:nowrap; flex-shrink:0; transition:background 0.15s; }
-.app-update-btn:active { background:rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.25); }
+.app-update-btn { font-size:12px; font-weight:600; font-family:'Space Mono',monospace; background:rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.18); border:1px solid rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.35); color:var(--accent); border-radius:8px; padding:6px 14px; cursor:pointer; white-space:nowrap; flex-shrink:0; transition:background 0.15s; }
+.app-update-btn:active { background:rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.3); }
 .app-update-dismiss { background:none; border:none; color:var(--text3); cursor:pointer; padding:4px; flex-shrink:0; display:flex; align-items:center; }
 .pwa-install-btn { background:var(--accent); border:none; border-radius:8px; padding:7px 14px; font-size:12px; font-weight:700; color:#000; cursor:pointer; font-family:'DM Sans',sans-serif; flex-shrink:0; }
 .pwa-dismiss-btn { background:none; border:none; color:var(--text3); cursor:pointer; padding:4px; flex-shrink:0; }
@@ -12107,19 +12125,33 @@ function initPWA() {
 }
 
 // Called when user taps "Update now"
-function applyAppUpdate() {
-  if (!_swWaitingReg || !_swWaitingReg.waiting) {
-    // No waiting worker — just reload, SW will sort itself out
-    window.location.reload();
-    return;
+async function applyAppUpdate() {
+  // Try the cached reg first, then fall back to getRegistration()
+  var reg = _swWaitingReg;
+  if (!reg || !reg.waiting) {
+    try {
+      reg = await navigator.serviceWorker.getRegistration();
+    } catch(e) { reg = null; }
   }
-  // Tell the waiting SW to skip waiting; controllerchange listener will reload
-  _swWaitingReg.waiting.postMessage({ type: 'SKIP_WAITING' });
+
+  if (reg && reg.waiting) {
+    // Tell the waiting SW to activate; controllerchange fires → reload
+    reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+  } else {
+    // No waiting worker found — hard reload clears everything
+    window.location.reload(true);
+  }
 }
 
 // Called when user taps dismiss X on update banner
 function dismissAppUpdate() {
-  document.getElementById('app-update-banner').classList.remove('visible');
+  var banner = document.getElementById('app-update-banner');
+  if (!banner) return;
+  banner.classList.add('hiding');
+  setTimeout(function() {
+    banner.classList.remove('visible');
+    banner.classList.remove('hiding');
+  }, 260);
 }
 
 // ── Settings page: Check / Download / Apply update ────────────────────────
