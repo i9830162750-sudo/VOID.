@@ -12225,8 +12225,20 @@ function initPWA() {
         });
       });
 
-      // Poll for updates every 60 seconds (catches deploys while app stays open)
-      setInterval(function() { reg.update().catch(function(){}); }, 60 * 1000);
+      // Poll /api/version every 30s — detects a new Render deploy immediately
+      // (The SW cache name changes each deploy so reg.update() finds a new SW)
+      let _knownVersion = null;
+      fetch('/api/version').then(r=>r.json()).then(d=>{ _knownVersion = d.v; }).catch(()=>{});
+      setInterval(function() {
+        fetch('/api/version', { cache: 'no-store' }).then(r=>r.json()).then(function(d) {
+          if (_knownVersion && d.v !== _knownVersion) {
+            _knownVersion = d.v;
+            reg.update().catch(function(){});
+          } else if (!_knownVersion) {
+            _knownVersion = d.v;
+          }
+        }).catch(function(){});
+      }, 30 * 1000);
 
     }).catch(function() {});
 
@@ -13984,11 +13996,12 @@ setTimeout(() => {
   if (!overlay) return;
 
   let dnpOpen = false;
-  let dnpActiveTab = 'queue';
+  let dnpActiveTab = localStorage.getItem('void_dnp_tab') || 'queue';
 
   window.openDeskNP = function() {
     if (!dnpOpen) {
       dnpOpen = true;
+      localStorage.setItem('void_dnp_open', '1');
       overlay.classList.add('open');
       deskNPSync();
       deskNPSyncQueue();
@@ -13999,6 +14012,7 @@ setTimeout(() => {
 
   window.closeDeskNP = function() {
     dnpOpen = false;
+    localStorage.removeItem('void_dnp_open');
     overlay.classList.remove('open');
     exitDeskNPFullscreen();
   };
@@ -14010,6 +14024,19 @@ setTimeout(() => {
       if (dnpOpen) closeDeskNP();
     }
   });
+
+  // ── Restore open state from previous session ──────────────────────────────
+  if (localStorage.getItem('void_dnp_open')) {
+    dnpOpen = true;
+    overlay.classList.add('open');
+    // defer sync so tracks/queue are loaded first
+    setTimeout(function() { deskNPSync(); deskNPSyncQueue(); }, 400);
+  }
+  // Restore active tab
+  if (dnpActiveTab !== 'queue') {
+    document.querySelectorAll('.dnp-tab').forEach(b => b.classList.toggle('active', b.dataset.dnptab === dnpActiveTab));
+    document.querySelectorAll('.dnp-tab-panel').forEach(p => p.classList.toggle('active', p.id === 'dnp-tab-' + dnpActiveTab));
+  }
 
   // ── Fullscreen (TV mode) ──────────────────────────────────────────────────
   let dnpFS = false;
@@ -14122,6 +14149,7 @@ setTimeout(() => {
   // ── Tab switching ────────────────────────────────────────────────────────
   window.switchDeskNPTab = function(tab) {
     dnpActiveTab = tab;
+    localStorage.setItem('void_dnp_tab', tab);
     document.querySelectorAll('.dnp-tab').forEach(b => b.classList.toggle('active', b.dataset.dnptab === tab));
     document.querySelectorAll('.dnp-tab-panel').forEach(p => p.classList.toggle('active', p.id === 'dnp-tab-' + tab));
     if (tab === 'queue') deskNPSyncQueue();
