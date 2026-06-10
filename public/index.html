@@ -1019,6 +1019,14 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
 .pwa-banner.visible { display:flex; }
 .pwa-banner-text { flex:1; font-size:12px; line-height:1.4; }
 .pwa-banner-text strong { color:var(--accent); display:block; font-size:13px; margin-bottom:1px; }
+/* App update banner */
+.app-update-banner { display:none; align-items:center; gap:10px; background:rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.10); border-bottom:1px solid rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.20); padding:10px 14px; flex-shrink:0; }
+.app-update-banner.visible { display:flex; }
+.app-update-banner-text { flex:1; font-size:12px; line-height:1.4; }
+.app-update-banner-text strong { color:var(--accent); display:block; font-size:13px; margin-bottom:1px; }
+.app-update-btn { font-size:12px; font-weight:600; font-family:'Space Mono',monospace; background:rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.15); border:1px solid rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.3); color:var(--accent); border-radius:8px; padding:6px 14px; cursor:pointer; white-space:nowrap; flex-shrink:0; transition:background 0.15s; }
+.app-update-btn:active { background:rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.25); }
+.app-update-dismiss { background:none; border:none; color:var(--text3); cursor:pointer; padding:4px; flex-shrink:0; display:flex; align-items:center; }
 .pwa-install-btn { background:var(--accent); border:none; border-radius:8px; padding:7px 14px; font-size:12px; font-weight:700; color:#000; cursor:pointer; font-family:'DM Sans',sans-serif; flex-shrink:0; }
 .pwa-dismiss-btn { background:none; border:none; color:var(--text3); cursor:pointer; padding:4px; flex-shrink:0; }
 .pwa-dismiss-btn svg { width:16px; height:16px; }
@@ -4812,6 +4820,18 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
 
 <!-- APP WRAP -->
 <div class="app-wrap">
+
+  <!-- App update banner — shown when a new SW version is waiting -->
+  <div class="app-update-banner" id="app-update-banner">
+    <div class="app-update-banner-text">
+      <strong>Update available</strong>
+      A new version of VOID Player is ready
+    </div>
+    <button class="app-update-btn" onclick="applyAppUpdate()">Update now</button>
+    <button class="app-update-dismiss" onclick="dismissAppUpdate()" title="Dismiss">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
+  </div>
 
   <div class="pwa-banner" id="pwa-banner">
     <div class="pwa-banner-text">
@@ -11987,9 +12007,49 @@ function setupMediaSession() {
 // ==============================
 // PWA
 // ==============================
+// Holds a reference to the SW registration that has a waiting worker
+var _swWaitingReg = null;
+
 function initPWA() {
   if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.register('./sw.js').catch(() => {});
+    navigator.serviceWorker.register('./sw.js').then(function(reg) {
+
+      // Helper: show the update banner if a waiting worker exists
+      function checkForWaiting() {
+        if (reg.waiting) {
+          _swWaitingReg = reg;
+          document.getElementById('app-update-banner').classList.add('visible');
+        }
+      }
+
+      // Case 1: a new SW is already waiting when the page loads
+      checkForWaiting();
+
+      // Case 2: a new SW finishes installing while the page is open
+      reg.addEventListener('updatefound', function() {
+        var newWorker = reg.installing;
+        if (!newWorker) return;
+        newWorker.addEventListener('statechange', function() {
+          if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            // New version installed and waiting — show banner
+            _swWaitingReg = reg;
+            document.getElementById('app-update-banner').classList.add('visible');
+          }
+        });
+      });
+
+      // Poll for updates every 60 seconds (catches deploys while app stays open)
+      setInterval(function() { reg.update().catch(function(){}); }, 60 * 1000);
+
+    }).catch(function() {});
+
+    // Case 3: SW controller changed (skipWaiting fired) → reload to pick up new SW
+    var refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function() {
+      if (refreshing) return;
+      refreshing = true;
+      window.location.reload();
+    });
   }
 
   window.addEventListener('beforeinstallprompt',e=>{
@@ -12002,6 +12062,22 @@ function initPWA() {
     document.getElementById('pwa-banner').classList.remove('visible');
     showToast('✓ VOID Player installed');
   });
+}
+
+// Called when user taps "Update now"
+function applyAppUpdate() {
+  if (!_swWaitingReg || !_swWaitingReg.waiting) {
+    // No waiting worker — just reload, SW will sort itself out
+    window.location.reload();
+    return;
+  }
+  // Tell the waiting SW to skip waiting; controllerchange listener will reload
+  _swWaitingReg.waiting.postMessage({ type: 'SKIP_WAITING' });
+}
+
+// Called when user taps dismiss X on update banner
+function dismissAppUpdate() {
+  document.getElementById('app-update-banner').classList.remove('visible');
 }
 
 function pwaInstall() {
@@ -14165,13 +14241,9 @@ setTimeout(() => {
         updateDriveUI();
         _driveReadyResolve(driveUser);
         if (authResult === 'success') {
-          // Fresh OAuth login — restore library from Drive, then upload any existing local tracks
+          // Fresh login — restore library from Drive, then upload any existing local tracks
           await driveRestoreLibrary();
           await driveBackfillLocalTracks();
-        } else {
-          // Normal page reload while already signed in — still restore from Drive
-          // so that tracks added on other devices / sessions show up
-          await driveRestoreLibrary();
         }
       } else {
         updateDriveUI();
