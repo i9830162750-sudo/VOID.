@@ -14435,47 +14435,87 @@ setTimeout(() => {
   var driveAutoSave  = null;   // debounce timer
   var AUTOSAVE_MS    = 8000;   // auto-save after 8s of quiet
 
-  // ── Transfer progress tracking ─────────────────────────────────────────
-  // Covers Drive uploads and Drive downloads only — not local PC→IDB saves.
-  // xferState: { total, done, activeId (trackId being transferred), mode }
+  // ── Transfer progress tracking ────────────────────────────────────────────────────
+  // Covers Drive uploads and Drive downloads only.
+  // xferState: { total, done, current, activeId, mode, songLoaded, songTotal }
+  //   songLoaded / songTotal = byte progress of the song currently uploading
   var xferState      = null;
   var _xferHideTimer = null;
-  // Map of trackId → mode for tracks currently mid-transfer (survives renderTrackList wipes)
-  var _xferActive    = {};   // { [trackId]: mode }
+  // Map of trackId -> { mode, loaded, total } for tracks mid-transfer
+  var _xferActive    = {};
+
+  // Throttle banner/panel DOM writes to ~30fps via rAF
+  var _pctRafPending = false;
+  function _xferUpdateAllThrottled() {
+    if (_pctRafPending) return;
+    _pctRafPending = true;
+    requestAnimationFrame(function() { _pctRafPending = false; _xferUpdateAll(); });
+  }
 
   function xferStart(total, mode) {
     clearTimeout(_xferHideTimer);
-    xferState = { total: total, done: 0, current: '', activeId: null, mode: mode };
+    xferState = { total: total, done: 0, current: '', activeId: null, mode: mode, songLoaded: 0, songTotal: 0 };
     _xferUpdateAll();
   }
   function xferTick(trackTitle, trackId) {
     if (!xferState) return;
-    xferState.current  = trackTitle || '';
-    xferState.activeId = trackId   || null;
-    if (trackId) _xferActive[trackId] = xferState.mode;
+    xferState.current    = trackTitle || '';
+    xferState.activeId   = trackId   || null;
+    xferState.songLoaded = 0;
+    xferState.songTotal  = 0;
+    if (trackId) _xferActive[trackId] = { mode: xferState.mode, loaded: 0, total: 0 };
     _xferUpdateAll();
-    _xferStampBars();   // re-stamp after any renderTrackList that may have just run
+    _xferStampBars();
+  }
+  // Called repeatedly during upload with byte counts for the current song
+  function xferProgress(loaded, total, trackId) {
+    if (!xferState) return;
+    xferState.songLoaded = loaded;
+    xferState.songTotal  = total;
+    if (trackId && _xferActive[trackId]) {
+      _xferActive[trackId].loaded = loaded;
+      _xferActive[trackId].total  = total;
+    }
+    if (trackId) _xferUpdateTrackBar(trackId, loaded, total);
+    _xferUpdateAllThrottled();
   }
   function xferDone(trackId) {
     if (!xferState) return;
     xferState.done++;
+    xferState.songLoaded = 0;
+    xferState.songTotal  = 0;
     if (trackId) delete _xferActive[trackId];
     _xferUpdateAll();
-    // Fade out the bar for this specific track
     if (trackId) _xferFadeTrackBar(trackId);
   }
   function xferEnd() {
     _xferActive = {};
     if (xferState) {
-      xferState.done    = xferState.total;
-      xferState.current = 'Done';
+      xferState.done       = xferState.total;
+      xferState.songLoaded = 0;
+      xferState.songTotal  = 0;
+      xferState.current    = 'Done';
       _xferUpdateAll();
     }
     clearTimeout(_xferHideTimer);
-    _xferHideTimer = setTimeout(function() {
-      xferState = null;
-      _xferUpdateAll();
-    }, 2200);
+    _xferHideTimer = setTimeout(function() { xferState = null; _xferUpdateAll(); }, 2200);
+  }
+
+  // Overall pct: completed songs + fractional progress of current song
+  function _xferPct() {
+    if (!xferState || xferState.total === 0) return 0;
+    var songFrac = xferState.songTotal > 0 ? (xferState.songLoaded / xferState.songTotal) : 0;
+    return Math.min(100, Math.round(((xferState.done + songFrac) / xferState.total) * 100));
+  }
+
+  function _xferBytesLabel() {
+    if (!xferState || xferState.songTotal === 0) return '';
+    function fmt(b) {
+      if (b >= 1048576) return (b / 1048576).toFixed(1) + ' MB';
+      if (b >= 1024)    return Math.round(b / 1024) + ' KB';
+      return b + ' B';
+    }
+    return fmt(xferState.songLoaded) + ' / ' + fmt(xferState.songTotal);
   }
 
   // Update both the library banner and the settings panel
@@ -14489,13 +14529,13 @@ setTimeout(() => {
     if (!banner) return;
     if (!xferState) { banner.style.display = 'none'; return; }
     banner.style.display = 'block';
-    var pct = xferState.total > 0 ? Math.round((xferState.done / xferState.total) * 100) : 0;
-    var label  = document.getElementById('lib-xfer-label');
-    var count  = document.getElementById('lib-xfer-count');
-    var track  = document.getElementById('lib-xfer-track');
-    var fill   = document.getElementById('lib-xfer-fill');
+    var pct   = _xferPct();
+    var label = document.getElementById('lib-xfer-label');
+    var count = document.getElementById('lib-xfer-count');
+    var track = document.getElementById('lib-xfer-track');
+    var fill  = document.getElementById('lib-xfer-fill');
     if (label) label.textContent = xferState.mode === 'upload' ? '↑ Uploading to Drive' : '↓ Downloading from Drive';
-    if (count) count.textContent = xferState.done + ' / ' + xferState.total;
+    if (count) count.textContent = xferState.done + ' / ' + xferState.total + (xferState.songTotal > 0 ? '  ·  ' + _xferBytesLabel() : '');
     if (track) track.textContent = xferState.current;
     if (fill)  { fill.style.width = pct + '%'; fill.style.background = xferState.mode === 'upload' ? 'linear-gradient(90deg,var(--accent),var(--accent2))' : 'linear-gradient(90deg,#4285f4,#34a8eb)'; }
   }
@@ -14505,29 +14545,55 @@ setTimeout(() => {
     if (!panel) return;
     if (!xferState) { panel.classList.remove('visible'); return; }
     panel.classList.add('visible');
-    var pct        = xferState.total > 0 ? Math.round((xferState.done / xferState.total) * 100) : 0;
+    var pct        = _xferPct();
     var labelLeft  = document.getElementById('drive-xfer-label-left');
     var labelRight = document.getElementById('drive-xfer-label-right');
     var trackLabel = document.getElementById('drive-xfer-track');
     var fill       = document.getElementById('drive-xfer-fill');
     if (labelLeft)  labelLeft.textContent  = xferState.mode === 'upload' ? '↑ Uploading to Drive' : '↓ Downloading from Drive';
-    if (labelRight) labelRight.textContent = xferState.done + ' / ' + xferState.total;
+    if (labelRight) labelRight.textContent = xferState.done + ' / ' + xferState.total + (xferState.songTotal > 0 ? ' · ' + _xferBytesLabel() : '');
     if (trackLabel) trackLabel.textContent = xferState.current;
     if (fill) { fill.style.width = pct + '%'; fill.className = 'drive-xfer-fill ' + xferState.mode; }
   }
 
-  // Re-stamp indeterminate bars onto all currently-active track items.
-  // Called after xferTick (and also hooked into renderTrackList) so bars survive re-renders.
+  // Update the per-track row bar with real byte progress
+  function _xferUpdateTrackBar(trackId, loaded, total) {
+    var el = document.querySelector('[data-track-id="' + trackId + '"]');
+    if (!el) return;
+    var bar = el.querySelector('.track-xfer-bar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.className = 'track-xfer-bar';
+      bar.innerHTML = '<div class="track-xfer-fill ' + (xferState ? xferState.mode : 'upload') + '"></div>';
+      el.appendChild(bar);
+    }
+    var fill = bar.querySelector('.track-xfer-fill');
+    if (!fill) return;
+    fill.classList.remove('indeterminate');
+    fill.style.width = (total > 0 ? Math.round((loaded / total) * 100) : 0) + '%';
+  }
+
+  // Re-stamp bars onto all currently-active track items after a re-render
   function _xferStampBars() {
     Object.keys(_xferActive).forEach(function(tid) {
-      var mode = _xferActive[tid];
+      var info = _xferActive[tid];
       var el   = document.querySelector('[data-track-id="' + tid + '"]');
       if (!el) return;
-      if (el.querySelector('.track-xfer-bar')) return; // already has one
-      var bar = document.createElement('div');
-      bar.className = 'track-xfer-bar';
-      bar.innerHTML = '<div class="track-xfer-fill ' + mode + ' indeterminate"></div>';
-      el.appendChild(bar);
+      var bar = el.querySelector('.track-xfer-bar');
+      if (!bar) {
+        bar = document.createElement('div');
+        bar.className = 'track-xfer-bar';
+        bar.innerHTML = '<div class="track-xfer-fill ' + info.mode + '"></div>';
+        el.appendChild(bar);
+      }
+      var fill = bar.querySelector('.track-xfer-fill');
+      if (!fill) return;
+      if (info.total > 0) {
+        fill.classList.remove('indeterminate');
+        fill.style.width = Math.round((info.loaded / info.total) * 100) + '%';
+      } else {
+        fill.classList.add('indeterminate');
+      }
     });
   }
 
@@ -14722,13 +14788,7 @@ setTimeout(() => {
           var fd = new FormData();
           fd.append('audio', blob.blob, t.blobId);
           fd.append('blobId', t.blobId);
-          var resp = await fetch('/api/drive/upload-audio', {
-            method: 'POST',
-            credentials: 'include',
-            body: fd,
-          });
-          if (!resp.ok) throw new Error('HTTP ' + resp.status);
-          var data = await resp.json();
+          var data = await _driveXhrUpload(fd, t.id);
           if (data.ok) {
             t.driveFileId = data.fileId;
             uploaded++;
@@ -14947,21 +15007,13 @@ setTimeout(() => {
           var fd = new FormData();
           fd.append('audio', blob.blob, t.blobId);
           fd.append('blobId', t.blobId);
-          // keepalive has a 64KB body limit in some browsers — for large audio files we
-          // use a regular fetch but add retry logic instead
-          var resp = await fetch('/api/drive/upload-audio', {
-            method: 'POST',
-            credentials: 'include',
-            body: fd,
-          });
-          var data = await resp.json();
+          var data = await _driveXhrUpload(fd, t.id);
           if (data.ok) {
             t.driveFileId = data.fileId;
             uploaded++;
           }
         } catch(e) {
           console.warn('[Drive] backfill error for', t.title, e);
-          // Put the track back at the end of the queue for one retry
           if (!t._retried) {
             t._retried = true;
             queue.push(t);
@@ -14983,6 +15035,32 @@ setTimeout(() => {
   }
 
   // ── Upload a local audio file to Drive ────────────────────────────────
+  // XHR-based upload helper — reports byte progress via xferProgress()
+  function _driveXhrUpload(fd, trackId) {
+    return new Promise(function(resolve, reject) {
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/drive/upload-audio');
+      xhr.withCredentials = true;
+      xhr.upload.onprogress = function(e) {
+        if (e.lengthComputable && typeof xferProgress === 'function') {
+          xferProgress(e.loaded, e.total, trackId);
+        }
+      };
+      xhr.onload = function() {
+        if (xhr.status === 200 || xhr.status === 201) {
+          try { resolve(JSON.parse(xhr.responseText)); }
+          catch(e) { reject(new Error('Bad JSON')); }
+        } else if (xhr.status === 401 || xhr.status === 403) {
+          reject(Object.assign(new Error('HTTP ' + xhr.status), { noRetry: true }));
+        } else {
+          reject(new Error('HTTP ' + xhr.status));
+        }
+      };
+      xhr.onerror = function() { reject(new Error('Network error')); };
+      xhr.send(fd);
+    });
+  }
+
   window.voidDriveUploadTrack = async function(track, fileBlob) {
     if (!driveUser || !fileBlob) return null;
     for (var attempt = 0; attempt < 3; attempt++) {
@@ -14990,21 +15068,13 @@ setTimeout(() => {
         var fd = new FormData();
         fd.append('audio', fileBlob, track.blobId);
         fd.append('blobId', track.blobId);
-        var resp = await fetch('/api/drive/upload-audio', {
-          method: 'POST',
-          credentials: 'include',
-          body: fd,
-        });
-        if (!resp.ok) {
-          if (resp.status === 401 || resp.status === 403) break; // no point retrying auth errors
-          throw new Error('HTTP ' + resp.status);
-        }
-        var data = await resp.json();
+        var data = await _driveXhrUpload(fd, track.id);
         if (data.ok) {
           track.driveFileId = data.fileId;
           return data.fileId;
         }
       } catch(e) {
+        if (e.noRetry) break;
         console.warn('[Drive] upload track error (attempt ' + (attempt+1) + '):', e);
         if (attempt < 2) await new Promise(function(r) { setTimeout(r, 1500 * (attempt + 1)); });
       }
@@ -15038,6 +15108,7 @@ setTimeout(() => {
   window.xferTick       = xferTick;
   window.xferDone       = xferDone;
   window.xferEnd        = xferEnd;
+  window.xferProgress   = xferProgress;
   window._xferStampBars = _xferStampBars;
 
   // ── Expose user info for Settings page ────────────────────────────────
