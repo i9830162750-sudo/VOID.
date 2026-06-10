@@ -80,6 +80,7 @@ app.use(
           // Misc cover art CDNs
           'https://c.saavncdn.com',
           'https://c.jiosaavn.com',
+          'https://inv.nadeko.net',
         ],
         connectSrc: [
           "'self'",
