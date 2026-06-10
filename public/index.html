@@ -925,6 +925,14 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   gap:12px;
 }
 .settings-row:last-child { border-bottom:none; }
+/* Update section states */
+.update-state { display:none; flex-direction:column; gap:10px; padding:12px 0 4px; }
+.update-state.visible { display:flex; }
+.update-progress-bar { width:100%; height:3px; background:var(--border2); border-radius:2px; overflow:hidden; }
+.update-progress-fill { height:100%; width:0%; border-radius:2px; background:linear-gradient(90deg,var(--accent),var(--accent2)); transition:width 0.3s ease; }
+.update-status-text { font-size:11px; color:var(--text3); font-family:'Space Mono',monospace; }
+.update-status-text.ok { color:var(--accent); }
+.update-status-text.err { color:#f87171; }
 .settings-row-info { flex:1; min-width:0; }
 .settings-row-label { font-size:14px; font-weight:500; }
 .settings-row-desc { font-size:11px; color:var(--text3); margin-top:2px; line-height:1.4; }
@@ -9703,6 +9711,39 @@ function buildSettingsPage() {
         <div class="settings-row-info"><div class="settings-row-label">Version</div><div class="settings-row-desc">VOID Player v6</div></div>
         <div class="settings-row-control" style="font-size:11px;color:var(--accent);font-family:'Space Mono',monospace">V6</div>
       </div>
+      <div class="settings-row" style="flex-direction:column;align-items:stretch;gap:0">
+        <div style="display:flex;align-items:center;justify-content:space-between;width:100%;gap:12px">
+          <div class="settings-row-info">
+            <div class="settings-row-label">App Updates</div>
+            <div class="settings-row-desc" id="update-desc">Check for a new version of VOID</div>
+          </div>
+          <div class="settings-row-control">
+            <button class="speed-btn active" id="update-check-btn" onclick="settingsCheckForUpdate()">Check</button>
+          </div>
+        </div>
+        <!-- idle: nothing shown -->
+        <div class="update-state" id="update-state-checking">
+          <div class="update-progress-bar"><div class="update-progress-fill" id="update-progress-fill" style="width:30%;animation:xfer-slide 1.2s ease-in-out infinite"></div></div>
+          <div class="update-status-text">Checking for updates…</div>
+        </div>
+        <div class="update-state" id="update-state-ready">
+          <div class="update-progress-bar"><div class="update-progress-fill" style="width:100%"></div></div>
+          <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+            <div class="update-status-text ok">✓ Update ready to install</div>
+            <button class="speed-btn active" onclick="applyAppUpdate()" style="font-size:11px;padding:4px 12px">Restart &amp; Update</button>
+          </div>
+        </div>
+        <div class="update-state" id="update-state-current">
+          <div class="update-status-text ok">✓ You're on the latest version</div>
+        </div>
+        <div class="update-state" id="update-state-downloading">
+          <div class="update-progress-bar"><div class="update-progress-fill" id="update-dl-fill" style="width:0%"></div></div>
+          <div class="update-status-text" id="update-dl-text">Downloading update…</div>
+        </div>
+        <div class="update-state" id="update-state-error">
+          <div class="update-status-text err" id="update-error-text">Could not check for updates</div>
+        </div>
+      </div>
     </div>
 
     ${_isLowEnd ? `
@@ -12031,9 +12072,10 @@ function initPWA() {
         if (!newWorker) return;
         newWorker.addEventListener('statechange', function() {
           if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-            // New version installed and waiting — show banner
+            // New version installed and waiting — show banner + update settings state if open
             _swWaitingReg = reg;
             document.getElementById('app-update-banner').classList.add('visible');
+            _setUpdateState('ready');
           }
         });
       });
@@ -12078,6 +12120,99 @@ function applyAppUpdate() {
 // Called when user taps dismiss X on update banner
 function dismissAppUpdate() {
   document.getElementById('app-update-banner').classList.remove('visible');
+}
+
+// ── Settings page: Check / Download / Apply update ────────────────────────
+function _setUpdateState(state) {
+  ['checking','ready','current','downloading','error'].forEach(function(s) {
+    var el = document.getElementById('update-state-' + s);
+    if (el) el.classList.toggle('visible', s === state);
+  });
+}
+
+async function settingsCheckForUpdate() {
+  if (!('serviceWorker' in navigator)) {
+    _setUpdateState('error');
+    var e = document.getElementById('update-error-text');
+    if (e) e.textContent = 'Service workers not supported in this browser';
+    return;
+  }
+
+  _setUpdateState('checking');
+  var btn = document.getElementById('update-check-btn');
+  if (btn) btn.disabled = true;
+
+  try {
+    var reg = await navigator.serviceWorker.getRegistration();
+    if (!reg) throw new Error('No SW registration found');
+
+    // If there's already a waiting worker, skip straight to ready
+    if (reg.waiting) {
+      _swWaitingReg = reg;
+      _setUpdateState('ready');
+      document.getElementById('app-update-banner').classList.add('visible');
+      if (btn) btn.disabled = false;
+      return;
+    }
+
+    // Kick off a fresh update check
+    await reg.update();
+
+    // Give the SW a moment to install if an update was found
+    await new Promise(function(resolve) {
+      var timeout = setTimeout(resolve, 8000); // max 8s wait
+
+      function checkWaiting() {
+        if (reg.waiting) {
+          clearTimeout(timeout);
+          resolve();
+          return;
+        }
+      }
+
+      // Poll reg.waiting every 400ms while new SW installs
+      var poll = setInterval(function() {
+        checkWaiting();
+        if (reg.waiting) clearInterval(poll);
+      }, 400);
+
+      // Also listen for updatefound → installing → installed
+      reg.addEventListener('updatefound', function onFound() {
+        var w = reg.installing;
+        if (!w) return;
+        w.addEventListener('statechange', function() {
+          if (w.state === 'installed') {
+            clearTimeout(timeout);
+            clearInterval(poll);
+            resolve();
+          }
+        });
+        reg.removeEventListener('updatefound', onFound);
+      });
+
+      setTimeout(function() { clearInterval(poll); }, 8100);
+    });
+
+    if (reg.waiting) {
+      _swWaitingReg = reg;
+      _setUpdateState('ready');
+      document.getElementById('app-update-banner').classList.add('visible');
+    } else {
+      _setUpdateState('current');
+      var desc = document.getElementById('update-desc');
+      if (desc) {
+        var now = new Date();
+        desc.textContent = 'Last checked ' + now.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+      }
+    }
+  } catch(err) {
+    console.warn('[Update] check failed:', err);
+    _setUpdateState('error');
+    var e = document.getElementById('update-error-text');
+    if (e) e.textContent = 'Could not check — ' + (err.message || 'network error');
+  }
+
+  if (btn) btn.disabled = false;
 }
 
 function pwaInstall() {
