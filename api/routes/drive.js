@@ -35,5 +35,6 @@ router.post('/library',      express.json({ limit: '5mb' }), controller.saveLibr
 router.post('/upload-audio', upload.single('audio'), controller.uploadAudio);
 router.get('/audio/:fileId', controller.streamAudio);
 router.delete('/audio/:fileId', controller.deleteAudio);
+router.post('/prune-audio', express.json({ limit: '1mb' }), controller.pruneAudio);
 
 module.exports = router;
