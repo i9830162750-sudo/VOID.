@@ -14886,17 +14886,83 @@ setTimeout(() => {
       showToast('Loading library from Google Drive…');
       var resp = await fetch('/api/drive/library', { credentials: 'include' });
       var data = await resp.json();
+
+      // ── Helper: parse "Artist - Title.mp3" filename into {title, artist} ──
+      function parseAudioFilename(name) {
+        var base = name.replace(/\.(mp3|m4a|flac|ogg|wav|aac|opus|weba)$/i, '');
+        if (base.indexOf(' - ') !== -1) {
+          var parts = base.split(' - ');
+          return { artist: parts[0].trim(), title: parts.slice(1).join(' - ').trim() };
+        }
+        return { artist: 'Unknown Artist', title: base.trim() };
+      }
+
+      // ── No JSON library — reconstruct entirely from audio files in Drive ──
       if (!data.library) {
-        showToast('No Drive library found — starting fresh');
+        var audioFiles = data.audioFiles || [];
+        if (!audioFiles.length) {
+          showToast('No Drive library found — starting fresh');
+          return;
+        }
+        showToast('Rebuilding library from ' + audioFiles.length + ' Drive audio files…');
+
+        var currentTracks = (typeof tracks !== 'undefined' && tracks.length) ? tracks : (window.tracks || []);
+        function normKey(title, artist) {
+          return (title || '').toLowerCase().trim() + '|' + (artist || '').toLowerCase().trim();
+        }
+        var localByKey = {};
+        currentTracks.forEach(function(t) { localByKey[normKey(t.title, t.artist)] = t; });
+
+        var added = 0;
+        audioFiles.forEach(function(f) {
+          var parsed = parseAudioFilename(f.name);
+          var key = normKey(parsed.title, parsed.artist);
+          if (localByKey[key]) {
+            // Already in library — just make sure it has the driveFileId
+            if (!localByKey[key].driveFileId) localByKey[key].driveFileId = f.id;
+            return;
+          }
+          var id     = 'track_drive_' + f.id;
+          var blobId = 'blob_drive_' + f.id;
+          var track = {
+            id: id, blobId: blobId,
+            title: parsed.title, artist: parsed.artist,
+            duration: 0, cover: null, isFav: false,
+            ytMeta: null, isOnline: false,
+            driveFileId: f.id,
+            url: '/api/drive/audio/' + f.id,
+            _needsDriveFetch: true,
+          };
+          if (typeof tracks !== 'undefined') tracks.push(track);
+          localByKey[key] = track;
+          added++;
+        });
+
+        window.tracks = (typeof tracks !== 'undefined') ? tracks : currentTracks;
+        if (typeof renderAll === 'function') renderAll();
+        if (typeof saveSettings === 'function') saveSettings();
+
+        // Persist new tracks to IndexedDB
+        var allNow = (typeof tracks !== 'undefined') ? tracks : (window.tracks || []);
+        Promise.all(allNow.filter(function(t) { return t.driveFileId; }).map(function(t) {
+          return dbPut('tracks', { id: t.id, blobId: t.blobId, title: t.title, artist: t.artist,
+            duration: t.duration, cover: t.cover, isFav: t.isFav, ytMeta: t.ytMeta || null,
+            isOnline: false, driveFileId: t.driveFileId }).catch(function(){});
+        }));
+
+        showToast('✓ Imported ' + added + ' track' + (added !== 1 ? 's' : '') + ' from Drive audio folder');
+
+        // Cache audio files locally in background
+        var toFetch = allNow.filter(function(t) { return t._needsDriveFetch && t.driveFileId; });
+        if (toFetch.length) driveDownloadToIndexedDB(toFetch);
         return;
       }
+
       var lib = data.library;
+      var audioFiles = data.audioFiles || [];
       console.log('[Drive] restore: library has', (lib.tracks||[]).length, 'tracks, savedAt:', lib._savedAt);
-      console.log('[Drive] restore: first track sample:', JSON.stringify((lib.tracks||[])[0]));
 
       // ── Merge Drive tracks into local library ──────────────────────────────
-      // Strategy: Drive metadata wins for shared tracks; local blob URLs are
-      // preserved; tracks that only exist locally are KEPT (not wiped).
       var currentTracks = (typeof tracks !== 'undefined' && tracks.length) ? tracks : (window.tracks || []);
 
       // Index local tracks by id and by normalised title|artist for dedup
@@ -14910,23 +14976,54 @@ setTimeout(() => {
         localByKey[normKey(t.title, t.artist)] = t;
       });
 
+      // Build a lookup of audio files by name for patching missing driveFileIds
+      var audioByName = {};
+      audioFiles.forEach(function(f) { audioByName[f.name] = f; });
+
       // Build the merged set starting from Drive tracks
       var merged = [];
       var driveIds = new Set();
       (lib.tracks || []).forEach(function(dt) {
         driveIds.add(dt.id);
         var local = localById[dt.id] || localByKey[normKey(dt.title, dt.artist)];
+
+        // If the JSON track is missing a driveFileId, try to match it from the audio file list
+        var driveFileId = dt.driveFileId;
+        if (!driveFileId) {
+          var expectedName = ((dt.artist||'Unknown') + ' - ' + (dt.title||'Unknown')).replace(/[/\\:*?"<>|]/g,'_') + '.mp3';
+          var matched = audioByName[expectedName];
+          if (matched) driveFileId = matched.id;
+        }
+
         merged.push(Object.assign({}, dt, {
-          // Prefer local blob URL; fall back to Drive audio proxy URL
-          url:   (local && local.url)   ? local.url   : (dt.driveFileId ? '/api/drive/audio/' + dt.driveFileId : null),
-          // Preserve local cover art (Drive snapshot omits it to save bandwidth)
+          driveFileId: driveFileId || dt.driveFileId || null,
+          url:   (local && local.url)   ? local.url   : (driveFileId ? '/api/drive/audio/' + driveFileId : null),
           cover: (local && local.cover) ? local.cover : (dt.cover || null),
-          // Flag tracks that need fetching from Drive (exist on Drive, no local blob)
-          _needsDriveFetch: !local && !!dt.driveFileId,
+          _needsDriveFetch: !local && !!driveFileId,
         }));
       });
 
-      // Append local-only tracks that weren't in the Drive snapshot (keep them!)
+      // Also import any audio files in Drive that aren't referenced in the JSON at all
+      audioFiles.forEach(function(f) {
+        var parsed = parseAudioFilename(f.name);
+        var key = normKey(parsed.title, parsed.artist);
+        var alreadyIn = merged.some(function(m) { return normKey(m.title, m.artist) === key; });
+        if (!alreadyIn) {
+          var id = 'track_drive_' + f.id;
+          var local = localById[id] || localByKey[key];
+          merged.push(Object.assign({
+            id: id, blobId: 'blob_drive_' + f.id,
+            title: parsed.title, artist: parsed.artist,
+            duration: 0, cover: null, isFav: false, ytMeta: null, isOnline: false,
+          }, local || {}, {
+            driveFileId: f.id,
+            url: (local && local.url) ? local.url : '/api/drive/audio/' + f.id,
+            _needsDriveFetch: !local,
+          }));
+        }
+      });
+
+      // Append local-only tracks that weren't in Drive at all (keep them!)
       currentTracks.forEach(function(t) {
         var key = normKey(t.title, t.artist);
         if (!driveIds.has(t.id) && !merged.some(function(m) { return normKey(m.title, m.artist) === key; })) {
@@ -14934,7 +15031,7 @@ setTimeout(() => {
         }
       });
 
-      // Apply to app state — update both the local var and window alias
+      // Apply to app state
       if (typeof tracks !== 'undefined') {
         tracks.length = 0;
         merged.forEach(function(t) { tracks.push(t); });
@@ -14945,12 +15042,11 @@ setTimeout(() => {
       if (lib.appSettings)  Object.assign(window.appSettings || {}, lib.appSettings);
       if (lib.recentlyPlayed) window.recentlyPlayed = lib.recentlyPlayed;
 
-      // Re-render
       if (typeof renderAll === 'function') renderAll();
       if (typeof saveSettings === 'function') saveSettings();
       if (typeof savePlaylists === 'function') savePlaylists();
 
-      // Persist restored track metadata to IndexedDB so they survive page reloads
+      // Persist restored track metadata to IndexedDB
       Promise.all(merged.map(function(t) {
         var meta = { id: t.id, blobId: t.blobId, title: t.title, artist: t.artist,
                      duration: t.duration, cover: t.cover, isFav: t.isFav,
@@ -14962,8 +15058,6 @@ setTimeout(() => {
       var count = merged.length;
       showToast('✓ Restored ' + count + ' track' + (count !== 1 ? 's' : '') + ' from Google Drive');
 
-      // Download audio blobs from Drive into IndexedDB for tracks flagged as _needsDriveFetch.
-      // This makes them available offline and ensures loadAll() finds them in the blobs store.
       var fetchNeeded = merged.filter(function(t) { return t._needsDriveFetch && t.driveFileId && t.blobId; });
       if (fetchNeeded.length) driveDownloadToIndexedDB(fetchNeeded);
     } catch(e) {
