@@ -1,19 +1,20 @@
 # render.yaml
 # VOID Player — Render deployment configuration
 # https://render.com/docs/blueprint-spec
-
 services:
   - type: web
     name: void-player
     runtime: node
     plan: free
     region: oregon
-
-    buildCommand: npm install --omit=dev && python3 -m pip install -U yt-dlp && python3 -m yt_dlp --version && which yt-dlp || find /opt/render -name "yt-dlp" 2>/dev/null || echo "yt-dlp not found in PATH"
+    buildCommand: npm install --omit=dev && python3 -m pip install -U yt-dlp && python3 -m yt_dlp --version && which yt-dlp || find /opt/render -name "yt-dlp" 2>/dev/null || echo "yt-dlp not found in PATH" && node -e "const fs=require('fs');const ts=Date.now();let sw=fs.readFileSync('sw.js','utf8');sw=sw.replace('void-v__BUILD_TS__','void-v'+ts);fs.writeFileSync('sw.js',sw);console.log('SW stamped: void-v'+ts);"
     startCommand: node server.js
     healthCheckPath: /api/health
     autoDeploy: true
-
+    headers:
+      - path: /sw.js
+        name: Cache-Control
+        value: no-cache, no-store, must-revalidate
     envVars:
       - key: NODE_ENV
         value: production
