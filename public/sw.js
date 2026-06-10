@@ -1,9 +1,8 @@
-const CACHE = 'void-v12';
+const CACHE = 'void-v__BUILD_TS__';
 const STATIC_ASSETS = [
   '/manifest.json',
   '/icon.svg'
 ];
-
 self.addEventListener('install', e => {
   e.waitUntil(
     caches.open(CACHE).then(c => c.addAll(STATIC_ASSETS).catch(() => {}))
@@ -11,7 +10,6 @@ self.addEventListener('install', e => {
   // Do NOT call skipWaiting() here — we wait for the page to tell us to activate.
   // This lets us show the user an "Update ready" banner before reloading.
 });
-
 self.addEventListener('activate', e => {
   e.waitUntil(
     caches.keys().then(keys =>
@@ -20,7 +18,6 @@ self.addEventListener('activate', e => {
   );
   self.clients.claim();
 });
-
 // ── Listen for SKIP_WAITING message from the page ────────────────────────
 // When the user taps "Update", the page sends this message to the waiting SW.
 self.addEventListener('message', e => {
@@ -28,15 +25,11 @@ self.addEventListener('message', e => {
     self.skipWaiting();
   }
 });
-
 self.addEventListener('fetch', e => {
   if (e.request.method !== 'GET') return;
-
   const url = new URL(e.request.url);
-
   // Only handle http(s) — skip chrome-extension://, data:, blob:, etc.
   if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
-
   // Never cache: API calls, Google services, CDNs, external audio
   if (
     url.hostname.includes('youtube.com') ||
@@ -54,7 +47,6 @@ self.addEventListener('fetch', e => {
   ) {
     return; // fall through to network, no SW involvement
   }
-
   // ── index.html: ALWAYS network-first so CSP headers stay fresh ──
   if (url.pathname === '/' || url.pathname === '/index.html') {
     e.respondWith(
@@ -62,7 +54,6 @@ self.addEventListener('fetch', e => {
     );
     return;
   }
-
   // Cache-first for true static assets (manifest, icons)
   const isStatic = STATIC_ASSETS.some(a => url.pathname === a);
   if (isStatic) {
@@ -71,7 +62,6 @@ self.addEventListener('fetch', e => {
     );
     return;
   }
-
   // Network-first with cache fallback for everything else
   e.respondWith(
     fetch(e.request)
