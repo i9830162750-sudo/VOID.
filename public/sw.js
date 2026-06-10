@@ -1,80 +1,40 @@
-const CACHE = 'void-v10';
-const STATIC_ASSETS = [
-  '/manifest.json',
-  '/icon.svg'
-];
+/**
+ * api/routes/drive.js
+ * Drive sync routes — all require authentication.
+ */
 
-self.addEventListener('install', e => {
-  e.waitUntil(
-    caches.open(CACHE).then(c => c.addAll(STATIC_ASSETS).catch(() => {}))
-  );
-  self.skipWaiting();
+'use strict';
+
+const express    = require('express');
+const multer     = require('multer');
+const router     = express.Router();
+const controller = require('../controllers/drive');
+
+// multer: memory storage (we stream straight to Drive, no disk writes)
+// Limit to 100MB for audio files
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 100 * 1024 * 1024 },
 });
 
-self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))
-    )
-  );
-  self.clients.claim();
-});
+// ── Auth guard ───────────────────────────────────────────────────────────
+function requireAuth(req, res, next) {
+  console.log('[Drive] requireAuth:', req.method, req.path, 'isAuthenticated:', req.isAuthenticated(), 'sessionID:', req.sessionID, 'user:', req.user ? req.user.email : 'none');
+  if (req.isAuthenticated()) return next();
+  res.status(401).json({ error: 'Not authenticated' });
+}
 
-self.addEventListener('fetch', e => {
-  if (e.request.method !== 'GET') return;
+// All drive routes require auth
+router.use(requireAuth);
 
-  const url = new URL(e.request.url);
+// Library (track metadata + playlists + settings)
+router.get('/library',       controller.getLibrary);
+router.post('/library',      express.json({ limit: '5mb' }), controller.saveLibrary);
 
-  // Only handle http(s) — skip chrome-extension://, data:, blob:, etc.
-  if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+// Audio file upload/stream/delete
+router.post('/upload-audio', upload.single('audio'), controller.uploadAudio);
+router.get('/audio/:fileId', controller.streamAudio);
+router.delete('/audio/:fileId', controller.deleteAudio);
+router.post('/prune-audio', express.json({ limit: '1mb' }), controller.pruneAudio);
 
-  // Never cache: API calls, Google services, CDNs, external audio
-  if (
-    url.hostname.includes('youtube.com') ||
-    url.hostname.includes('ytimg.com') ||
-    url.hostname.includes('googleapis.com') ||
-    url.hostname.includes('googlevideo.com') ||
-    url.hostname.includes('googleusercontent.com') ||
-    url.hostname.includes('fonts.googleapis.com') ||
-    url.hostname.includes('fonts.gstatic.com') ||
-    url.hostname.includes('sndcdn.com') ||
-    url.hostname.includes('saavncdn.com') ||
-    url.hostname.includes('cdnjs.cloudflare.com') ||
-    url.hostname.includes('jsdelivr.net') ||
-    url.pathname.startsWith('/api/')
-  ) {
-    return; // fall through to network, no SW involvement
-  }
-
-  // ── index.html: ALWAYS network-first so CSP headers stay fresh ──
-  // Never serve index.html from cache — it must come from the server
-  // so helmet's Content-Security-Policy headers are always up to date.
-  if (url.pathname === '/' || url.pathname === '/index.html') {
-    e.respondWith(
-      fetch(e.request).catch(() => caches.match('/index.html'))
-    );
-    return;
-  }
-
-  // Cache-first for true static assets (manifest, icons)
-  const isStatic = STATIC_ASSETS.some(a => url.pathname === a);
-  if (isStatic) {
-    e.respondWith(
-      caches.match(e.request).then(cached => cached || fetch(e.request))
-    );
-    return;
-  }
-
-  // Network-first with cache fallback for everything else
-  e.respondWith(
-    fetch(e.request)
-      .then(r => {
-        if (r && r.status === 200 && r.type !== 'opaque') {
-          const clone = r.clone();
-          caches.open(CACHE).then(c => c.put(e.request, clone));
-        }
-        return r;
-      })
-      .catch(() => caches.match(e.request))
-  );
-});
+module.exports = router;
