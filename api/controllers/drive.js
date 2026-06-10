@@ -88,20 +88,80 @@ async function uploadJSON(drive, name, data, folderId, existingFileId = null) {
   return res.data.id;
 }
 
+// ── Helper: list all audio files in the Drive audio folder ───────────────
+async function listAudioFiles(drive, audioFolderId) {
+  const files = [];
+  let pageToken = null;
+  do {
+    const params = {
+      q: `'${audioFolderId}' in parents and trashed=false`,
+      fields: 'nextPageToken,files(id,name,size,mimeType)',
+      spaces: 'drive',
+      pageSize: 1000,
+    };
+    if (pageToken) params.pageToken = pageToken;
+    const res = await drive.files.list(params);
+    files.push(...(res.data.files || []));
+    pageToken = res.data.nextPageToken || null;
+  } while (pageToken);
+  return files;
+}
+
 // ── Controller: GET /api/drive/library ───────────────────────────────────
 exports.getLibrary = async (req, res) => {
   try {
     const drive    = getDriveClient(req.user);
     const rootId   = await ensureFolder(drive, FOLDER_NAME);
-    const libFile  = await findFile(drive, LIBRARY_FILE, rootId);
 
-    if (!libFile) return res.json({ library: null }); // first login — no data yet
+    // Always fetch the audio file list in parallel with the library JSON.
+    // This lets the client reconstruct tracks from filenames if the JSON is missing.
+    const audioFolderRes = await drive.files.list({
+      q: `name='${AUDIO_FOLDER}' and mimeType='application/vnd.google-apps.folder' and '${rootId}' in parents and trashed=false`,
+      fields: 'files(id)',
+      spaces: 'drive',
+    });
+    const audioFolderId = audioFolderRes.data.files.length > 0
+      ? audioFolderRes.data.files[0].id
+      : null;
+
+    const [libFile, audioFiles] = await Promise.all([
+      findFile(drive, LIBRARY_FILE, rootId),
+      audioFolderId ? listAudioFiles(drive, audioFolderId) : Promise.resolve([]),
+    ]);
+
+    // No library JSON at all — return just the audio file list so client can reconstruct
+    if (!libFile) {
+      return res.json({ library: null, audioFiles });
+    }
 
     const data = await downloadJSON(drive, libFile.id);
-    res.json({ library: data });
+    // Always attach audio file list so client can fill in any tracks missing a driveFileId
+    res.json({ library: data, audioFiles });
   } catch (err) {
     console.error('[Drive] getLibrary error:', err.message);
     res.status(502).json({ error: 'Could not read from Google Drive', detail: err.message });
+  }
+};
+
+// ── Controller: GET /api/drive/audio-files ───────────────────────────────
+// Returns the list of audio files in the Drive audio folder.
+// Useful for rescanning without a full library fetch.
+exports.listAudioFiles = async (req, res) => {
+  try {
+    const drive    = getDriveClient(req.user);
+    const rootId   = await ensureFolder(drive, FOLDER_NAME);
+    const audioFolderRes = await drive.files.list({
+      q: `name='${AUDIO_FOLDER}' and mimeType='application/vnd.google-apps.folder' and '${rootId}' in parents and trashed=false`,
+      fields: 'files(id)',
+      spaces: 'drive',
+    });
+    if (!audioFolderRes.data.files.length) return res.json({ audioFiles: [] });
+    const audioFolderId = audioFolderRes.data.files[0].id;
+    const audioFiles = await listAudioFiles(drive, audioFolderId);
+    res.json({ audioFiles });
+  } catch (err) {
+    console.error('[Drive] listAudioFiles error:', err.message);
+    res.status(502).json({ error: 'Could not list audio files from Google Drive', detail: err.message });
   }
 };
 
