@@ -144,10 +144,24 @@ exports.uploadAudio = async (req, res) => {
     const rootId     = await ensureFolder(drive, FOLDER_NAME);
     const audioId    = await ensureFolder(drive, AUDIO_FOLDER, rootId);
 
-    // Check if file already exists (avoid duplicates)
-    const fileName  = `${blobId}`;
-    const existing  = await findFile(drive, fileName, audioId);
-    if (existing) return res.json({ ok: true, fileId: existing.id, cached: true });
+    // Use the real filename sent by the client (e.g. "Artist - Title.mp3").
+    // Fall back to blobId if somehow missing. Strip any path components for safety.
+    const rawName   = (req.file.originalname && req.file.originalname !== 'blob')
+      ? req.file.originalname.replace(/^.*[/\\]/, '')
+      : blobId + '.mp3';
+    // Ensure it ends with a proper audio extension
+    const hasAudioExt = /\.(mp3|m4a|flac|ogg|wav|aac|opus|weba)$/i.test(rawName);
+    const fileName  = hasAudioExt ? rawName : rawName + '.mp3';
+
+    // Dedup: check by blobId-tagged name (legacy) AND new filename to avoid re-uploading
+    const existingByName  = await findFile(drive, fileName, audioId);
+    if (existingByName) return res.json({ ok: true, fileId: existingByName.id, cached: true });
+    const existingByBlob  = await findFile(drive, blobId, audioId);
+    if (existingByBlob) {
+      // Rename the legacy blobId file to the proper filename for future imports
+      await drive.files.update({ fileId: existingByBlob.id, resource: { name: fileName } }).catch(() => {});
+      return res.json({ ok: true, fileId: existingByBlob.id, cached: true });
+    }
 
     // Stream upload to Drive
     const { Readable } = require('stream');
