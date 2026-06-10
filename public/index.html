@@ -6205,7 +6205,14 @@ async function loadAll() {
     if (_isLowEnd && appSettings.lowEndFullStudio) document.body.classList.add('void-low-end-full-studio');
     document.getElementById('vol-slider').value = s.volume||80;
     // Stash studio state for the studio IIFE to restore after it initialises
-    if (s.studioState) window._savedStudioState = s.studioState;
+    if (s.studioState) {
+      window._savedStudioState = s.studioState;
+      // Apply UI immediately (sliders, buttons, enabled) — initAudioContext will
+      // handle the audio nodes when the user first plays
+      if (typeof window._applyStudioUIState === 'function') {
+        window._applyStudioUIState(s.studioState);
+      }
+    }
   }
 
   buildEQ();
@@ -6546,45 +6553,9 @@ function initAudioContext() {
   // Re-fire all studio slider input events now that nodes exist.
   // wire() ran its initial update() calls before the AudioContext was created,
   // so the onChange callbacks were no-ops (nodes were null). Dispatching 'input'
-  // again here ensures every slider value is actually pushed into the live nodes
-  // for the initially-loaded song (without this, effects only apply after you
-  // switch to a different track for the first time).
+  // again here ensures every slider value is actually pushed into the live nodes.
+  // Sliders are already set to saved values by _applyStudioUIState (called from loadAll).
   requestAnimationFrame(function() {
-    // ── Restore slider values from saved state FIRST so the input events
-    //    push the right values into the audio nodes (not HTML defaults) ──────
-    if (_st) {
-      var _sv = function(id, val) {
-        if (val === null || val === undefined) return;
-        var el = document.getElementById(id);
-        if (el) el.value = val;
-      };
-      _sv('studio-gain-slider',    _st.gain);
-      _sv('studio-pan-slider',     _st.pan);
-      _sv('studio-comp-thresh',    _st.compThresh);
-      _sv('studio-comp-ratio',     _st.compRatio);
-      _sv('studio-comp-attack',    _st.compAttack);
-      _sv('studio-comp-release',   _st.compRelease);
-      _sv('studio-comp-knee',      _st.compKnee);
-      _sv('studio-reverb-wet',     _st.reverbWet);
-      _sv('studio-reverb-size',    _st.reverbSize);
-      _sv('studio-reverb-damp',    _st.reverbDamp);
-
-      // Sync compressor button + enabled state
-      var compBtn = document.getElementById('studio-comp-btn');
-      if (compBtn && _st.compOn !== undefined) {
-        enabled.compressor = _st.compOn;
-        compBtn.classList.toggle('on', _st.compOn);
-        compBtn.textContent = _st.compOn ? 'ON' : 'OFF';
-      }
-      // Sync reverb button + enabled state
-      var reverbBtn = document.getElementById('studio-reverb-btn');
-      if (reverbBtn && _st.reverbOn !== undefined) {
-        enabled.reverb = _st.reverbOn;
-        reverbBtn.classList.toggle('on', _st.reverbOn);
-        reverbBtn.textContent = _st.reverbOn ? 'ON' : 'OFF';
-      }
-    }
-
     var studioSliderIds = [
       'studio-gain-slider', 'studio-pan-slider',
       'studio-comp-thresh', 'studio-comp-ratio', 'studio-comp-attack',
@@ -13403,8 +13374,8 @@ function toggleNPPanel() {
   syncStudioNP();
 
   // ── Restore studio state saved from previous session ─────────────────────
-  (function restoreSavedStudioState() {
-    const st = window._savedStudioState;
+  // Exposed on window so loadAll() can call it after IDB state is ready.
+  window._applyStudioUIState = function(st) {
     if (!st) return;
     // Helper: set slider value and fire input event so wire() label/style callbacks apply
     // BUT suppress the audio-node onChange callbacks since nodes don't exist yet
@@ -13454,7 +13425,7 @@ function toggleNPPanel() {
       });
     }
     // Keep _savedStudioState alive — initAudioContext will consume it when nodes exist
-  })();
+  };
 })();
 
 function syncTransportChips() {
