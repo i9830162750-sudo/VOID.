@@ -50,7 +50,9 @@ self.addEventListener('fetch', e => {
   // ── index.html: ALWAYS network-first so CSP headers stay fresh ──
   if (url.pathname === '/' || url.pathname === '/index.html') {
     e.respondWith(
-      fetch(e.request).catch(() => caches.match('/index.html'))
+      fetch(e.request).catch(() =>
+        caches.match('/index.html').then(r => r || new Response('Offline', { status: 503, headers: { 'Content-Type': 'text/plain' } }))
+      )
     );
     return;
   }
@@ -72,6 +74,8 @@ self.addEventListener('fetch', e => {
         }
         return r;
       })
-      .catch(() => caches.match(e.request))
+      .catch(() =>
+        caches.match(e.request).then(r => r || new Response('Offline', { status: 503, headers: { 'Content-Type': 'text/plain' } }))
+      )
   );
 });
