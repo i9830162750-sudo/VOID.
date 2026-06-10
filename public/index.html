@@ -6131,6 +6131,18 @@ async function saveSettings() {
         reverbWet:   sl('studio-reverb-wet'),
         reverbSize:  sl('studio-reverb-size'),
         reverbDamp:  sl('studio-reverb-damp'),
+        outputMode: (function() {
+          const active = document.querySelector('#studio-output-modes .studio-fx-btn.on');
+          return active ? active.dataset.mode : 'stereo';
+        })(),
+        reverbPresetKey: (function() {
+          const active = document.querySelector('#studio-reverb-presets .studio-fx-btn.on');
+          return active ? active.dataset.rvp : null;
+        })(),
+        compPresetKey: (function() {
+          const active = document.querySelector('#studio-comp-presets .studio-fx-btn.on');
+          return active ? active.dataset.cp : null;
+        })(),
       };
     })(),
   });
@@ -6506,6 +6518,15 @@ function initAudioContext() {
       reverbNode.buffer = buf;
     };
     if (_isLowEnd) setTimeout(_buildIR, 500); else _buildIR();
+  }
+
+  // Output mode
+  const _outputMode = _st ? _st.outputMode : 'stereo';
+  if (_outputMode && _outputMode !== 'stereo') {
+    // applyOutputMode needs nodes to exist — they do now
+    if (typeof window.studioSetOutputMode === 'function') {
+      window.studioSetOutputMode(_outputMode);
+    }
   }
 
   // Pan
@@ -13350,7 +13371,7 @@ function toggleNPPanel() {
       // just be no-ops if compNode/reverbNode are null at this point
       el.dispatchEvent(new Event('input'));
     }
-    setSlider('studio-gain-slider',  0); // Always start at 0dB regardless of saved state
+    setSlider('studio-gain-slider',  st.gain !== null && st.gain !== undefined ? st.gain : 0);
     setSlider('studio-pan-slider',   st.pan);
     setSlider('studio-comp-thresh',  st.compThresh);
     setSlider('studio-comp-ratio',   st.compRatio);
@@ -13370,6 +13391,21 @@ function toggleNPPanel() {
     enabled.reverb     = reverbOn;
     if (compBtn)   { compBtn.classList.toggle('on', compOn);     compBtn.textContent   = compOn   ? 'ON' : 'OFF'; }
     if (reverbBtn) { reverbBtn.classList.toggle('on', reverbOn); reverbBtn.textContent = reverbOn ? 'ON' : 'OFF'; }
+    // Restore active preset button highlights
+    if (typeof renderReverbPresets === 'function') renderReverbPresets(st.reverbPresetKey || null);
+    if (typeof renderCompPresets   === 'function') renderCompPresets(st.compPresetKey || null);
+    // Sync eq-toggle-btn-desk (studio panel EQ button) with loaded eqEnabled state
+    const deskEqBtn = document.getElementById('eq-toggle-btn-desk');
+    if (deskEqBtn) {
+      deskEqBtn.textContent = eqEnabled ? 'ON' : 'OFF';
+      deskEqBtn.className = 'studio-fx-btn' + (eqEnabled ? ' on' : '');
+    }
+    // Restore output mode button visual (actual audio graph applied by initAudioContext)
+    if (st.outputMode && st.outputMode !== 'stereo') {
+      document.querySelectorAll('#studio-output-modes .studio-fx-btn').forEach(b => {
+        b.classList.toggle('on', b.dataset.mode === st.outputMode);
+      });
+    }
     // Keep _savedStudioState alive — initAudioContext will consume it when nodes exist
   })();
 })();
