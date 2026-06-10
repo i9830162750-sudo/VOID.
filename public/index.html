@@ -8793,16 +8793,23 @@ document.getElementById('file-input').addEventListener('change', async function(
   // Show indeterminate progress bars on newly added tracks while processing
   var _localUploadActive = true;
 
+  // ── Deduplication helpers ─────────────────────────────────────────────────
+  // Build a lookup of existing tracks by a normalised "title|artist" key so
+  // we can skip re-adding songs that are already in the library.
+  function normKey(title, artist) {
+    return (title || '').toLowerCase().trim() + '|' + (artist || '').toLowerCase().trim();
+  }
+  const existingKeys = new Set(tracks.map(t => normKey(t.title, t.artist)));
+
   // ── Fast parallel processing ──────────────────────────────────────────────
   const processFile = async (file) => {
-    const url = URL.createObjectURL(file);
-    const name = file.name.replace(/\.[^.]+$/, '');
-
-    let title = name, artist = 'Unknown Artist', cover = null;
+    // Derive a clean safe filename (artist - title.mp3) for Drive storage
+    const rawName = file.name.replace(/\.[^.]+$/, '');
+    let title = rawName, artist = 'Unknown Artist', cover = null;
 
     // Filename parsing fallback (fast, always run first)
-    if (name.includes(' - ')) {
-      const parts = name.split(' - ', 2);
+    if (rawName.includes(' - ')) {
+      const parts = rawName.split(' - ', 2);
       artist = parts[0].trim();
       title  = parts[1].trim();
     }
@@ -8828,6 +8835,22 @@ document.getElementById('file-input').addEventListener('change', async function(
       }
     }
 
+    // ── Duplicate check — skip if this title+artist is already in the library ──
+    if (existingKeys.has(normKey(title, artist))) {
+      console.log('[Upload] Skipping duplicate:', title, '-', artist);
+      return null; // signal to skip
+    }
+    // Register key immediately so concurrent batch items don't duplicate each other
+    existingKeys.add(normKey(title, artist));
+
+    // ── Wrap file as a proper named MP3 so Drive stores it with a real filename ──
+    // This prevents the "blob" filename issue that breaks large Drive imports.
+    const ext = (file.name.match(/\.[^.]+$/) || ['.mp3'])[0].toLowerCase();
+    const safeName = (artist + ' - ' + title).replace(/[/\\:*?"<>|]/g, '_') + ext;
+    const namedFile = new File([file], safeName, { type: file.type || 'audio/mpeg' });
+
+    const url = URL.createObjectURL(namedFile);
+
     // Step 2: Get duration via audio element (after ID3 read so no file-read contention)
     const duration = await (async () => {
       try {
@@ -8844,20 +8867,24 @@ document.getElementById('file-input').addEventListener('change', async function(
     const id     = 'track_' + Date.now() + '_' + Math.random().toString(36).slice(2);
     const blobId = 'blob_' + id;
 
-    return { track: { id, blobId, title, artist, url, cover, duration, isFav:false, ytMeta:null, isOnline:false }, file };
+    return { track: { id, blobId, title, artist, url, cover, duration, isFav:false, ytMeta:null, isOnline:false }, file: namedFile };
   };
 
   // Process files with limited concurrency to avoid memory pressure on large batches
   const CONCURRENCY = 3;
-  const validResults = [];
+  const allResults = [];
   for (let i = 0; i < files.length; i += CONCURRENCY) {
     const batch = files.slice(i, i + CONCURRENCY);
     const batchResults = await Promise.all(batch.map(f => processFile(f).catch(err => {
       console.warn('Failed to process file:', err); return null;
     })));
-    validResults.push(...batchResults.filter(Boolean));
+    allResults.push(...batchResults);
   }
 
+  const validResults = allResults.filter(Boolean);
+  const skippedCount = allResults.length - validResults.length;
+
+  // ── Add new tracks to the EXISTING library (not replace it) ──────────────
   for (const { track } of validResults) {
     tracks.push(track);
   }
@@ -8896,11 +8923,10 @@ document.getElementById('file-input').addEventListener('change', async function(
   if (currentIndex < 0) updateUI();
   saveSettings();
 
-  showToast(
-    '✓ Added ' + validResults.length + ' track' +
-    (validResults.length !== 1 ? 's' : '') +
-    ' — tap "Scan for YouTube" to match'
-  );
+  var addedMsg = '✓ Added ' + validResults.length + ' track' + (validResults.length !== 1 ? 's' : '');
+  if (skippedCount > 0) addedMsg += ' (' + skippedCount + ' duplicate' + (skippedCount !== 1 ? 's' : '') + ' skipped)';
+  else addedMsg += ' — tap "Scan for YouTube" to match';
+  showToast(addedMsg);
 
   const scanWrap = document.getElementById('ytscan-btn-wrap');
   if (scanWrap) scanWrap.style.display = 'block';
@@ -14785,8 +14811,11 @@ setTimeout(() => {
         try {
           var blob = await dbGet('blobs', t.blobId).catch(function() { return null; });
           if (!blob || !blob.blob) { xferDone(t.id); continue; }
+          // Use the stored filename if available (it's a File), otherwise construct one
+          var audioFile = (blob.blob instanceof File) ? blob.blob
+            : new File([blob.blob], ((t.artist||'Unknown') + ' - ' + (t.title||'Unknown')).replace(/[/\\:*?"<>|]/g,'_') + '.mp3', { type: blob.blob.type || 'audio/mpeg' });
           var fd = new FormData();
-          fd.append('audio', blob.blob, t.blobId);
+          fd.append('audio', audioFile, audioFile.name);
           fd.append('blobId', t.blobId);
           var data = await _driveXhrUpload(fd, t.id);
           if (data.ok) {
@@ -14865,21 +14894,44 @@ setTimeout(() => {
       console.log('[Drive] restore: library has', (lib.tracks||[]).length, 'tracks, savedAt:', lib._savedAt);
       console.log('[Drive] restore: first track sample:', JSON.stringify((lib.tracks||[])[0]));
 
-      // Merge Drive tracks with local (Drive wins for metadata, local wins for blobs)
-      var localById = {};
+      // ── Merge Drive tracks into local library ──────────────────────────────
+      // Strategy: Drive metadata wins for shared tracks; local blob URLs are
+      // preserved; tracks that only exist locally are KEPT (not wiped).
       var currentTracks = (typeof tracks !== 'undefined' && tracks.length) ? tracks : (window.tracks || []);
-      currentTracks.forEach(function(t) { localById[t.id] = t; });
 
-      var merged = (lib.tracks || []).map(function(dt) {
-        var local = localById[dt.id];
-        return Object.assign({}, dt, {
-          // If we have a local blob URL, keep it; otherwise mark as no-blob
-          url:  (local && local.url) ? local.url : (dt.driveFileId ? '/api/drive/audio/' + dt.driveFileId : null),
-          // Preserve local cover art — Drive snapshot intentionally omits it to save bandwidth
+      // Index local tracks by id and by normalised title|artist for dedup
+      var localById = {};
+      var localByKey = {};
+      function normKey(title, artist) {
+        return (title || '').toLowerCase().trim() + '|' + (artist || '').toLowerCase().trim();
+      }
+      currentTracks.forEach(function(t) {
+        localById[t.id] = t;
+        localByKey[normKey(t.title, t.artist)] = t;
+      });
+
+      // Build the merged set starting from Drive tracks
+      var merged = [];
+      var driveIds = new Set();
+      (lib.tracks || []).forEach(function(dt) {
+        driveIds.add(dt.id);
+        var local = localById[dt.id] || localByKey[normKey(dt.title, dt.artist)];
+        merged.push(Object.assign({}, dt, {
+          // Prefer local blob URL; fall back to Drive audio proxy URL
+          url:   (local && local.url)   ? local.url   : (dt.driveFileId ? '/api/drive/audio/' + dt.driveFileId : null),
+          // Preserve local cover art (Drive snapshot omits it to save bandwidth)
           cover: (local && local.cover) ? local.cover : (dt.cover || null),
-          // Restore blob from Drive if we have a driveFileId but no local blob
+          // Flag tracks that need fetching from Drive (exist on Drive, no local blob)
           _needsDriveFetch: !local && !!dt.driveFileId,
-        });
+        }));
+      });
+
+      // Append local-only tracks that weren't in the Drive snapshot (keep them!)
+      currentTracks.forEach(function(t) {
+        var key = normKey(t.title, t.artist);
+        if (!driveIds.has(t.id) && !merged.some(function(m) { return normKey(m.title, m.artist) === key; })) {
+          merged.push(t);
+        }
       });
 
       // Apply to app state — update both the local var and window alias
@@ -14956,7 +15008,10 @@ setTimeout(() => {
         xferTick(t.title, t.id);
         try {
           var resp = await fetchWithRetry('/api/drive/audio/' + t.driveFileId, 2);
-          var blob = await resp.blob();
+          var rawBlob = await resp.blob();
+          // Wrap as a named file so the browser treats it as proper audio (not anonymous blob)
+          var safeName = ((t.artist || 'Unknown') + ' - ' + (t.title || 'Unknown')).replace(/[/\\:*?"<>|]/g, '_') + '.mp3';
+          var blob = new File([rawBlob], safeName, { type: rawBlob.type || 'audio/mpeg' });
           await dbPut('blobs', { id: t.blobId, blob: blob }).catch(function(){});
           var localUrl = URL.createObjectURL(blob);
           var allTracks = (typeof tracks !== 'undefined' && tracks.length) ? tracks : (window.tracks || []);
@@ -15004,8 +15059,10 @@ setTimeout(() => {
         try {
           var blob = await dbGet('blobs', t.blobId).catch(function() { return null; });
           if (!blob || !blob.blob) { xferDone(t.id); continue; }
+          var audioFile = (blob.blob instanceof File) ? blob.blob
+            : new File([blob.blob], ((t.artist||'Unknown') + ' - ' + (t.title||'Unknown')).replace(/[/\\:*?"<>|]/g,'_') + '.mp3', { type: blob.blob.type || 'audio/mpeg' });
           var fd = new FormData();
-          fd.append('audio', blob.blob, t.blobId);
+          fd.append('audio', audioFile, audioFile.name);
           fd.append('blobId', t.blobId);
           var data = await _driveXhrUpload(fd, t.id);
           if (data.ok) {
@@ -15063,10 +15120,14 @@ setTimeout(() => {
 
   window.voidDriveUploadTrack = async function(track, fileBlob) {
     if (!driveUser || !fileBlob) return null;
+    // Ensure the file has a real name so Drive doesn't store it as an unnamed blob
+    var audioFile = (fileBlob instanceof File && fileBlob.name && fileBlob.name !== 'blob')
+      ? fileBlob
+      : new File([fileBlob], ((track.artist||'Unknown') + ' - ' + (track.title||'Unknown')).replace(/[/\\:*?"<>|]/g,'_') + '.mp3', { type: fileBlob.type || 'audio/mpeg' });
     for (var attempt = 0; attempt < 3; attempt++) {
       try {
         var fd = new FormData();
-        fd.append('audio', fileBlob, track.blobId);
+        fd.append('audio', audioFile, audioFile.name);
         fd.append('blobId', track.blobId);
         var data = await _driveXhrUpload(fd, track.id);
         if (data.ok) {
