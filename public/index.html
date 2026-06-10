@@ -6550,6 +6550,41 @@ function initAudioContext() {
   // for the initially-loaded song (without this, effects only apply after you
   // switch to a different track for the first time).
   requestAnimationFrame(function() {
+    // ── Restore slider values from saved state FIRST so the input events
+    //    push the right values into the audio nodes (not HTML defaults) ──────
+    if (_st) {
+      var _sv = function(id, val) {
+        if (val === null || val === undefined) return;
+        var el = document.getElementById(id);
+        if (el) el.value = val;
+      };
+      _sv('studio-gain-slider',    _st.gain);
+      _sv('studio-pan-slider',     _st.pan);
+      _sv('studio-comp-thresh',    _st.compThresh);
+      _sv('studio-comp-ratio',     _st.compRatio);
+      _sv('studio-comp-attack',    _st.compAttack);
+      _sv('studio-comp-release',   _st.compRelease);
+      _sv('studio-comp-knee',      _st.compKnee);
+      _sv('studio-reverb-wet',     _st.reverbWet);
+      _sv('studio-reverb-size',    _st.reverbSize);
+      _sv('studio-reverb-damp',    _st.reverbDamp);
+
+      // Sync compressor button + enabled state
+      var compBtn = document.getElementById('studio-comp-btn');
+      if (compBtn && _st.compOn !== undefined) {
+        enabled.compressor = _st.compOn;
+        compBtn.classList.toggle('on', _st.compOn);
+        compBtn.textContent = _st.compOn ? 'ON' : 'OFF';
+      }
+      // Sync reverb button + enabled state
+      var reverbBtn = document.getElementById('studio-reverb-btn');
+      if (reverbBtn && _st.reverbOn !== undefined) {
+        enabled.reverb = _st.reverbOn;
+        reverbBtn.classList.toggle('on', _st.reverbOn);
+        reverbBtn.textContent = _st.reverbOn ? 'ON' : 'OFF';
+      }
+    }
+
     var studioSliderIds = [
       'studio-gain-slider', 'studio-pan-slider',
       'studio-comp-thresh', 'studio-comp-ratio', 'studio-comp-attack',
