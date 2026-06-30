@@ -237,23 +237,36 @@ body {
 .np-close-btn svg { width:22px; height:22px; }
 
 /* Cover */
-.np-cover-wrap { padding:4px 28px 20px; display:flex; justify-content:center; flex-shrink:0; }
+.np-cover-wrap { padding:4px 28px 20px; display:flex; justify-content:center; flex-shrink:0; perspective:1200px; }
 .np-cover {
   width:100%; max-width:300px; aspect-ratio:1; border-radius:20px;
   background:var(--bg3); display:flex; align-items:center; justify-content:center;
   overflow:hidden; position:relative;
   box-shadow:0 28px 72px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.06);
-  transition:transform 0.35s ease, box-shadow 0.6s ease;
+  transition:box-shadow 0.6s ease;
+  transform-style:preserve-3d;
+  will-change:transform;
 }
 .np-cover.playing {
   box-shadow:0 28px 80px rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.3),
              0 0 60px rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.12),
              0 0 0 1px rgba(255,255,255,0.08);
-  transform:scale(1.02);
 }
-.np-cover img { width:100%; height:100%; object-fit:cover; }
+.np-cover img { width:100%; height:100%; object-fit:cover; will-change:transform; position:relative; z-index:1; }
 .np-cover-placeholder { color:var(--text3); }
 .np-cover-placeholder svg { width:72px; height:72px; }
+/* Glass reflection overlay — sits on top without affecting depth */
+.np-cover::after {
+  content:'';
+  position:absolute;
+  top:-60%; left:-60%;
+  width:220%; height:220%;
+  pointer-events:none; z-index:2;
+  background:
+    radial-gradient(circle at 38% 30%, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.12) 10%, rgba(255,255,255,0) 24%),
+    linear-gradient(125deg, rgba(255,255,255,0) 38%, rgba(255,255,255,0.18) 48%, rgba(255,255,255,0.05) 54%, rgba(255,255,255,0) 64%);
+  mix-blend-mode:soft-light;
+}
 .np-yt-badge {
   position:absolute; top:10px; right:10px; background:rgba(255,0,0,0.85);
   border-radius:6px; padding:3px 7px; font-size:10px; font-weight:700;
@@ -1980,15 +1993,29 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
     background: rgba(255,255,255,0.06); overflow: hidden;
     box-shadow: 0 24px 64px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.06);
     flex-shrink: 0;
-    transition: transform 0.35s ease, box-shadow 0.35s ease;
+    transition: box-shadow 0.35s ease;
+    transform-style: preserve-3d;
+    will-change: transform;
+    position: relative;
   }
   .dnp-cover.playing {
-    transform: scale(1.025);
     box-shadow: 0 28px 72px rgba(0,0,0,0.7), 0 0 32px rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.15), 0 0 0 1px rgba(255,255,255,0.08);
   }
-  .dnp-cover img { width:100%; height:100%; object-fit:cover; }
+  .dnp-cover img { width:100%; height:100%; object-fit:cover; will-change:transform; position:relative; z-index:1; }
   .dnp-cover-ph { width:100%;height:100%;display:flex;align-items:center;justify-content:center; }
   .dnp-cover-ph svg { width:52px;height:52px;color:rgba(255,255,255,0.15); }
+  /* Glass reflection */
+  .dnp-cover::after {
+    content:'';
+    position:absolute;
+    top:-60%; left:-60%;
+    width:220%; height:220%;
+    pointer-events:none; z-index:2;
+    background:
+      radial-gradient(circle at 38% 30%, rgba(255,255,255,0.32) 0%, rgba(255,255,255,0.1) 10%, rgba(255,255,255,0) 24%),
+      linear-gradient(125deg, rgba(255,255,255,0) 38%, rgba(255,255,255,0.16) 48%, rgba(255,255,255,0.04) 54%, rgba(255,255,255,0) 64%);
+    mix-blend-mode:soft-light;
+  }
 
   /* Meta (title, artist, source) */
   .dnp-meta { flex:1; min-width:0; padding-top: 8px; }
@@ -2185,14 +2212,27 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
     overflow: hidden;
     flex-shrink: 0;
     box-shadow: 0 24px 64px rgba(0,0,0,0.85), 0 0 0 1px rgba(255,255,255,0.09);
-    transition: opacity 0.3s ease, transform 0.3s ease;
+    transition: opacity 0.3s ease;
     opacity: 1;
-    transform: none;
     z-index: 2;
+    transform-style: preserve-3d;
+    will-change: transform;
   }
-  .dnp-fs-cover img { width: 100%; height: 100%; object-fit: cover; }
+  .dnp-fs-cover img { width: 100%; height: 100%; object-fit: cover; will-change:transform; position:relative; z-index:1; }
   .dnp-fs-cover-ph { width:100%;height:100%;display:flex;align-items:center;justify-content:center; }
   .dnp-fs-cover-ph svg { width:60px;height:60px;color:rgba(255,255,255,0.1); }
+  /* Glass reflection */
+  .dnp-fs-cover::after {
+    content:'';
+    position:absolute;
+    top:-60%; left:-60%;
+    width:220%; height:220%;
+    pointer-events:none; z-index:2;
+    background:
+      radial-gradient(circle at 38% 30%, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.12) 10%, rgba(255,255,255,0) 24%),
+      linear-gradient(125deg, rgba(255,255,255,0) 38%, rgba(255,255,255,0.18) 48%, rgba(255,255,255,0.05) 54%, rgba(255,255,255,0) 64%);
+    mix-blend-mode:soft-light;
+  }
 
   /* ── Meta: bigger title, next to cover, always visible ── */
   .dnp-fs-meta {
@@ -15914,6 +15954,124 @@ setTimeout(() => {
   }, 800);
 
 })();
+
+/* ============================================================
+   GYRO TILT FOR ALBUM COVER (NOW PLAYING)
+============================================================ */
+(function() {
+  'use strict';
+
+  // All cover elements to tilt
+  const covers = {
+    mobile: document.querySelector('.np-cover'),
+    desktop: document.querySelector('.dnp-cover'),
+    tv: document.querySelector('.dnp-fs-cover')
+  };
+
+  // If no covers found, exit
+  if (!covers.mobile && !covers.desktop && !covers.tv) return;
+
+  const state = {
+    curX: 0,
+    curY: 0,
+    targetX: 0,
+    targetY: 0,
+    usingGyro: false,
+    usingMouse: false
+  };
+
+  const MAX_TILT = 20; // max rotation in degrees
+  const SENSITIVITY = 2; // max sensitivity (1.5-2.5 is good)
+
+  // Request permission for iOS 13+
+  async function requestPermission() {
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      try {
+        const permission = await DeviceOrientationEvent.requestPermission();
+        if (permission === 'granted') {
+          window.addEventListener('deviceorientation', handleGyro);
+        }
+      } catch (err) {
+        console.log('Gyro permission denied or unavailable');
+      }
+    } else {
+      // Non-iOS devices
+      window.addEventListener('deviceorientation', handleGyro);
+    }
+  }
+
+  function handleGyro(e) {
+    if (state.usingMouse) return; // mouse takes priority
+    state.usingGyro = true;
+    const beta = e.beta || 0;  // X axis: -180 to 180 (tilt forward/back)
+    const gamma = e.gamma || 0; // Y axis: -90 to 90 (tilt left/right)
+
+    // Map device tilt to rotation: clamp to max tilt
+    state.targetX = Math.max(-MAX_TILT, Math.min(MAX_TILT, (beta / 90) * MAX_TILT)) * SENSITIVITY;
+    state.targetY = Math.max(-MAX_TILT, Math.min(MAX_TILT, (gamma / 90) * MAX_TILT)) * SENSITIVITY;
+  }
+
+  // Desktop mouse parallax
+  function handleMouseMove(e) {
+    if (state.usingGyro) return; // gyro takes priority on mobile
+    
+    state.usingMouse = true;
+    
+    // Use viewport center for parallax from anywhere on screen
+    const centerX = window.innerWidth / 2;
+    const centerY = window.innerHeight / 2;
+    
+    const nx = (e.clientX - centerX) / centerX; // -1 to 1
+    const ny = (e.clientY - centerY) / centerY; // -1 to 1
+    
+    state.targetX = ny * MAX_TILT * SENSITIVITY * 0.5; // subtle parallax
+    state.targetY = nx * MAX_TILT * SENSITIVITY * 0.5;
+  }
+
+  // Reset on mouse leave screen
+  function handleMouseLeave() {
+    state.usingMouse = false;
+    state.targetX = 0;
+    state.targetY = 0;
+  }
+
+  // Interpolation function
+  function lerp(a, b, t) {
+    return a + (b - a) * t;
+  }
+
+  // Render loop
+  function tick() {
+    state.curX = lerp(state.curX, state.targetX, 0.72);
+    state.curY = lerp(state.curY, state.targetY, 0.72);
+
+    const transform = `rotateX(${state.curX}deg) rotateY(${state.curY}deg)`;
+
+    // Apply to all covers that exist
+    if (covers.mobile) covers.mobile.style.transform = transform;
+    if (covers.desktop) covers.desktop.style.transform = transform;
+    if (covers.tv) covers.tv.style.transform = transform;
+
+    requestAnimationFrame(tick);
+  }
+
+  // Only enable gyro on mobile devices
+  function isMobile() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  }
+
+  // Initialize
+  if (isMobile()) {
+    requestPermission();
+  } else {
+    // Desktop: use mouse parallax
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseleave', handleMouseLeave);
+  }
+  
+  tick();
+})();
+
 </script>
 </body>
 </html>
