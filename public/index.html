@@ -6112,7 +6112,11 @@ let ytDownloads    = {}; // trackId -> progress
 
 const audioEl = new Audio();
 audioEl.crossOrigin = 'anonymous';
-audioEl.preload = 'auto';
+audioEl.preload = 'metadata'; // only load metadata, not the whole file
+audioEl.volume = 0.7;
+// Add these for instant playback:
+audioEl.buffered;  // Warm up the buffer
+audioEl.canPlayType('audio/mpeg'); // Preload codec check
 
 // ==============================
 // INDEXEDDB
@@ -6639,6 +6643,7 @@ audioEl.addEventListener('waiting', () => {
 });
 audioEl.addEventListener('canplay', () => {
   isBuffering=false; updateBufferingUI(false);
+  _currentTrackReady = true; // current track stable — prefetch is now safe
 });
 audioEl.addEventListener('stalled', () => {
   updateBufferingUI(true);
@@ -6704,6 +6709,14 @@ function updateProgress() {
       if (repeatMode !== 2) _doCrossfade(remaining);
     }
   }
+
+  // Next-track prefetch: only when current track is stable + 1/3 remains
+  if (_currentTrackReady && audioEl.duration && audioEl.currentTime > 0) {
+    const remaining = audioEl.duration - audioEl.currentTime;
+    if (remaining > 0 && remaining <= audioEl.duration / 3) {
+      prefetchNextTrack(); // no-op if already prefetched (guarded by _prefetchedIdx)
+    }
+  }
 }
 
 function fmtTime(s) {
@@ -6730,6 +6743,94 @@ function isOnlineTrack(idx) {
   return !!(t && t.isOnline);
 }
 
+// ── NEXT-TRACK PREFETCH ──────────────────────────────────────────────────
+// Silently resolves stream URLs / blobs for the upcoming track so the
+// transition is instant. Fires when 1/3 of the current track remains.
+let _prefetchedIdx = -1;       // guard: only prefetch once per upcoming track
+let _prefetchAbort = null;     // AbortController for in-flight prefetch fetch
+let _prefetchTimer = null;     // setTimeout handle for the 2-5s delay
+let _currentTrackReady = false; // true once current track hits canplay
+
+function _peekNextIdx() {
+  if (queue.manual.length) return queue.manual[0];
+  if (queue.future.length) return queue.future[0];
+  if (!isShuffle && !isSmartShuffle) {
+    const n = currentIndex + 1;
+    if (repeatMode === 1) return n % tracks.length;
+    if (n < tracks.length) return n;
+  }
+  return null;
+}
+
+async function prefetchNextTrack() {
+  const nextIdx = _peekNextIdx();
+  if (nextIdx === null || nextIdx === _prefetchedIdx) return;
+  _prefetchedIdx = nextIdx; // mark immediately to prevent scheduling twice
+
+  const t = tracks[nextIdx];
+  if (!t) return;
+
+  // Already has a playable source — nothing to do
+  if (t.streamUrl || (t.url && !t.url.startsWith('/api/drive/audio/'))) return;
+
+  // Cancel any previous pending prefetch (timer + in-flight fetch)
+  if (_prefetchTimer) { clearTimeout(_prefetchTimer); _prefetchTimer = null; }
+  if (_prefetchAbort) { _prefetchAbort.abort(); _prefetchAbort = null; }
+
+  // Wait 3s so current track's buffering gets full priority first
+  _prefetchTimer = setTimeout(async () => {
+    _prefetchTimer = null;
+    // Re-check — user may have skipped during the delay
+    if (_peekNextIdx() !== nextIdx) return;
+    if (t.streamUrl || (t.url && !t.url.startsWith('/api/drive/audio/'))) return;
+
+    _prefetchAbort = new AbortController();
+    const sig = _prefetchAbort.signal;
+
+    try {
+      // ── SoundCloud ────────────────────────────────────────────────────
+      if (t.scMeta && t.scMeta.trackId) {
+        const r = await fetch(
+          `${VOID_API_BASE}/soundcloud/stream?id=${encodeURIComponent(t.scMeta.trackId)}`,
+          { signal: sig }
+        );
+        if (!r.ok) return;
+        const { url } = await r.json();
+        if (url && !t.streamUrl) t.streamUrl = url;
+        return;
+      }
+
+      // ── YouTube ───────────────────────────────────────────────────────
+      if (t.isOnline && t.ytMeta && t.ytMeta.videoId) {
+        const r = await fetch(
+          `${VOID_API_BASE}/youtube/stream?id=${encodeURIComponent(t.ytMeta.videoId)}`,
+          { signal: sig }
+        );
+        if (!r.ok) return;
+        const { url } = await r.json();
+        if (url && !t.streamUrl) t.streamUrl = url;
+        return;
+      }
+
+      // ── Google Drive ──────────────────────────────────────────────────
+      if (t.url && t.url.startsWith('/api/drive/audio/')) {
+        const resp = await fetch(t.url, { credentials: 'include', signal: sig });
+        if (!resp.ok) return;
+        const blob = await resp.blob();
+        if (blob.size === 0) return;
+        const blobUrl = URL.createObjectURL(blob);
+        if (!t.url.startsWith('blob:')) {
+          t.url = blobUrl;
+          if (t.blobId) dbPut('blobs', { id: t.blobId, blob }).catch(() => {});
+        }
+      }
+    } catch (e) {
+      if (e.name !== 'AbortError') _prefetchedIdx = -1; // allow retry if non-abort failure
+    }
+  }, 3000); // 3s delay — current track gets full bandwidth first
+}
+// ─────────────────────────────────────────────────────────────────────────
+
 // Crossfade: fade out current audioEl while fading in a clone playing the next track
 let _xfadeOutEl = null;
 function _doCrossfade(fadeDur) {
@@ -6751,20 +6852,8 @@ function _doCrossfade(fadeDur) {
   _xfadeOutEl.playbackRate = audioEl.playbackRate;
   _xfadeOutEl.play().catch(()=>{});
 
-  // Fade out the clone over fadeDur seconds
-  const steps = fadeDur * 20;
-  const startVol = _xfadeOutEl.volume;
-  let step = 0;
-  const fadeOutInterval = setInterval(() => {
-    step++;
-    const t = step / steps;
-    _xfadeOutEl.volume = Math.max(0, startVol * (1 - t));
-    if (step >= steps) { clearInterval(fadeOutInterval); _xfadeOutEl.pause(); _xfadeOutEl.src = ''; _xfadeOutEl = null; }
-  }, 50);
-
   // Start the next track immediately at volume 0 and ramp it up
   currentIndex = next;
-  updateUI();
   audioEl._xfadeFired = false;
   audioEl.currentTime = 0;
   audioEl.src = nextT.url;
@@ -6772,18 +6861,40 @@ function _doCrossfade(fadeDur) {
   audioEl.playbackRate = playbackSpeed;
   audioEl.play().catch(()=>{});
   isPlaying = true;
-  updatePlayButtons();
+  requestAnimationFrame(updateUI);
   addToRecent(nextT.id); saveSettings();
-  setTimeout(function() { renderTrackList(document.getElementById('search-input')?.value || ''); renderQueueList(); }, 150);
-
+  
+  // Use requestAnimationFrame for smooth fade instead of setInterval
+  const startTime = performance.now();
+  const fadeDurMs = fadeDur * 1000;
+  const startVol = _xfadeOutEl.volume;
   const targetVol = 1;
-  let inStep = 0;
-  const fadeInInterval = setInterval(() => {
-    inStep++;
-    const t = inStep / steps;
-    audioEl.volume = Math.min(targetVol, targetVol * t);
-    if (inStep >= steps) { clearInterval(fadeInInterval); audioEl.volume = targetVol; }
-  }, 50);
+  
+  function animateFade(currentTime) {
+    const elapsed = currentTime - startTime;
+    const progress = Math.min(1, elapsed / fadeDurMs);
+    
+    // Fade out the old track
+    _xfadeOutEl.volume = Math.max(0, startVol * (1 - progress));
+    // Fade in the new track
+    audioEl.volume = Math.min(targetVol, targetVol * progress);
+    
+    if (progress < 1) {
+      requestAnimationFrame(animateFade);
+    } else {
+      // Cleanup
+      audioEl.volume = targetVol;
+      if (_xfadeOutEl) { _xfadeOutEl.pause(); _xfadeOutEl.src = ''; _xfadeOutEl = null; }
+    }
+  }
+  
+  requestAnimationFrame(animateFade);
+  
+  // Defer UI list updates
+  requestAnimationFrame(() => {
+    renderTrackList(document.getElementById('search-input')?.value || '');
+    renderQueueList();
+  });
 }
 
 // ==============================
@@ -6830,17 +6941,27 @@ async function playTrack(idx, pushHistory=true) {
   const alreadyUpdated = (currentIndex === idx);
   currentIndex = idx;
   audioEl._xfadeFired = false; // reset crossfade trigger for new track
+  _prefetchedIdx = -1;         // re-arm prefetch for the new upcoming track
+  _currentTrackReady = false;  // new track not ready yet
+  if (_prefetchTimer) { clearTimeout(_prefetchTimer); _prefetchTimer = null; }
+  if (_prefetchAbort) { _prefetchAbort.abort(); _prefetchAbort = null; }
   const t = tracks[idx];
+
+  // Mark playing state immediately for UI consumers that check isPlaying synchronously
+  isPlaying = true;
+
   if (t.isOnline) {
     // No direct streaming — download & cache the audio first, then play.
     // ytFetchAndPlay handles the whole flow with a progress toast.
+    if (!alreadyUpdated) updateUI(); else updatePlayButtons();
     ytFetchAndPlay(idx);
     return;
   }
 
   if (t.url) {
-    // Drive-hosted audio: fetch as blob so the audio element can seek/play it
+    // Drive-hosted audio not yet cached as a blob — needs a fetch, can't be instant.
     if (t.url.startsWith('/api/drive/audio/')) {
+      if (!alreadyUpdated) updateUI(); else updatePlayButtons();
       showToast('Loading from Google Drive…');
       const driveUrl = t.url; // keep original in case we need to retry
       try {
@@ -6870,31 +6991,49 @@ async function playTrack(idx, pushHistory=true) {
         return;
       }
     } else {
+      // LOCAL / already-cached track: this is the hot path that needs to be instant.
+      // Set src and call play() FIRST, before any DOM/UI work, so there is zero
+      // main-thread work between the skip action and audible sound.
       audioEl.src = t.url;
+      initAudioContext();
+      if (audioCtx && audioCtx.state==='suspended') audioCtx.resume().catch(()=>{});
+      audioEl.playbackRate = playbackSpeed;
+      audioEl.play().catch(e => {
+        showToast('Playback blocked — tap play');
+        isPlaying = false; updatePlayButtons();
+      });
+      // Now do the (heavier) UI sync, and defer the heaviest bits (cover art,
+      // dominant color extraction, list re-renders) to the next frame.
+      if (!alreadyUpdated) requestAnimationFrame(updateUI); else updatePlayButtons();
+      addToRecent(t.id); saveSettings();
+      requestAnimationFrame(() => {
+        renderTrackList(document.getElementById('search-input')?.value || '');
+        renderQueueList();
+      });
+      return;
     }
   } else {
+    if (!alreadyUpdated) updateUI(); else updatePlayButtons();
     showToast('No audio source for this track');
     return;
   }
 
   initAudioContext();
-  // Await resume so AudioContext is running before play() — prevents silent gap on low-end
-  if (audioCtx && audioCtx.state==='suspended') await audioCtx.resume();
+  // Don't block play() on AudioContext resume — fire both in parallel so there's
+  // zero added latency between a skip/track-end and audible sound.
+  if (audioCtx && audioCtx.state==='suspended') audioCtx.resume().catch(()=>{});
   audioEl.playbackRate = playbackSpeed;
-  // Update UI immediately unless nextTrack/prevTrack already did it (alreadyUpdated flag)
-  isPlaying = true;
-  if (!alreadyUpdated) updateUI();
-  else updatePlayButtons();
   audioEl.play().catch(e => {
     showToast('Playback blocked — tap play');
     isPlaying = false; updatePlayButtons();
   });
   addToRecent(t.id); saveSettings();
-  // Defer heavy DOM re-renders so they don't block audio start (critical for low-end)
-  setTimeout(function() {
+  
+  // Defer only the heavy list renders - use requestAnimationFrame for next paint instead of 100ms timeout
+  requestAnimationFrame(() => {
     renderTrackList(document.getElementById('search-input')?.value || '');
     renderQueueList();
-  }, 100);
+  });
 }
 
 async function togglePlay() {
@@ -6902,6 +7041,7 @@ async function togglePlay() {
   if (currentIndex<0) { startPlayback(); return; }
   if (isPlaying) {
     audioEl.pause(); isPlaying=false; updatePlayButtons();
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'paused';
     const badge = document.querySelector('.home-hero-badge');
     if (badge) badge.textContent = '❚❚ PAUSED';
   } else {
@@ -6914,6 +7054,7 @@ async function togglePlay() {
     initAudioContext();
     if (audioCtx&&audioCtx.state==='suspended') await audioCtx.resume();
     isPlaying=true; updatePlayButtons();
+    if ('mediaSession' in navigator) navigator.mediaSession.playbackState = 'playing';
     audioEl.play().catch(()=>{ playTrack(currentIndex, false); });
     const badge = document.querySelector('.home-hero-badge');
     if (badge) badge.textContent = '▶ PLAYING';
@@ -6942,14 +7083,12 @@ function prevTrack() {
   prevPressTime = now;
   // Spotify-style: if >3s into track AND not double tap, restart
   if (!doubleTap && audioEl.currentTime>3) { audioEl.currentTime=0; return; }
-  // Defer playTrack so the browser can paint the button press before heavy work
+  // Snap UI immediately so the transition feels instant
   if (queue.history.length) {
     if (currentIndex>=0) queue.future.unshift(currentIndex);
     const prev = queue.history.pop();
-    // Snap UI immediately so the transition feels instant
     currentIndex = prev;
-    updateUI();
-    playTrack(prev, false);
+    playTrack(prev, false); // fires audio immediately (playTrack handles its own UI sync)
   } else {
     audioEl.currentTime=0;
   }
@@ -6967,9 +7106,8 @@ function nextTrack() {
     else if (isShuffle) buildShuffleQueue();
     nextTrack(); return;
   }
-  // Snap UI immediately so the transition feels instant, then load audio
-  currentIndex = next;
-  updateUI();
+  // currentIndex is set inside playTrack; fire it immediately so audio starts
+  // before any DOM/UI work happens (playTrack handles its own UI sync).
   playTrack(next);
 }
 
@@ -7501,10 +7639,10 @@ function updateUI() {
       : `<svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:20px;height:20px;color:var(--text3)"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>`;
     document.getElementById('mini-bar').classList.add('visible');
     updateHomeCard(); updateFavBtn(); setupMediaSession();
-    // Extract dominant color from cover art for dynamic theming
-    // Start immediately (no delay) so the lerp begins in parallel with the cover image loading
-    if (thumb) extractDynColor(thumb);
-    else resetDynColor();
+    // Extract dominant color from cover art for dynamic theming.
+    // Delayed: the accent shouldn't shift the instant a track starts — give it
+    // a beat. A fast skip cancels the pending change for the track being left.
+    scheduleDynColor(thumb || null);
     // Refresh desk NP overlay if open
     if (typeof deskNPSync === 'function') setTimeout(deskNPSync, 50);
     if (typeof deskNPSyncQueue === 'function') setTimeout(deskNPSyncQueue, 50);
@@ -12251,15 +12389,47 @@ function setupMediaSession() {
   if (!('mediaSession' in navigator)) return;
   const t=tracks[currentIndex]; if (!t) return;
   const thumb=(t.ytMeta&&t.ytMeta.thumbnail)?t.ytMeta.thumbnail:t.cover;
+
+  // Figure out which playlist (if any) this track belongs to, so the
+  // notification / lock-screen / earbud controls can show it as the album.
+  let albumName = 'VOID Player';
+  try {
+    const owningPl = playlists.find(p => p.id !== 'void_local_songs' && (p.trackIds||[]).includes(t.id));
+    if (owningPl && owningPl.name) albumName = owningPl.name;
+  } catch(e) {}
+
+  // Build a multi-resolution artwork array. If we have real cover art, give
+  // the OS several declared sizes (it'll pick the best fit). If not, fall
+  // back to a generated square tinted with the current dynamic accent color
+  // so the notification still shows something on-brand instead of blank.
+  let artwork = [];
+  if (thumb) {
+    artwork = [96,128,192,256,384,512].map(sz => ({ src: thumb, sizes: `${sz}x${sz}`, type: 'image/png' }));
+  } else {
+    const dr = typeof _dynR !== 'undefined' ? _dynR : 29;
+    const dg = typeof _dynG !== 'undefined' ? _dynG : 185;
+    const db = typeof _dynB !== 'undefined' ? _dynB : 84;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><rect width="512" height="512" fill="#0c0c10"/><text x="256" y="320" text-anchor="middle" font-family="sans-serif" font-weight="900" font-size="260" fill="rgb(${dr},${dg},${db})">V</text></svg>`;
+    const dataUrl = 'data:image/svg+xml,' + encodeURIComponent(svg);
+    artwork = [96,128,192,256,384,512].map(sz => ({ src: dataUrl, sizes: `${sz}x${sz}`, type: 'image/svg+xml' }));
+  }
+
   navigator.mediaSession.metadata=new MediaMetadata({
-    title:t.title, artist:t.artist, album:'VOID Player',
-    artwork:thumb?[{src:thumb,sizes:'256x256'}]:[],
+    title: t.title || 'Unknown Track',
+    artist: t.artist || 'Unknown Artist',
+    album: albumName,
+    artwork,
   });
+  navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused';
   navigator.mediaSession.setActionHandler('play',          ()=>togglePlay());
   navigator.mediaSession.setActionHandler('pause',         ()=>togglePlay());
   navigator.mediaSession.setActionHandler('nexttrack',     ()=>nextTrack());
   navigator.mediaSession.setActionHandler('previoustrack', ()=>prevTrack());
   navigator.mediaSession.setActionHandler('seekto',        d=>{ audioEl.currentTime=d.seekTime; });
+  try {
+    navigator.mediaSession.setActionHandler('seekbackward', d=>{ audioEl.currentTime=Math.max(0, audioEl.currentTime-(d.seekOffset||10)); });
+    navigator.mediaSession.setActionHandler('seekforward',  d=>{ audioEl.currentTime=Math.min(audioEl.duration||Infinity, audioEl.currentTime+(d.seekOffset||10)); });
+  } catch(e) {}
 }
 
 // ==============================
@@ -13599,6 +13769,24 @@ function updateEQBandDesk(i, val) {
 
 
 // ── Dynamic color extraction from album art ─────────────────────────────────
+// ── Dynamic accent color: delayed + cancellable per track change ──────────
+// We don't want the background color shifting the instant a track starts —
+// it should settle in only after the listener's been on the track a bit,
+// and a fast skip should cancel any pending change for the track being left.
+let _dynColorTimer = null;
+let _dynColorToken = 0; // guards against a stale timer firing after another track change
+function scheduleDynColor(thumb) {
+  if (_dynColorTimer) { clearTimeout(_dynColorTimer); _dynColorTimer = null; }
+  const myToken = ++_dynColorToken;
+  const DELAY = 12000; // 12s after track change before the color starts shifting
+  _dynColorTimer = setTimeout(() => {
+    _dynColorTimer = null;
+    if (myToken !== _dynColorToken) return; // a newer track change superseded this
+    if (thumb) extractDynColor(thumb);
+    else resetDynColor();
+  }, DELAY);
+}
+
 function extractDynColor(src) {
   // Immediately start fading toward a dim neutral — this gives instant visual feedback
   // while the CORS image loads. The real color lerp will interrupt and take over from
@@ -13716,7 +13904,7 @@ function _applyDynColor(r, g, b) {
   // Cancel any in-flight transition
   if (_dynRafId) { cancelAnimationFrame(_dynRafId); _dynRafId = null; }
 
-  const DURATION = 2000; // ms — slow, cinematic crossfade
+  const DURATION = 20000; // ms — slow, cinematic crossfade
   const startR = _curDynR, startG = _curDynG, startB = _curDynB;
   const endR = r, endG = g, endB = b;
   let startTime = null;
@@ -13790,6 +13978,18 @@ function updateFaviconAccent(r, g, b) {
     let link = document.querySelector("link[rel='icon']");
     if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
     link.href = encoded;
+  } catch(e) {}
+  // Sync the theme-color meta tag so the OS media notification / lockscreen /
+  // earbud control surfaces (which take their accent tint from this) follow
+  // the same dynamic accent color as the rest of the app.
+  try {
+    const hex = '#' + [r,g,b].map(v => Math.max(0,Math.min(255,Math.round(v))).toString(16).padStart(2,'0')).join('');
+    let meta = document.querySelector("meta[name='theme-color']");
+    if (!meta) { meta = document.createElement('meta'); meta.name = 'theme-color'; document.head.appendChild(meta); }
+    meta.setAttribute('content', hex);
+    // Also refresh media session metadata so any open notification reflects
+    // the current accent-tinted state immediately.
+    if (typeof setupMediaSession === 'function') setupMediaSession();
   } catch(e) {}
 }
 
@@ -15955,122 +16155,7 @@ setTimeout(() => {
 
 })();
 
-/* ============================================================
-   GYRO TILT FOR ALBUM COVER (NOW PLAYING)
-============================================================ */
-(function() {
-  'use strict';
 
-  // All cover elements to tilt
-  const covers = {
-    mobile: document.querySelector('.np-cover'),
-    desktop: document.querySelector('.dnp-cover'),
-    tv: document.querySelector('.dnp-fs-cover')
-  };
-
-  // If no covers found, exit
-  if (!covers.mobile && !covers.desktop && !covers.tv) return;
-
-  const state = {
-    curX: 0,
-    curY: 0,
-    targetX: 0,
-    targetY: 0,
-    usingGyro: false,
-    usingMouse: false
-  };
-
-  const MAX_TILT = 20; // max rotation in degrees
-  const SENSITIVITY = 2; // max sensitivity (1.5-2.5 is good)
-
-  // Request permission for iOS 13+
-  async function requestPermission() {
-    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
-      try {
-        const permission = await DeviceOrientationEvent.requestPermission();
-        if (permission === 'granted') {
-          window.addEventListener('deviceorientation', handleGyro);
-        }
-      } catch (err) {
-        console.log('Gyro permission denied or unavailable');
-      }
-    } else {
-      // Non-iOS devices
-      window.addEventListener('deviceorientation', handleGyro);
-    }
-  }
-
-  function handleGyro(e) {
-    if (state.usingMouse) return; // mouse takes priority
-    state.usingGyro = true;
-    const beta = e.beta || 0;  // X axis: -180 to 180 (tilt forward/back)
-    const gamma = e.gamma || 0; // Y axis: -90 to 90 (tilt left/right)
-
-    // Map device tilt to rotation: clamp to max tilt
-    state.targetX = Math.max(-MAX_TILT, Math.min(MAX_TILT, (beta / 90) * MAX_TILT)) * SENSITIVITY;
-    state.targetY = Math.max(-MAX_TILT, Math.min(MAX_TILT, (gamma / 90) * MAX_TILT)) * SENSITIVITY;
-  }
-
-  // Desktop mouse parallax
-  function handleMouseMove(e) {
-    if (state.usingGyro) return; // gyro takes priority on mobile
-    
-    state.usingMouse = true;
-    
-    // Use viewport center for parallax from anywhere on screen
-    const centerX = window.innerWidth / 2;
-    const centerY = window.innerHeight / 2;
-    
-    const nx = (e.clientX - centerX) / centerX; // -1 to 1
-    const ny = (e.clientY - centerY) / centerY; // -1 to 1
-    
-    state.targetX = ny * MAX_TILT * SENSITIVITY * 0.5; // subtle parallax
-    state.targetY = nx * MAX_TILT * SENSITIVITY * 0.5;
-  }
-
-  // Reset on mouse leave screen
-  function handleMouseLeave() {
-    state.usingMouse = false;
-    state.targetX = 0;
-    state.targetY = 0;
-  }
-
-  // Interpolation function
-  function lerp(a, b, t) {
-    return a + (b - a) * t;
-  }
-
-  // Render loop
-  function tick() {
-    state.curX = lerp(state.curX, state.targetX, 0.72);
-    state.curY = lerp(state.curY, state.targetY, 0.72);
-
-    const transform = `rotateX(${state.curX}deg) rotateY(${state.curY}deg)`;
-
-    // Apply to all covers that exist
-    if (covers.mobile) covers.mobile.style.transform = transform;
-    if (covers.desktop) covers.desktop.style.transform = transform;
-    if (covers.tv) covers.tv.style.transform = transform;
-
-    requestAnimationFrame(tick);
-  }
-
-  // Only enable gyro on mobile devices
-  function isMobile() {
-    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-  }
-
-  // Initialize
-  if (isMobile()) {
-    requestPermission();
-  } else {
-    // Desktop: use mouse parallax
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseleave', handleMouseLeave);
-  }
-  
-  tick();
-})();
 
 </script>
 </body>
