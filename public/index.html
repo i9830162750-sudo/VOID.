@@ -36,7 +36,7 @@
   --dyn-glow: rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.28);
   --dyn-glow2: rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.08);
   /* Dynamic accent transition duration */
-  --dyn-transition: 2s;
+  --dyn-transition: 0s;
   --text:  #f0f0f5;
   --text2: #8888a0;
   --text3: #3a3a52;
@@ -73,18 +73,11 @@ body {
 .nav-btn.active,
 .mini-play-btn svg,
 .playing-bars span,
-.track-fav-dot,
-.home-hero-badge,
-.quick-btn svg,
-.topbar h1 {
-  transition-property: background, background-color, box-shadow, color, filter, border-color, text-shadow;
-  transition-duration: var(--dyn-transition, 0.7s);
-  transition-timing-function: ease;
-}
+/* dyn-transition removed — color lerp handled entirely by JS, no CSS transitions needed */
 /* np-overlay glow transitions */
-.np-overlay::before { transition: background 2s ease; }
-.home-hero { transition: background 2s ease, box-shadow 2s ease; }
-.home-hero::before { transition: background 2s ease; }
+.np-overlay::before { transition: none; }
+.home-hero { transition: none; }
+.home-hero::before { transition: none; }
 
 
 .app-wrap { position:absolute; inset:0; display:flex; flex-direction:column; overflow:hidden; }
@@ -128,7 +121,7 @@ body {
   letter-spacing:0.3px; text-transform:uppercase; padding:8px 4px; gap:4px;
 }
 .nav-btn svg { width:20px; height:20px; stroke-width:1.6; transition:transform 0.2s; }
-.nav-btn.active { color:var(--accent); transition: color var(--dyn-transition, 0.7s) ease; }
+.nav-btn.active { color:var(--accent); transition: none; }
 .nav-btn.active svg {
   filter:drop-shadow(0 0 8px rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.7));
   transform:translateY(-1px);
@@ -150,7 +143,7 @@ body {
 .mini-bg {
   position:absolute; inset:0;
   background:linear-gradient(90deg,rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.10) 0%,transparent 55%);
-  pointer-events:none; transition:background 0.6s ease;
+  pointer-events:none;
 }
 .mini-cover {
   width:48px; height:48px; border-radius:12px; background:var(--bg4); flex-shrink:0;
@@ -206,7 +199,7 @@ body {
 .np-overlay::before {
   content:''; position:absolute; top:0; left:0; right:0; height:340px;
   background:radial-gradient(ellipse at 50% 0%, rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.18) 0%, transparent 70%);
-  pointer-events:none; transition:background 0.8s ease; z-index:0;
+  pointer-events:none; transition:none; z-index:0;
 }
 .np-overlay > * { position:relative; z-index:1; }
 .np-overlay.open { top:0; }
@@ -547,17 +540,19 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
 
 /* ====== HOME PAGE ====== */
 .home-hero {
-  margin:0 16px 20px;
+  margin:0 0 20px;
   background:linear-gradient(135deg, var(--bg3) 0%, rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.09) 100%);
-  border:1px solid rgba(255,255,255,0.08);
-  border-radius:22px; overflow:hidden; position:relative;
+  border-left:none; border-right:none;
+  border-top:1px solid rgba(255,255,255,0.08);
+  border-bottom:1px solid rgba(255,255,255,0.08);
+  border-radius:0; overflow:hidden; position:relative;
   box-shadow: 0 10px 36px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.06);
-  transition: background 0.6s ease, box-shadow 0.6s ease;
+  transition: none;
 }
 .home-hero::before {
   content:''; position:absolute; inset:0; border-radius:inherit;
   background:radial-gradient(ellipse at 15% 40%, rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.12) 0%, transparent 72%);
-  pointer-events:none; transition:background 0.6s ease;
+  pointer-events:none;
 }
 .home-hero-inner { padding:16px 18px; display:flex; align-items:center; gap:15px; cursor:pointer; }
 .home-hero-cover {
@@ -602,13 +597,26 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   vertical-align:middle;
 }
 
-/* Greeting text swaps in a famous-artist reaction briefly when a
-   well-known artist's track starts playing */
-#home-greeting { transition:color 0.3s ease; }
-#home-greeting.greeting-reacting {
-  color:var(--dyn,var(--accent));
+/* Greeting text — shared base styles for both mobile and desktop */
+#home-greeting, .dtb-greeting {
+  font-size: 10px;
+  font-family: 'Space Mono', monospace;
+  font-weight: 700;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.18);
+  white-space: nowrap;
+  transition: color 0.3s ease;
+}
+#home-greeting { padding: 0; }
+#home-greeting.greeting-reacting,
+.dtb-greeting.greeting-reacting {
+  color: var(--dyn, var(--accent));
   animation: greetingFadeIn 0.6s ease forwards, greetingGlowPulse 2.8s ease-in-out 0.6s infinite;
 }
+/* Track counter — hidden on mobile, visible on desktop */
+.home-count-badge { display: none; }
+@media (min-width: 768px) { .home-count-badge { display: block; } }
 @keyframes greetingFadeIn {
   0%   { opacity:0; transform:translateY(3px); }
   100% { opacity:1; transform:translateY(0); }
@@ -625,7 +633,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   content:''; position:fixed; top:0; left:50%; transform:translateX(-50%);
   width:480px; height:300px; pointer-events:none; z-index:0;
   background:radial-gradient(ellipse at 50% -10%, rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.07) 0%, transparent 65%);
-  transition:background 0.8s ease;
+  transition:none;
 }
 
 /* ====== HOME FEED — HORIZONTAL ROWS ====== */
@@ -724,6 +732,32 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
 }
 .home-see-all:active { color:var(--dyn,var(--accent)); border-color:rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.5); background:var(--dyn-dim); }
 
+/* ── Row scroll arrows (desktop overlay style) ── */
+.home-section-hdr-right { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+.home-row-wrap { position:relative; }
+.home-row-arr {
+  display:none;
+  position:absolute; top:50%; transform:translateY(calc(-50% - 6px));
+  z-index:10; width:38px; height:38px; border-radius:50%;
+  background:rgba(30,30,30,0.92); border:1.5px solid rgba(255,255,255,0.18);
+  box-shadow:0 4px 18px rgba(0,0,0,0.55);
+  color:#fff; cursor:pointer;
+  align-items:center; justify-content:center;
+  transition:background 0.15s, transform 0.15s, opacity 0.18s;
+  padding:0; flex-shrink:0;
+}
+.home-row-arr svg { width:18px; height:18px; stroke-width:2.5; pointer-events:none; }
+.home-row-arr-left  { left:6px; }
+.home-row-arr-right { right:6px; }
+.home-row-arr:active { transform:translateY(calc(-50% - 6px)) scale(0.9); }
+.home-row-arr:hover  { background:rgba(60,60,60,0.98); }
+.home-row-arr[disabled] { opacity:0 !important; pointer-events:none; }
+@media (min-width:768px) {
+  /* Hidden until the row is hovered */
+  .home-row-arr { display:flex; opacity:0; transition:opacity 0.18s ease; }
+  .home-row-wrap:hover .home-row-arr:not([disabled]) { opacity:1; }
+}
+
 /* Section spacing */
 .home-section { padding:8px 0 24px; }
 .home-section + .home-section { margin-top:0; }
@@ -751,6 +785,16 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
     black calc(100% - 24px),
     transparent 100%
   );
+}
+@media (min-width:768px) {
+  /* Desktop: arrow-only navigation — no mouse/trackpad scroll on rows */
+  .home-feed-row {
+    overflow-x: hidden;
+    scroll-snap-type: none;
+    pointer-events: none; /* block scroll passthrough */
+  }
+  /* Re-enable pointer events on the cards inside so clicks still work */
+  .home-feed-row > * { pointer-events: all; }
 }
 
 /* ====== SEE-ALL OVERLAY ====== */
@@ -964,7 +1008,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   font-size:10px; text-transform:uppercase; letter-spacing:2px;
   color:var(--accent); font-family:'Space Mono',monospace; font-weight:700;
   padding:0 0 10px; border-bottom:1px solid rgba(var(--dyn-r),var(--dyn-g),var(--dyn-b),0.15); margin-bottom:4px;
-  transition: color var(--dyn-transition, 0.7s) ease, border-color var(--dyn-transition, 0.7s) ease;
+  transition: none;
 }
 .settings-row {
   display:flex; align-items:center; justify-content:space-between;
@@ -997,7 +1041,7 @@ input.np-seekbar-input { position:absolute; inset:-8px 0; width:100%; opacity:0;
   background:#fff; border-radius:50%; transition:transform 0.2s, background 0.2s;
   pointer-events:none;
 }
-.toggle-switch input:checked ~ .toggle-track { background:var(--accent); transition: background var(--dyn-transition, 0.7s) ease; }
+.toggle-switch input:checked ~ .toggle-track { background:var(--accent); transition: none; }
 .toggle-switch input:checked ~ .toggle-thumb { transform:translateX(20px); }
 
 /* Select */
@@ -1085,7 +1129,7 @@ body.settings-open .settings-gear-btn svg { transform:rotate(75deg); }
   width:34px; height:34px; border-radius:10px; flex-shrink:0;
   display:flex; align-items:center; justify-content:center;
   background:var(--dyn-dim); color:var(--dyn,var(--accent));
-  transition:background var(--dyn-transition,0.7s) ease, color var(--dyn-transition,0.7s) ease;
+  transition: none;
 }
 .settings-group-icon svg { width:17px; height:17px; }
 .settings-group-title { flex:1; min-width:0; }
@@ -1107,7 +1151,7 @@ body.settings-open .settings-gear-btn svg { transform:rotate(75deg); }
 .settings-badge {
   font-size:9px; font-family:'Space Mono',monospace; font-weight:700; letter-spacing:0.4px;
   color:var(--dyn,var(--accent)); background:var(--dyn-dim); border-radius:5px; padding:2px 6px;
-  transition:background var(--dyn-transition,0.7s) ease, color var(--dyn-transition,0.7s) ease;
+  transition: none;
 }
 
 .settings-panel-footer {
@@ -1446,6 +1490,9 @@ body.settings-open .settings-gear-btn svg { transform:rotate(75deg); }
 
   /* Desktop NP panel tabs and studio panel */
   .np-panel-tabs { display: none !important; }
+  /* Header mini track info — desktop only */
+  #np-header-mini-cover, #np-header-mini-info { display:none; }
+
   /* Studio panel hidden on mobile ONLY when inside the np-overlay (desktop placement) */
   #np-overlay #studio-panel { display: none !important; }
   /* When inside mobile page, show it normally */
@@ -1664,7 +1711,7 @@ body.settings-open .settings-gear-btn svg { transform:rotate(75deg); }
       "topbar topbar topbar"
       "sidebar main   npanel"
       "playbar playbar playbar";
-    transition: grid-template-columns 0.32s cubic-bezier(0.4,0,0.2,1);
+    transition: grid-template-columns 0.3s cubic-bezier(0.4,0,0.2,1);
   }
 
   .app-wrap { display:contents; }
@@ -2629,21 +2676,38 @@ body.settings-open .settings-gear-btn svg { transform:rotate(75deg); }
     position: static !important;
     transform: none !important;
     width: 300px !important;
+    min-width: 0 !important;
     height: 100% !important;
     top: auto !important; left: auto !important;
-    transition: width 0.28s cubic-bezier(0.4,0,0.2,1) !important;
+    /* Animate width; panel always stuck to right wall via grid */
+    transition: width 0.3s cubic-bezier(0.4,0,0.2,1) !important;
     display: flex !important;
     flex-direction: column;
     background: var(--bg2);
     border-left: 1px solid var(--border);
     overflow: hidden;
     z-index: 1 !important;
+    /* Ensure content inside doesn't leak during animation */
   }
-  body.np-collapsed #np-overlay { width: 48px !important; }
-  body.np-collapsed #np-overlay .np-scroll { opacity:0; pointer-events:none; }
+  body.np-collapsed #np-overlay {
+    width: 48px !important;
+    border-left: 1px solid var(--border);
+  }
+  body.np-collapsed #np-overlay .np-scroll {
+    opacity: 0; pointer-events: none;
+    transition: opacity 0.15s ease;
+  }
+  #np-overlay .np-scroll {
+    transition: opacity 0.2s ease 0.08s;
+  }
   body.np-collapsed #np-overlay .np-header-actions { opacity:0; pointer-events:none; }
   body.np-collapsed #np-overlay .np-header-label { opacity:0; }
-  body.np-collapsed { grid-template-columns: 64px 1fr 48px; }
+  body.np-collapsed #np-header-mini-cover,
+  body.np-collapsed #np-header-mini-info { display:none; }
+  body.np-collapsed {
+    grid-template-columns: 64px 1fr 48px;
+    transition: grid-template-columns 0.3s cubic-bezier(0.4,0,0.2,1);
+  }
   /* Overlays track panel width */
   body.np-collapsed .pl-detail,
   body.np-collapsed .see-all-overlay,
@@ -2658,9 +2722,9 @@ body.settings-open .settings-gear-btn svg { transform:rotate(75deg); }
 
   #np-overlay .np-handle-area { display:none !important; }
   #np-overlay .np-close-btn { display:none !important; }
-  #np-overlay .np-header { padding:12px 10px 10px; border-bottom:1px solid var(--border); flex-shrink:0; display:flex; align-items:center; gap:6px; }
+  #np-overlay .np-header { padding:10px 10px; border-bottom:1px solid var(--border); flex-shrink:0; display:flex; align-items:center; gap:8px; }
   #np-overlay .np-header-label { font-size:10px; letter-spacing:2px; flex:1; transition:opacity 0.15s; }
-  #np-overlay .np-header-actions { display:flex; gap:2px; transition:opacity 0.15s; }
+  #np-overlay .np-header-actions { display:flex; gap:2px; transition:opacity 0.15s; flex-shrink:0; }
 
   /* Hide player UI on desktop — replaced by audio studio */
   #np-overlay .np-cover-wrap,
@@ -2888,7 +2952,7 @@ body.settings-open .settings-gear-btn svg { transform:rotate(75deg); }
 
   /* Other pages */
   #page-home { padding-top:0; }
-  #page-home > .home-hero { margin:0 24px 16px; }
+  #page-home > .home-hero { margin:0 0 16px; border-radius:0; border-left:none; border-right:none; }
   #page-home > .home-quick-actions { padding:0 24px 16px !important; }
   #page-home .home-section-hdr { padding:0 24px; }
   #page-home .home-feed-row { padding:0 0 12px 24px; overflow-x:auto; scroll-padding-left:24px; scroll-behavior:smooth; }
@@ -2900,9 +2964,20 @@ body.settings-open .settings-gear-btn svg { transform:rotate(75deg); }
   .queue-hdr { padding:12px 24px; }
   .new-pl-btn { margin:12px 24px; }
 
-  /* Desktop NP panel label override */
-  #np-overlay .np-header-label::before { content: 'AUDIO STUDIO'; }
-  #np-overlay .np-header-label { font-size:0; } /* hide "Now Playing" text, show pseudo */
+  /* Desktop NP panel header — show mini track info instead of label */
+  #np-overlay .np-header-label { display:none; }
+  #np-header-mini-cover, #np-header-mini-info { display:flex; }
+  #np-header-mini-info { flex-direction:column; justify-content:center; }
+  #np-overlay .np-header { gap:8px; padding:10px 10px 10px; }
+  #np-header-mini-cover {
+    width:32px; height:32px; border-radius:6px;
+    background:var(--bg3); flex-shrink:0; overflow:hidden;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #np-header-mini-cover img { width:100%; height:100%; object-fit:cover; }
+  #np-header-mini-info { flex:1; min-width:0; }
+  #np-header-mini-title { font-size:11px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text1); }
+  #np-header-mini-artist { font-size:10px; color:var(--text2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:1px; }
 
   /* Overlays — use rail width (64px) */
   .pl-detail { left:64px; right:300px; max-width:none; width:auto; bottom:58px; transform:none; }
@@ -4379,22 +4454,8 @@ body.settings-open .settings-gear-btn svg { transform:rotate(75deg); }
   }
   .dtb-logo-dot { color: var(--accent); }
 
-  /* Greeting label — small muted text after logo */
-  .dtb-greeting {
-    font-size: 10px;
-    font-family: 'Space Mono', monospace;
-    font-weight: 700;
-    letter-spacing: 0.8px;
-    text-transform: uppercase;
-    color: rgba(255,255,255,0.18);
-    white-space: nowrap;
-    padding: 0 4px;
-    transition: color 0.3s ease;
-  }
-  .dtb-greeting.greeting-reacting {
-    color: var(--dyn, var(--accent));
-    animation: greetingFadeIn 0.6s ease forwards, greetingGlowPulse 2.8s ease-in-out 0.6s infinite;
-  }
+  /* Greeting label — desktop only padding tweak (base styles in global CSS) */
+  .dtb-greeting { padding: 0 4px; }
 
   /* Home nav button — icon only */
   .dtb-nav-btn {
@@ -4751,7 +4812,7 @@ body.settings-open .settings-gear-btn svg { transform:rotate(75deg); }
       <div class="topbar">
         <div style="display:flex;flex-direction:column;gap:1px">
           <h1>VOID<span>.</span></h1>
-          <div id="home-greeting" style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace;letter-spacing:0.5px;text-transform:uppercase"></div>
+          <div id="home-greeting"></div>
         </div>
         <div class="topbar-search-wrap" id="topbar-search-wrap-home">
           <div class="desktop-topbar-search">
@@ -4765,7 +4826,7 @@ body.settings-open .settings-gear-btn svg { transform:rotate(75deg); }
           <div class="search-dropdown" id="search-dropdown-home"></div>
         </div>
         <div style="display:flex;align-items:center;gap:10px">
-          <div style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace" id="home-count">0 tracks</div>
+          <div style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace" id="home-count" class="home-count-badge">0 tracks</div>
           <button id="gdrive-auth-btn" onclick="voidDriveAuthClick()" style="display:none;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border2);color:var(--text2);border-radius:8px;padding:5px 10px;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.2s" title="Google Drive Sync">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
             <span id="gdrive-auth-label">Sign in</span>
@@ -5220,7 +5281,7 @@ body.settings-open .settings-gear-btn svg { transform:rotate(75deg); }
     <div class="transport-vol">
       <div class="void-vol-row">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/></svg>
-        <input type="range" class="transport-vol-slider" id="tb-vol" min="0" max="100" value="80">
+        <input type="range" class="transport-vol-slider" id="tb-vol" min="0" max="100" value="60">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 010 14.14M15.54 8.46a5 5 0 010 7.07"/></svg>
       </div>
       <div class="void-eq-badge" id="void-eq-badge">
@@ -5328,6 +5389,13 @@ body.settings-open .settings-gear-btn svg { transform:rotate(75deg); }
   <div class="np-handle-area"><div class="np-handle"></div></div>
   <div class="np-header">
     <div class="np-header-label">Now Playing</div>
+    <div id="np-header-mini-cover" class="studio-np-cover" style="width:34px;height:34px;border-radius:7px;">
+      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:14px;height:14px;color:var(--text3)"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+    </div>
+    <div id="np-header-mini-info">
+      <div id="np-header-mini-title" class="studio-np-title" style="font-size:12px;">No Track</div>
+      <div id="np-header-mini-artist" class="studio-np-artist" style="font-size:10px;">—</div>
+    </div>
     <div class="np-header-actions">
       <button class="np-action-btn" id="np-fav-btn" onclick="toggleCurrentFav()" title="Favorite">
         <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
@@ -5398,7 +5466,7 @@ body.settings-open .settings-gear-btn svg { transform:rotate(75deg); }
 
     <div class="np-volume">
       <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/></svg>
-      <input type="range" class="vol-slider" id="vol-slider" min="0" max="100" value="80" oninput="setVolume(this.value)">
+      <input type="range" class="vol-slider" id="vol-slider" min="0" max="100" value="60" oninput="setVolume(this.value)">
       <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M19.07 4.93a10 10 0 010 14.14"/><path d="M15.54 8.46a5 5 0 010 7.07"/></svg>
     </div>
 
@@ -5643,15 +5711,26 @@ const _isLowEnd = (function() {
   const ua = navigator.userAgent || '';
   const isAndroid = /Android/i.test(ua);
   const mem = navigator.deviceMemory || (isAndroid ? 2 : 8);
-  // CPU benchmark — run a short tight loop and measure wall time.
-  // On a fast machine this takes ~1-3ms. Under Chrome's 6x CPU throttle it
-  // takes ~6-18ms, and on genuinely weak hardware it's similarly slow.
-  // Threshold of 10ms catches both throttled devtools and real low-end CPUs.
-  const _t0 = performance.now();
-  let _x = 0;
-  for (let i = 0; i < 200000; i++) _x += Math.sqrt(i);
-  const _cpuMs = performance.now() - _t0;
-  const _cpuSlow = _cpuMs > 10;
+
+  // High-spec escape hatch: if the device clearly has plenty of RAM and cores,
+  // skip the CPU benchmark entirely — it's unreliable at page load time (GC pauses,
+  // cold browser start, background tabs can all spike a fast machine past any threshold).
+  if (mem >= 8 && cores >= 8) {
+    window._voidCpuBenchmarkMs = 0;
+    return false;
+  }
+
+  // CPU benchmark — larger loop (500k) for more stable signal, and a more
+  // generous threshold (30ms) so transient load spikes don't false-trigger.
+  // Run it twice and take the minimum to reduce noise.
+  function _bench() {
+    const t0 = performance.now();
+    let x = 0;
+    for (let i = 0; i < 500000; i++) x += Math.sqrt(i);
+    return performance.now() - t0;
+  }
+  const _cpuMs = Math.min(_bench(), _bench());
+  const _cpuSlow = _cpuMs > 30;
   window._voidCpuBenchmarkMs = _cpuMs; // expose so you can check in console
   return mem < 4 || cores <= 2 || _cpuSlow;
 })();
@@ -5856,7 +5935,21 @@ let ytDownloads    = {}; // trackId -> progress
 const audioEl = new Audio();
 audioEl.crossOrigin = 'anonymous';
 audioEl.preload = 'metadata'; // only load metadata, not the whole file
-audioEl.volume = 0.7;
+audioEl.volume = 0.6;
+// Fast-path: restore volume from localStorage immediately (before IDB async load)
+(function() {
+  const savedVol = localStorage.getItem('void_volume');
+  if (savedVol !== null) {
+    const v = parseFloat(savedVol);
+    if (!isNaN(v)) {
+      const slider = document.getElementById('vol-slider');
+      const tbSlider = document.getElementById('tb-vol');
+      if (slider) slider.value = v;
+      if (tbSlider) tbSlider.value = v;
+      audioEl.volume = Math.min(1, Math.max(0, v / 100));
+    }
+  }
+})();
 // Add these for instant playback:
 audioEl.buffered;  // Warm up the buffer
 audioEl.canPlayType('audio/mpeg'); // Preload codec check
@@ -5991,7 +6084,9 @@ async function loadAll() {
     if (s.appSettings) Object.assign(appSettings, s.appSettings);
     // Re-apply low-end full studio class now that settings are loaded from IDB
     if (_isLowEnd && appSettings.lowEndFullStudio) document.body.classList.add('void-low-end-full-studio');
-    document.getElementById('vol-slider').value = s.volume||80;
+    const _restoredVol = s.volume||60;
+    document.getElementById('vol-slider').value = _restoredVol;
+    localStorage.setItem('void_volume', String(_restoredVol));
     // Stash studio state for the studio IIFE to restore after it initialises
     if (s.studioState) {
       window._savedStudioState = s.studioState;
@@ -6053,6 +6148,10 @@ async function loadAll() {
           });
         }
         updateUI();
+        // Restore special message if a famous-artist track was playing
+        setTimeout(() => {
+          if (tracks[currentIndex]) maybeShowFamousArtistReaction(tracks[currentIndex].id);
+        }, 400);
       }
     }
   }
@@ -6254,15 +6353,34 @@ function initAudioContext() {
     // it so the spectrum's "original" view keeps working after a rebuild.
     try { sourceNode.connect(dryAnalyser); } catch(e) {}
     if (fullStudio) {
+      // Read per-effect enabled state set by studio toggle buttons
+      const _en = window._voidStudioEnabled || { compressor: true, reverb: false };
+      const compOn   = _en.compressor;
+      const reverbOn = _en.reverb;
+
       let chain = sourceNode;
       eqNodes.forEach(n => { chain.connect(n); chain = n; });
-      chain.connect(compNode);
-      const afterComp = panNode ? (compNode.connect(panNode), panNode) : compNode;
-      afterComp.connect(dryGainNode);
-      afterComp.connect(reverbNode);
-      reverbNode.connect(reverbGainNode);
+
+      // Compressor: wire in if enabled, else bypass (flatten so audio passes through)
+      if (compOn) {
+        chain.connect(compNode);
+        chain = panNode ? (compNode.connect(panNode), panNode) : compNode;
+      } else {
+        compNode.ratio.value = 1; compNode.threshold.value = 0; compNode.knee.value = 0;
+        if (panNode) { chain.connect(panNode); chain = panNode; }
+      }
+
+      // Reverb: wire in if enabled, else skip reverbNode entirely
+      chain.connect(dryGainNode);
+      if (reverbOn) {
+        chain.connect(reverbNode);
+        reverbNode.connect(reverbGainNode);
+        reverbGainNode.connect(analyserNode);
+      } else {
+        reverbGainNode.gain.value = 0;
+        dryGainNode.gain.value = 1;
+      }
       dryGainNode.connect(analyserNode);
-      reverbGainNode.connect(analyserNode);
       analyserNode.connect(gainNode);
       gainNode.connect(postGainAnalyser);
       postGainAnalyser.connect(audioCtx.destination);
@@ -7375,6 +7493,13 @@ function applyMasterGain(rampSec) {
 }
 
 function setVolume(val) {
+  _safetyUserInteracting = true;
+  // Fast-path: persist to localStorage immediately so next load restores before IDB
+  localStorage.setItem('void_volume', String(val));
+  // Keep tb-vol in sync with main vol-slider
+  const tbVol = document.getElementById('tb-vol');
+  const mainVol = document.getElementById('vol-slider');
+  if (tbVol && mainVol && document.activeElement !== tbVol) tbVol.value = mainVol.value;
   applyMasterGain();
   saveSettings();
   checkAudioSafety();
@@ -7403,8 +7528,12 @@ window.toggleSpectrumOriginal = function() {
 // ==============================
 // AUDIO SAFETY SYSTEM
 // ==============================
-let _safetyWarnState = 0; // 0=ok, 1=warned, 2=danger-warned
+// Persist warn state so "already warned" survives page reload —
+// warnings only fire when the user actively raises the slider, not on every load.
+let _safetyWarnState = parseInt(localStorage.getItem('void_safetyWarnState') || '0', 10);
+let _safetyNoRemind = localStorage.getItem('void_safetyNoRemind') === '1';
 let _safetyDialogOpen = false;
+let _safetyUserInteracting = false; // true only while user is dragging a slider
 
 function getAudioSafetyLevel() {
   const vol = parseFloat((document.getElementById('vol-slider') || {}).value || 0);
@@ -7433,40 +7562,57 @@ function updateGainSafetyColor() {
 
 function checkAudioSafety() {
   updateGainSafetyColor();
+  if (_safetyNoRemind) return;
   if (_safetyDialogOpen) return;
   const level = getAudioSafetyLevel();
   if (level === 0) {
-    _safetyWarnState = 0; // Reset so warnings can re-trigger if user goes high again
+    // Only reset warn state when user actively lowers to safe — not on load
+    if (_safetyUserInteracting) {
+      _safetyWarnState = 0;
+      localStorage.setItem('void_safetyWarnState', '0');
+    }
     return;
   }
+  // Only fire warnings when the user is actively moving a slider
+  if (!_safetyUserInteracting) return;
   if (level < 2 && _safetyWarnState >= 2) {
-    _safetyWarnState = 1; // Dropped from danger to warning zone
+    _safetyWarnState = 1;
+    localStorage.setItem('void_safetyWarnState', '1');
   }
   if (level === 2 && _safetyWarnState < 2) {
     _safetyWarnState = 2;
+    localStorage.setItem('void_safetyWarnState', '2');
     showSafetyDialog();
   } else if (level === 1 && _safetyWarnState < 1) {
     _safetyWarnState = 1;
+    localStorage.setItem('void_safetyWarnState', '1');
     showSafetyToast();
   }
 }
 
 function showSafetyToast() {
-  const msg = 'High volume may cause hearing discomfort.';
   const toastEl = document.getElementById('toast');
   if (!toastEl) return;
-  const prev = toastEl.textContent;
   toastEl.style.background = 'rgba(241,196,15,0.95)';
   toastEl.style.color = '#000';
-  toastEl.textContent = '⚠ ' + msg;
+  toastEl.innerHTML = `<span>⚠ High volume may cause hearing discomfort.</span><span id="safety-toast-mute" style="margin-left:10px;font-size:11px;opacity:0.65;cursor:pointer;text-decoration:underline;white-space:nowrap">Don't remind</span>`;
   toastEl.classList.add('show');
+  const muteBtn = toastEl.querySelector('#safety-toast-mute');
+  if (muteBtn) muteBtn.onclick = function(e) {
+    e.stopPropagation();
+    _safetyNoRemind = true;
+    localStorage.setItem('void_safetyNoRemind', '1');
+    toastEl.classList.remove('show');
+    setTimeout(() => { toastEl.style.background = ''; toastEl.style.color = ''; toastEl.innerHTML = ''; }, 300);
+  };
   setTimeout(() => {
     toastEl.classList.remove('show');
     setTimeout(() => {
       toastEl.style.background = '';
       toastEl.style.color = '';
+      toastEl.innerHTML = '';
     }, 300);
-  }, 3500);
+  }, 4500);
 }
 
 function showSafetyDialog() {
@@ -7484,9 +7630,21 @@ function showSafetyDialog() {
         <button id="safety-lower-btn" style="flex:1;padding:12px;background:var(--accent);border:none;border-radius:10px;font-size:13px;font-weight:700;color:#000;cursor:pointer;font-family:'DM Sans',sans-serif">Lower Volume</button>
         <button id="safety-continue-btn" style="flex:1;padding:12px;background:rgba(231,76,60,0.12);border:1px solid rgba(231,76,60,0.3);border-radius:10px;font-size:13px;font-weight:600;color:var(--danger);cursor:pointer;font-family:'DM Sans',sans-serif">Continue</button>
       </div>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:14px;cursor:pointer;justify-content:center">
+        <input type="checkbox" id="safety-no-remind" style="width:14px;height:14px;accent-color:var(--accent);cursor:pointer" ${_safetyNoRemind ? 'checked' : ''}>
+        <span style="font-size:12px;color:rgba(255,255,255,0.4);font-family:'DM Sans',sans-serif">Don't remind me again</span>
+      </label>
     </div>`;
   document.body.appendChild(overlay);
+  function _applyNoRemindFromDialog() {
+    const cb = overlay.querySelector('#safety-no-remind');
+    if (cb && cb.checked) {
+      _safetyNoRemind = true;
+      localStorage.setItem('void_safetyNoRemind', '1');
+    }
+  }
   overlay.querySelector('#safety-lower-btn').onclick = function() {
+    _applyNoRemindFromDialog();
     const volEl = document.getElementById('vol-slider');
     const gainEl = document.getElementById('studio-gain-slider');
     if (volEl && parseFloat(volEl.value) > 70) { volEl.value = 70; setVolume(70); }
@@ -7496,6 +7654,7 @@ function showSafetyDialog() {
     overlay.remove();
   };
   overlay.querySelector('#safety-continue-btn').onclick = function() {
+    _applyNoRemindFromDialog();
     _safetyDialogOpen = false;
     overlay.remove();
   };
@@ -13010,20 +13169,6 @@ function setupMediaSession() {
 var _swWaitingReg = null;
 
 function initPWA() {
-  // Skip all service-worker / PWA-update machinery when running inside the
-  // native Android wrapper (window.Android is injected there via
-  // addJavascriptInterface — it never exists in a real browser tab).
-  // The wrapper app polls /api/version and unconditionally calls
-  // window.location.reload() on SW update, which causes a jarring,
-  // unexplained page reload mid-session inside the WebView (no browser
-  // chrome to signal it, so it just looks like the app randomly reloading).
-  // The native app doesn't need install prompts or SW caching either —
-  // NewPipe/ExoPlayer already handle playback, and app updates ship via
-  // Play Store / APK rebuilds, not via this web-based auto-update path.
-  if (window.Android && typeof window.Android.isAvailable === 'function') {
-    return;
-  }
-
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').then(function(reg) {
 
@@ -13342,16 +13487,6 @@ function toggleNPPanel() {
   studioEl.className = 'studio-panel';
   studioEl.id = 'studio-panel';
   studioEl.innerHTML = `
-    <div class="studio-now-playing" id="studio-np-strip">
-      <div class="studio-np-cover" id="studio-np-cover">
-        <svg fill="none" viewBox="0 0 24 24" stroke="currentColor" style="width:16px;height:16px;color:var(--text3)"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
-      </div>
-      <div class="studio-np-info">
-        <div class="studio-np-title" id="studio-np-title">No Track</div>
-        <div class="studio-np-artist" id="studio-np-artist">&mdash;</div>
-      </div>
-    </div>
-
     <!-- Overall Presets -->
     <div class="studio-section">
       <div class="studio-section-hdr">
@@ -13755,6 +13890,7 @@ function toggleNPPanel() {
 
   // ── Toggle state (source of truth) ───────────────────────────────────────
   const enabled = { compressor: true, reverb: false };
+  window._voidStudioEnabled = enabled; // expose for _lowEndRebuildGraph
 
   function isOn(key) { return enabled[key]; }
 
@@ -13766,6 +13902,7 @@ function toggleNPPanel() {
       const volLinear = (document.getElementById('vol-slider').value || 80) / 100;
       g.gain.setTargetAtTime(volLinear * Math.pow(10, v / 20), audioCtx.currentTime, 0.02);
     }
+    _safetyUserInteracting = true;
     if (typeof checkAudioSafety === 'function') checkAudioSafety();
   });
 
@@ -14142,17 +14279,29 @@ function toggleNPPanel() {
     btn.classList.toggle('on', on);
     btn.textContent = on ? 'ON' : 'OFF';
 
-    // On low-end: physically rebuild the audio graph instead of just setting params
+    // On low-end: physically rebuild the audio graph respecting current enabled state
     if (_isLowEnd && typeof window._lowEndRebuildGraph === 'function') {
       window._lowEndRebuildGraph();
-      // After rebuild, restore params if turning on
-      if (on && key === 'reverb') {
-        const wet  = parseFloat(document.getElementById('studio-reverb-wet').value);
-        const size = parseFloat(document.getElementById('studio-reverb-size').value);
-        const damp = parseFloat((document.getElementById('studio-reverb-damp')||{value:'0.5'}).value);
-        const rg = nodes().reverbGainNode; const dg = nodes().dryGainNode; const rv = nodes().reverbNode;
-        if (rg && audioCtx) { rg.gain.setTargetAtTime(wet, audioCtx.currentTime, 0.05); dg.gain.setTargetAtTime(1-wet*0.5, audioCtx.currentTime, 0.05); }
-        if (rv && audioCtx) makeImpulseDebounced(size, damp, buf => { rv.buffer = buf; });
+      // After rebuild, restore params for whichever effect was just turned on
+      if (on) {
+        if (key === 'compressor') {
+          const c = nodes().compNode;
+          if (c && audioCtx) {
+            c.threshold.setTargetAtTime(parseFloat(document.getElementById('studio-comp-thresh').value),  audioCtx.currentTime, 0.02);
+            c.ratio.setTargetAtTime(    parseFloat(document.getElementById('studio-comp-ratio').value),   audioCtx.currentTime, 0.02);
+            c.attack.setTargetAtTime(   parseFloat(document.getElementById('studio-comp-attack').value),  audioCtx.currentTime, 0.02);
+            c.release.setTargetAtTime(  parseFloat(document.getElementById('studio-comp-release').value), audioCtx.currentTime, 0.02);
+            c.knee.setTargetAtTime(     parseFloat(document.getElementById('studio-comp-knee').value),    audioCtx.currentTime, 0.02);
+          }
+        }
+        if (key === 'reverb') {
+          const wet  = parseFloat(document.getElementById('studio-reverb-wet').value);
+          const size = parseFloat(document.getElementById('studio-reverb-size').value);
+          const damp = parseFloat((document.getElementById('studio-reverb-damp')||{value:'0.5'}).value);
+          const rg = nodes().reverbGainNode; const dg = nodes().dryGainNode; const rv = nodes().reverbNode;
+          if (rg && audioCtx) { rg.gain.setTargetAtTime(wet, audioCtx.currentTime, 0.05); dg.gain.setTargetAtTime(1-wet*0.5, audioCtx.currentTime, 0.05); }
+          if (rv && audioCtx) makeImpulseDebounced(size, damp, buf => { rv.buffer = buf; });
+        }
       }
       return;
     }
@@ -14195,17 +14344,16 @@ function toggleNPPanel() {
 
   // ── NP strip sync ─────────────────────────────────────────────────────────
   function syncStudioNP() {
-    const imgEl = document.querySelector('#np-cover img');
-    // Sync desktop studio NP strip
-    const cover = document.getElementById('studio-np-cover');
-    const title = document.getElementById('studio-np-title');
-    const artist = document.getElementById('studio-np-artist');
-    if (cover && imgEl) { cover.innerHTML = ''; cover.appendChild(imgEl.cloneNode(true)); }
+    const imgEl  = document.querySelector('#np-cover img');
     const npTitle  = (document.getElementById('np-title')  || {}).textContent || 'No Track';
     const npArtist = (document.getElementById('np-artist') || {}).textContent || '\u2014';
+    // Header mini strip (desktop) — IDs also used by legacy studio-np refs
+    const cover  = document.getElementById('np-header-mini-cover');
+    const title  = document.getElementById('np-header-mini-title');
+    const artist = document.getElementById('np-header-mini-artist');
+    if (cover && imgEl) { cover.innerHTML = ''; cover.appendChild(imgEl.cloneNode(true)); }
     if (title)  title.textContent  = npTitle;
     if (artist) artist.textContent = npArtist;
-    // Mobile uses the same studio-panel element, so studio-np-cover/title/artist are already synced above
   }
   setInterval(syncStudioNP, _isLowEnd ? 4000 : 1500);
   syncStudioNP();
@@ -14571,44 +14719,24 @@ var _dynCancelTick = null; // cancels whichever tick source (rAF or timeout) is 
 // Tracks whatever color the transition is currently heading toward.
 var _targetDynR = 29, _targetDynG = 185, _targetDynB = 84;
 
-// Drives the color-transition loop with requestAnimationFrame while the tab is
-// visible (smooth, 60fps). Browsers fully pause rAF in background tabs, which
-// used to freeze the whole transition — the favicon/accent would just stop
-// moving until you came back. Fall back to setTimeout while hidden instead:
-// browsers throttle background timers to roughly once a second regardless of
-// the delay we ask for, but that's still a steady stream of steps rather than
-// a dead stop, so the transition keeps visibly progressing in the background.
-function _dynTick(fn) {
-  if (document.hidden) {
-    const id = setTimeout(() => fn(performance.now()), 1000);
-    _dynCancelTick = () => clearTimeout(id);
-  } else {
-    const id = requestAnimationFrame(fn);
-    _dynCancelTick = () => cancelAnimationFrame(id);
-  }
-}
-
 function _applyDynColor(r, g, b) {
-  // Cancel any in-flight transition
   if (_dynCancelTick) { _dynCancelTick(); _dynCancelTick = null; }
 
-  const DURATION = 20000; // ms — slow, cinematic crossfade
+  const DURATION  = 20000; // ms total fade
+  const STEP_MS   = 100;   // pure setTimeout — zero rAF overhead, fires exactly 10x/sec
   const startR = _curDynR, startG = _curDynG, startB = _curDynB;
   const endR = r, endG = g, endB = b;
-  let startTime = null;
-  let lastFaviconTs = 0;
-  const FAVICON_THROTTLE_MS = 120; // ~8 favicon updates/sec while visible — smooth to the eye, cheap on the DOM
+  const startTime = performance.now();
+  let faviconStep = 0;
 
   _targetDynR = endR; _targetDynG = endG; _targetDynB = endB;
 
   function ease(t) {
-    // Cubic ease-in-out for extra smoothness
-    return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t + 2, 3) / 2;
+    return t < 0.5 ? 4*t*t*t : 1 - Math.pow(-2*t+2,3)/2;
   }
 
-  function step(ts) {
-    if (!startTime) startTime = ts;
-    const elapsed = ts - startTime;
+  function step() {
+    const elapsed  = performance.now() - startTime;
     const progress = Math.min(elapsed / DURATION, 1);
     const e = ease(progress);
 
@@ -14616,36 +14744,39 @@ function _applyDynColor(r, g, b) {
     const cg = Math.round(startG + (endG - startG) * e);
     const cb = Math.round(startB + (endB - startB) * e);
 
-    const root = document.documentElement;
-    root.style.setProperty('--dyn-r', cr);
-    root.style.setProperty('--dyn-g', cg);
-    root.style.setProperty('--dyn-b', cb);
-    root.style.setProperty('--accent', `rgb(${cr},${cg},${cb})`);
-    root.style.setProperty('--accent-rgb', `${cr},${cg},${cb}`);
-    root.style.setProperty('--accent2', `rgb(${Math.min(255,cr+30)},${Math.min(255,cg+30)},${Math.min(255,cb+30)})`);
-    root.style.setProperty('--accent-dim', `rgba(${cr},${cg},${cb},0.14)`);
-    root.style.setProperty('--accent-glow', `rgba(${cr},${cg},${cb},0.3)`);
-    _dynR = cr; _dynG = cg; _dynB = cb;
+    // Only write to DOM if something actually changed
+    if (cr !== _curDynR || cg !== _curDynG || cb !== _curDynB || progress >= 1) {
+      _curDynR = cr; _curDynG = cg; _curDynB = cb;
+      _dynR = cr; _dynG = cg; _dynB = cb;
 
-    // Follow the same eased curve for the favicon. While visible this is
-    // throttled to ~8/sec; while hidden, _dynTick is already only calling us
-    // about once a second, so every step's favicon update goes through.
-    if (ts - lastFaviconTs >= FAVICON_THROTTLE_MS || progress >= 1) {
-      updateFaviconAccent(cr, cg, cb);
-      lastFaviconTs = ts;
+      // Single style mutation — browsers batch these into one recalc
+      const root = document.documentElement;
+      const acc2r = Math.min(255,cr+30), acc2g = Math.min(255,cg+30), acc2b = Math.min(255,cb+30);
+      root.style.setProperty('--dyn-r',    String(cr));
+      root.style.setProperty('--dyn-g',    String(cg));
+      root.style.setProperty('--dyn-b',    String(cb));
+      root.style.setProperty('--accent',   `rgb(${cr},${cg},${cb})`);
+      root.style.setProperty('--accent-rgb',`${cr},${cg},${cb}`);
+      root.style.setProperty('--accent2',  `rgb(${acc2r},${acc2g},${acc2b})`);
+      root.style.setProperty('--accent-dim',`rgba(${cr},${cg},${cb},0.14)`);
+      root.style.setProperty('--accent-glow',`rgba(${cr},${cg},${cb},0.3)`);
+
+      // Favicon ~every 2s is plenty
+      if (++faviconStep % 20 === 0 || progress >= 1) updateFaviconAccent(cr, cg, cb);
     }
 
     if (progress < 1) {
-      _dynTick(step);
+      const id = setTimeout(step, STEP_MS);
+      _dynCancelTick = () => clearTimeout(id);
     } else {
       _curDynR = endR; _curDynG = endG; _curDynB = endB;
       _dynCancelTick = null;
+      updateFaviconAccent(endR, endG, endB);
     }
   }
 
-  // Snap current displayed values as start point
-  _curDynR = startR; _curDynG = startG; _curDynB = startB;
-  _dynTick(step);
+  // Kick off immediately then repeat via setTimeout — no rAF ever
+  step();
 }
 
 var _resetDynIdx = 0;
@@ -15385,11 +15516,18 @@ setTimeout(() => {
   // ── Next-song countdown popup ────────────────────────────────────────────
   let _fsCountdownTimer  = null;
   let _fsCountdownActive = false;
+  let _fsTrackChangeCooldown = false; // blocks re-trigger right after a crossfade handoff
   const COUNTDOWN_SECS   = 5;
 
   // Non-destructive peek: mirrors getNextQueueIndex() without shifting the queue
   function _peekNextTrack() {
     if (typeof tracks === 'undefined' || typeof currentIndex === 'undefined') return null;
+    // When crossfade is running, the next track IS _xfadeNextIdx — use it directly
+    // to avoid using currentIndex+1 which may have already been updated to nextIdx
+    if (typeof _xfadeActive !== 'undefined' && _xfadeActive &&
+        typeof _xfadeNextIdx !== 'undefined' && _xfadeNextIdx !== null) {
+      return tracks[_xfadeNextIdx] || null;
+    }
     let nextIdx = null;
     if (queue.manual.length)      nextIdx = queue.manual[0];
     else if (queue.future.length) nextIdx = queue.future[0];
@@ -15465,6 +15603,7 @@ setTimeout(() => {
   window.updateProgress = function() {
     if (typeof _origUpdateProgressFS === 'function') _origUpdateProgressFS.apply(this, arguments);
     if (!dnpFS) { if (_fsCountdownActive) _hideFSCountdown(); return; }
+    if (_fsTrackChangeCooldown) return; // new track just started via crossfade — skip until stable
     if (typeof audioEl === 'undefined' || !audioEl.duration || isNaN(audioEl.duration)) return;
     const remaining = audioEl.duration - audioEl.currentTime;
     if (remaining <= COUNTDOWN_SECS && remaining > 0 && isPlaying) {
@@ -15483,10 +15622,14 @@ setTimeout(() => {
   };
 
   // Hide + reset when a new track starts (so it re-triggers on the new track)
+  // Also set a brief cooldown to prevent the popup immediately re-triggering
+  // on the incoming track when crossfade hands off mid-song
   const _origDeskNPSyncFS2 = window.deskNPSyncFS;
   window.deskNPSyncFS = function() {
     if (typeof _origDeskNPSyncFS2 === 'function') _origDeskNPSyncFS2.apply(this, arguments);
     _hideFSCountdown();
+    _fsTrackChangeCooldown = true;
+    setTimeout(() => { _fsTrackChangeCooldown = false; }, 3000);
   };
 
 })();
@@ -16804,6 +16947,98 @@ setTimeout(() => {
 
 
 
+</script>
+
+<script>
+/* ── Home row scroll arrows ─────────────────────────────────────────────── */
+(function() {
+  var SCROLL_AMT = 440; // px per arrow click (~3 cards)
+
+  var arrowSVG = {
+    left:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="15 18 9 12 15 6"/></svg>',
+    right: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><polyline points="9 18 15 12 9 6"/></svg>'
+  };
+
+  function attachArrowsToRow(row) {
+    // Wrap row in a positioned container so arrows can overlay it
+    var wrap = document.createElement('div');
+    wrap.className = 'home-row-wrap';
+    row.parentNode.insertBefore(wrap, row);
+    wrap.appendChild(row);
+
+    var btnL = document.createElement('button');
+    btnL.className = 'home-row-arr home-row-arr-left';
+    btnL.setAttribute('aria-label', 'Scroll left');
+    btnL.innerHTML = arrowSVG.left;
+
+    var btnR = document.createElement('button');
+    btnR.className = 'home-row-arr home-row-arr-right';
+    btnR.setAttribute('aria-label', 'Scroll right');
+    btnR.innerHTML = arrowSVG.right;
+
+    wrap.appendChild(btnL);
+    wrap.appendChild(btnR);
+
+    function update() {
+      btnL.disabled = row.scrollLeft <= 4;
+      btnR.disabled = row.scrollLeft >= row.scrollWidth - row.clientWidth - 4;
+    }
+
+    btnL.addEventListener('click', function(e) {
+      e.stopPropagation();
+      row.scrollBy({ left: -SCROLL_AMT, behavior: 'smooth' });
+    });
+    btnR.addEventListener('click', function(e) {
+      e.stopPropagation();
+      row.scrollBy({ left: SCROLL_AMT, behavior: 'smooth' });
+    });
+
+    row.addEventListener('scroll', update, { passive: true });
+    new MutationObserver(update).observe(row, { childList: true });
+    update();
+  }
+
+  function attachArrows() {
+    // Static sections
+    document.querySelectorAll('#page-home .home-section').forEach(function(section) {
+      var hdr = section.querySelector('.home-section-hdr');
+      var row = section.querySelector('.home-feed-row');
+      if (!hdr || !row || hdr.dataset.arrowsAttached) return;
+      hdr.dataset.arrowsAttached = '1';
+      attachArrowsToRow(row);
+    });
+
+    // Dynamic genre sections injected later
+    var homeContent = document.getElementById('home-content') || document.getElementById('page-home');
+    if (homeContent && !homeContent._arrowObserver) {
+      homeContent._arrowObserver = new MutationObserver(function() {
+        attachArrows();
+      });
+      homeContent._arrowObserver.observe(homeContent, { childList: true, subtree: true });
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', function() {
+    setTimeout(attachArrows, 300);
+  });
+
+  // Block all wheel/trackpad scroll on feed rows on desktop — arrows only
+  document.addEventListener('wheel', function(e) {
+    if (window.innerWidth < 768) return;
+    var row = e.target.closest('.home-feed-row');
+    if (!row) return;
+    e.preventDefault();
+    e.stopPropagation();
+  }, { passive: false, capture: true });
+
+  // Also block touch scroll on desktop (stylus/touch screen users)
+  document.addEventListener('touchmove', function(e) {
+    if (window.innerWidth < 768) return;
+    var row = e.target.closest('.home-feed-row');
+    if (row) e.preventDefault();
+  }, { passive: false, capture: true });
+
+})();
 </script>
 </body>
 </html>
