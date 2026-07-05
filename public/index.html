@@ -5220,7 +5220,7 @@ body.settings-open .settings-gear-btn svg { transform:rotate(75deg); }
         </button>
       </div>
       <div style="font-size:12px;color:var(--text3);margin-bottom:12px">Paste a JioSaavn or SoundCloud playlist URL</div>
-      <input id="online-pl-url-input" type="text" placeholder="https://jiosaavn.com/featured/… or soundcloud.com/…/sets/…"
+      <input id="online-pl-url-input" type="text" placeholder="youtube.com/playlist?list=… or jiosaavn.com/… or soundcloud.com/…/sets/…"
         style="width:100%;box-sizing:border-box;background:var(--bg2);border:1px solid var(--border);border-radius:10px;padding:11px 14px;color:var(--text);font-size:14px;font-family:'DM Sans',sans-serif;outline:none;margin-bottom:12px">
       <button onclick="importOnlinePlaylist()" style="width:100%;background:var(--accent);border:none;border-radius:10px;padding:12px;font-size:14px;font-weight:700;color:#000;cursor:pointer;font-family:'DM Sans',sans-serif">Import Playlist</button>
     </div>
@@ -11353,8 +11353,11 @@ async function importOnlinePlaylist() {
   if (!val) { showToast('Paste a playlist URL first'); return; }
   closeOnlinePlOverlay();
   const isSC = val.includes('soundcloud.com');
+  const isYT = val.includes('youtube.com') || val.includes('youtu.be');
   if (isSC) {
     await importSCPlaylist(val);
+  } else if (isYT) {
+    await ytImportPlaylist(val);
   } else {
     // Try JioSaavn
     await importSaavnPlaylist(val);
@@ -12609,9 +12612,14 @@ function ytScanApplyAll() {
 // ==============================
 // YOUTUBE — QUICK SEARCH (updated)
 // ==============================
-async function ytImportPlaylist() {
-  const input=document.getElementById('yt-pl-url-input');
-  const val=input.value.trim(); if (!val) return;
+async function ytImportPlaylist(urlOrVal) {
+  let val = urlOrVal;
+  let input = null;
+  if (!val) {
+    input=document.getElementById('yt-pl-url-input');
+    val=input ? input.value.trim() : '';
+  }
+  if (!val) return;
   let plId=val;
   const m=val.match(/[?&]list=([^&]+)/); if (m) plId=m[1];
   if (plId.length<10) { showToast('Invalid playlist ID'); return; }
