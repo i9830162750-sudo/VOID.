@@ -5936,6 +5936,28 @@ const audioEl = new Audio();
 audioEl.crossOrigin = 'anonymous';
 audioEl.preload = 'metadata'; // only load metadata, not the whole file
 audioEl.volume = 0.6;
+
+// ── Android wrapper bridge: play state + live progress ──────────────────
+// window.Android is injected by the native app (see YouTubeStreamBridge.kt).
+// It doesn't exist in a normal browser, so all these are safely skipped there.
+// Without this, the wrapper's notification/lock-screen never learns the
+// real position/duration, so its seek buttons compute against 0 and appear
+// broken — this keeps native playback state and position in sync with the
+// actual <audio> element at all times.
+if (window.Android) {
+  audioEl.addEventListener('play',  () => { try { window.Android.setPlaying('true');  } catch(e) {} });
+  audioEl.addEventListener('pause', () => { try { window.Android.setPlaying('false'); } catch(e) {} });
+  audioEl.addEventListener('timeupdate', () => {
+    try {
+      if (typeof window.Android.updateProgress === 'function' && audioEl.duration && isFinite(audioEl.duration)) {
+        window.Android.updateProgress(
+          Math.round(audioEl.currentTime * 1000),
+          Math.round(audioEl.duration * 1000)
+        );
+      }
+    } catch(e) {}
+  });
+}
 // Fast-path: restore volume from localStorage immediately (before IDB async load)
 (function() {
   const savedVol = localStorage.getItem('void_volume');
@@ -13160,6 +13182,24 @@ function setupMediaSession() {
       _syncPositionState();
     });
   } catch(e) {}
+
+  // ── Android wrapper bridge ─────────────────────────────────────────────
+  // The Android app injects a JS interface called "Android" (see
+  // MainActivity.kt / YouTubeStreamBridge.kt). Nothing in this file was
+  // ever calling into it, so the wrapper's notification never got real
+  // title/artist/art, play state, progress, or accent color — and its
+  // native seek buttons were seeking against stale/zero position data.
+  // This pushes the same info the web UI already has into the native side.
+  if (window.Android && typeof window.Android.updateNotification === 'function') {
+    try {
+      window.Android.updateNotification(
+        t.title  || 'Unknown Track',
+        t.artist || 'Unknown Artist',
+        thumb || '',
+        isPlaying ? 'true' : 'false'
+      );
+    } catch(e) {}
+  }
 }
 
 // ==============================
@@ -14763,6 +14803,13 @@ function _applyDynColor(r, g, b) {
 
       // Favicon ~every 2s is plenty
       if (++faviconStep % 20 === 0 || progress >= 1) updateFaviconAccent(cr, cg, cb);
+
+      // Push final accent color to the Android notification once the
+      // color-transition animation settles (avoids spamming the native
+      // bridge every animation frame).
+      if (progress >= 1 && window.Android && typeof window.Android.setAccentColor === 'function') {
+        try { window.Android.setAccentColor(cr, cg, cb); } catch(e) {}
+      }
     }
 
     if (progress < 1) {
