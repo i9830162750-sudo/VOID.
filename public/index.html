@@ -12087,6 +12087,7 @@ async function ytFetchAndPlay(trackIdx) {
       isPlaying = true;
       updateUI(); renderTrackList(); renderQueueList();
       addToRecent(t.id); saveSettings();
+      try { if (window.Android && Android.isAvailable()) { var _m=currentTrackMeta?currentTrackMeta():{title:t.title,artist:t.artist,artUrl:t.cover||''}; Android.updateNotification(_m.title,_m.artist,_m.artUrl,'true'); } } catch(_e) {}
     } catch(e) {
       updateBufferingUI(false);
       showToast('⚠ SC stream failed: ' + (e.message || 'Unknown error'));
@@ -12118,6 +12119,7 @@ async function ytFetchAndPlay(trackIdx) {
     isPlaying = true;
     updateUI(); renderTrackList(); renderQueueList();
     addToRecent(t.id); saveSettings();
+    try { if (window.Android && Android.isAvailable()) { var _m=currentTrackMeta?currentTrackMeta():{title:t.title,artist:t.artist,artUrl:(t.ytMeta&&t.ytMeta.thumbnail)||''}; Android.updateNotification(_m.title,_m.artist,_m.artUrl,'true'); } } catch(_e) {}
     return;
   }
 
@@ -12144,6 +12146,7 @@ async function ytFetchAndPlay(trackIdx) {
     isPlaying = true;
     updateUI(); renderTrackList(); renderQueueList();
     addToRecent(t.id); saveSettings();
+    try { if (window.Android && Android.isAvailable()) { var _m=currentTrackMeta?currentTrackMeta():{title:t.title,artist:t.artist,artUrl:(t.ytMeta&&t.ytMeta.thumbnail)||''}; Android.updateNotification(_m.title,_m.artist,_m.artUrl,'true'); } } catch(_e) {}
   } catch(e) {
     updateBufferingUI(false);
     showToast('⚠ Could not load stream: ' + (e.message || 'Try again'));
