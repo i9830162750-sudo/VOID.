@@ -12127,17 +12127,11 @@ async function ytFetchAndPlay(trackIdx) {
   showToast('▶ Loading stream…');
   updateBufferingUI(true);
 
-  try {
-    const streamResp = await fetch(`${VOID_API_BASE}/youtube/stream?id=${encodeURIComponent(t.ytMeta.videoId)}`, { signal: AbortSignal.timeout(15000) });
-    if (!streamResp.ok) throw new Error(`Stream resolve failed: HTTP ${streamResp.status}`);
-    const { url } = await streamResp.json();
-    if (!url) throw new Error('No audio URL returned');
-
-    // Cache stream URL in memory for this session
+  // Helper: play whatever URL was resolved
+  async function _doPlay(url) {
     t.streamUrl = url;
     updateBufferingUI(false);
     showToast('▶ Streaming: ' + t.title);
-
     audioEl.src = url;
     initAudioContext();
     if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
@@ -12147,6 +12141,40 @@ async function ytFetchAndPlay(trackIdx) {
     updateUI(); renderTrackList(); renderQueueList();
     addToRecent(t.id); saveSettings();
     try { if (window.Android && Android.isAvailable()) { var _m=currentTrackMeta?currentTrackMeta():{title:t.title,artist:t.artist,artUrl:(t.ytMeta&&t.ytMeta.thumbnail)||''}; Android.updateNotification(_m.title,_m.artist,_m.artUrl,'true'); } } catch(_e) {}
+  }
+
+  // Try native NewPipe resolution first (Android only — bypasses bot detection)
+  const canNative = typeof window.Android !== 'undefined' && Android.isAvailable &&
+                    Android.isAvailable() && typeof Android.resolveYTStream === 'function';
+
+  if (canNative) {
+    try {
+      const url = await new Promise((resolve, reject) => {
+        const cbId = 'yt_' + Date.now() + '_' + Math.random().toString(36).slice(2);
+        const timer = setTimeout(() => {
+          delete window.__voidNativeCallbacks[cbId];
+          reject(new Error('Native stream resolve timed out'));
+        }, 20000);
+        window.__voidNativeCallbacks[cbId] = (err, url) => {
+          clearTimeout(timer);
+          if (err) reject(new Error(err)); else resolve(url);
+        };
+        Android.resolveYTStream(t.ytMeta.videoId, cbId);
+      });
+      await _doPlay(url);
+      return;
+    } catch(nativeErr) {
+      console.warn('Native stream resolve failed, falling back to server:', nativeErr.message);
+    }
+  }
+
+  // Server fallback
+  try {
+    const streamResp = await fetch(`${VOID_API_BASE}/youtube/stream?id=${encodeURIComponent(t.ytMeta.videoId)}`, { signal: AbortSignal.timeout(15000) });
+    if (!streamResp.ok) throw new Error(`Stream resolve failed: HTTP ${streamResp.status}`);
+    const { url } = await streamResp.json();
+    if (!url) throw new Error('No audio URL returned');
+    await _doPlay(url);
   } catch(e) {
     updateBufferingUI(false);
     showToast('⚠ Could not load stream: ' + (e.message || 'Try again'));
