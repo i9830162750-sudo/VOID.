@@ -13010,6 +13010,20 @@ function setupMediaSession() {
 var _swWaitingReg = null;
 
 function initPWA() {
+  // Skip all service-worker / PWA-update machinery when running inside the
+  // native Android wrapper (window.Android is injected there via
+  // addJavascriptInterface — it never exists in a real browser tab).
+  // The wrapper app polls /api/version and unconditionally calls
+  // window.location.reload() on SW update, which causes a jarring,
+  // unexplained page reload mid-session inside the WebView (no browser
+  // chrome to signal it, so it just looks like the app randomly reloading).
+  // The native app doesn't need install prompts or SW caching either —
+  // NewPipe/ExoPlayer already handle playback, and app updates ship via
+  // Play Store / APK rebuilds, not via this web-based auto-update path.
+  if (window.Android && typeof window.Android.isAvailable === 'function') {
+    return;
+  }
+
   if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('./sw.js').then(function(reg) {
 
