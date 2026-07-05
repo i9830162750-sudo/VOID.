@@ -12147,6 +12147,8 @@ async function ytFetchAndPlay(trackIdx) {
   const canNative = typeof window.Android !== 'undefined' && Android.isAvailable &&
                     Android.isAvailable() && typeof Android.resolveYTStream === 'function';
 
+  console.log('[VOID] canNative='+canNative+' Android='+typeof window.Android+' resolveYTStream='+typeof (window.Android&&window.Android.resolveYTStream));
+
   if (canNative) {
     try {
       const url = await new Promise((resolve, reject) => {
