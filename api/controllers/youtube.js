@@ -516,26 +516,72 @@ exports.playlistItems = async (req, res, next) => {
 
 async function resolveYouTubeInnerTubeStream(videoId) {
   const personas = [
-    {
-      url: 'https://music.youtube.com/youtubei/v1/player',
-      clientName: 'IOS',
-      clientVersion: '19.29.1',
-      userAgent: 'com.google.ios.youtube/19.29.1 (iPhone16,2; U; CPU iOS 17_5_1 like Mac OS X; en_US)',
-      headers: { 'X-YouTube-Client-Name': '5', 'X-YouTube-Client-Version': '19.29.1' }
-    },
+    // 1. ANDROID_VR 1.65.10 — Primary InnerTube Persona (from Android app YouTubeClient.kt)
     {
       url: 'https://music.youtube.com/youtubei/v1/player',
       clientName: 'ANDROID_VR',
-      clientVersion: '1.43.32',
-      userAgent: 'com.google.android.apps.youtube.vr.oculus/1.43.32 (Linux; U; Android 12; Oculus Quest 2)',
-      headers: { 'X-YouTube-Client-Name': '93', 'X-YouTube-Client-Version': '1.43.32' }
+      clientVersion: '1.65.10',
+      userAgent: 'com.google.android.apps.youtube.vr.oculus/1.65.10 (Linux; U; Android 12L; eureka-user Build/SQ3A.220605.009.A1) gzip',
+      headers: {
+        'Origin': 'https://music.youtube.com',
+        'Referer': 'https://music.youtube.com/',
+        'X-YouTube-Client-Name': '93',
+        'X-YouTube-Client-Version': '1.65.10'
+      },
+      clientContext: {
+        clientName: 'ANDROID_VR',
+        clientVersion: '1.65.10',
+        deviceMake: 'Oculus',
+        deviceModel: 'Quest 3',
+        osName: 'Android',
+        osVersion: '12L',
+        androidSdkVersion: 32,
+        hl: 'en',
+        gl: 'US'
+      }
     },
+    // 2. ANDROID_VR 1.61.48 (Fallback)
+    {
+      url: 'https://music.youtube.com/youtubei/v1/player',
+      clientName: 'ANDROID_VR',
+      clientVersion: '1.61.48',
+      userAgent: 'com.google.android.apps.youtube.vr.oculus/1.61.48 (Linux; U; Android 12; en_US; Quest 3; Build/SQ3A.220605.009.A1; Cronet/132.0.6808.3)',
+      headers: {
+        'Origin': 'https://music.youtube.com',
+        'Referer': 'https://music.youtube.com/',
+        'X-YouTube-Client-Name': '93',
+        'X-YouTube-Client-Version': '1.61.48'
+      },
+      clientContext: {
+        clientName: 'ANDROID_VR',
+        clientVersion: '1.61.48',
+        deviceMake: 'Oculus',
+        deviceModel: 'Quest 3',
+        osName: 'Android',
+        osVersion: '12',
+        androidSdkVersion: 32,
+        hl: 'en',
+        gl: 'US'
+      }
+    },
+    // 3. TVHTML5 Persona (Fallback)
     {
       url: 'https://www.youtube.com/youtubei/v1/player',
       clientName: 'TVHTML5',
       clientVersion: '7.20230405.08.01',
       userAgent: 'Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version',
-      headers: { 'X-YouTube-Client-Name': '30', 'X-YouTube-Client-Version': '7.20230405.08.01' }
+      headers: {
+        'Origin': 'https://www.youtube.com',
+        'Referer': 'https://www.youtube.com/tv',
+        'X-YouTube-Client-Name': '30',
+        'X-YouTube-Client-Version': '7.20230405.08.01'
+      },
+      clientContext: {
+        clientName: 'TVHTML5',
+        clientVersion: '7.20230405.08.01',
+        hl: 'en',
+        gl: 'US'
+      }
     }
   ];
 
@@ -550,16 +596,13 @@ async function resolveYouTubeInnerTubeStream(videoId) {
         },
         body: JSON.stringify({
           context: {
-            client: {
-              clientName: config.clientName,
-              clientVersion: config.clientVersion,
-            }
+            client: config.clientContext
           },
           videoId: videoId,
           contentCheckOk: true,
           racyCheckOk: true
         }),
-        signal: AbortSignal.timeout(8000)
+        signal: AbortSignal.timeout(15000)
       });
 
       if (!res.ok) continue;
@@ -567,7 +610,7 @@ async function resolveYouTubeInnerTubeStream(videoId) {
       const formats = data?.streamingData?.adaptiveFormats || [];
 
       const audioFormat = formats
-        .filter(f => f.mimeType && f.mimeType.startsWith('audio/'))
+        .filter(f => f.mimeType && f.mimeType.startsWith('audio/') && f.url)
         .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0];
 
       if (audioFormat && audioFormat.url) {
