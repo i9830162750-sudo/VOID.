@@ -516,7 +516,7 @@ exports.playlistItems = async (req, res, next) => {
 
 async function resolveYouTubeInnerTubeStream(videoId) {
   const personas = [
-    // 1. ANDROID_VR 1.65.10 — Primary InnerTube Persona (from Android app YouTubeClient.kt)
+    // 1. ANDROID_VR 1.65.10 — Primary Persona from Android app InnerTube.kt
     {
       url: 'https://music.youtube.com/youtubei/v1/player',
       clientName: 'ANDROID_VR',
@@ -540,7 +540,7 @@ async function resolveYouTubeInnerTubeStream(videoId) {
         gl: 'US'
       }
     },
-    // 2. ANDROID_VR 1.61.48 (Fallback)
+    // 2. ANDROID_VR 1.61.48 — Secondary Persona
     {
       url: 'https://music.youtube.com/youtubei/v1/player',
       clientName: 'ANDROID_VR',
@@ -560,25 +560,6 @@ async function resolveYouTubeInnerTubeStream(videoId) {
         osName: 'Android',
         osVersion: '12',
         androidSdkVersion: 32,
-        hl: 'en',
-        gl: 'US'
-      }
-    },
-    // 3. TVHTML5 Persona (Fallback)
-    {
-      url: 'https://www.youtube.com/youtubei/v1/player',
-      clientName: 'TVHTML5',
-      clientVersion: '7.20230405.08.01',
-      userAgent: 'Mozilla/5.0 (ChromiumStylePlatform) Cobalt/Version',
-      headers: {
-        'Origin': 'https://www.youtube.com',
-        'Referer': 'https://www.youtube.com/tv',
-        'X-YouTube-Client-Name': '30',
-        'X-YouTube-Client-Version': '7.20230405.08.01'
-      },
-      clientContext: {
-        clientName: 'TVHTML5',
-        clientVersion: '7.20230405.08.01',
         hl: 'en',
         gl: 'US'
       }
